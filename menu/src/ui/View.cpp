@@ -51,7 +51,7 @@ void View::popScissor() {
 
     if (scissorStack.empty()) {
         hasScissor = false;
-        rdpq_set_scissor(0, 0, 640, 480);
+        rdpq_set_scissor(0, 0, display_get_width(), display_get_height());
     }
     else {
         applyScissor(scissorStack.back());
