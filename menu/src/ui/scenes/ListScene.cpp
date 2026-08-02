@@ -306,8 +306,6 @@ void ListScene::setupViews() {
             cart3DView.scale = rowView.cartScale;
         }
     }
-
-    tabControlView.frame = Rect(154, 19, 332, 36);
     
     tabControlView.tabs[0] = TabInfo(69,  "GAMES");
     tabControlView.tabs[1] = TabInfo(111, "HOMEBREW");
@@ -318,6 +316,17 @@ void ListScene::setupViews() {
 }
 
 void ListScene::updateViews(const RenderInfo& renderInfo) {
+    Size tabControlSize = Size(332, 36);
+    Vec2 tabControlPosition = Vec2(
+        (view.frame.size.width - tabControlSize.width) / 2,
+        19
+    );
+
+    tabControlView.frame = Rect(
+        tabControlPosition,
+        tabControlSize
+    );
+    
     labelView.maxWidth = view.frame.size.width;
 
     const int frameNumber = renderInfo.frameNumber;

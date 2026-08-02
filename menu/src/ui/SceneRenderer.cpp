@@ -16,9 +16,11 @@
 SceneRenderer::SceneRenderer(Scene* initialScene) : currentScene(initialScene), hasEnded(false), frameNumber(0) {
     sceneStack.reserve(5);
 
+    rootView.frame = sceneRect();
+
     if (currentScene) {
         currentScene->setSceneRenderer(this);
-        currentScene->view.frame = sceneRect();
+        currentScene->view.frame = Rect(Vec2(), rootView.frame.size);
 
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_SET);
@@ -53,7 +55,7 @@ void SceneRenderer::changeScene(Scene* scene) {
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
-        currentScene->view.frame = sceneRect();
+        currentScene->view.frame = Rect(Vec2(), rootView.frame.size);
 
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_SET);
@@ -74,7 +76,7 @@ void SceneRenderer::pushScene(Scene* scene) {
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
-        currentScene->view.frame = sceneRect();
+        currentScene->view.frame = Rect(Vec2(), rootView.frame.size);
         
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_PUSH);
@@ -178,12 +180,13 @@ void SceneRenderer::render(int frameNumber) {
         };
 
         currentScene->updateViews(renderInfo);
-        currentScene->view.updateRecursive(renderInfo);
+        rootView.updateRecursive(renderInfo);
         
         rdpq_attach(display_get(), NULL);
         rdpq_mode_zbuf(false, false);
 
-        currentScene->render(renderInfo);
+        rootView.clearRecursive(renderInfo);
+        rootView.render(renderInfo);
 
         // rdpq_mode_push();
         //     rdpq_set_prim_color(Color::WHITE);

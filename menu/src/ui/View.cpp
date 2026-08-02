@@ -149,7 +149,9 @@ bool View::isPendingRemoval(const View* view) {
 }
 
 void View::updateRecursive(const RenderInfo& renderInfo) {
-    updateSubtree(renderInfo);
+    finalFrame = frame;
+
+    updateSubtree(renderInfo, 1.0f, isHidden, frame.origin);
 }
 
 void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsBlendedWithMemory) {
