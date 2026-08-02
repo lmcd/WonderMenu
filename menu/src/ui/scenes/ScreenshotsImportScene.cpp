@@ -169,13 +169,13 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     progressBarView.progress += 1.0f;
 
     labelView.frame.origin = Vec2(0, 458);
-    labelView.maxWidth = 640;
+    labelView.maxWidth = view.frame.size.width;
     labelView.setString("Processing Screenshots");
     labelView.textColor = Color(128);
     labelView.align = ALIGN_CENTER;
     labelView.fontID = 6;
 
-    Rect screenRect = renderInfo.screenRect;
+    Rect sceneRect = view.frame;
 
     Rect progressRect = progressBarView.progressRect();
     Rect insetRect = progressBarView.frame.insetBy(Vec2(4, 0));

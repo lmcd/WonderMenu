@@ -22,7 +22,6 @@ SettingsScene::SettingsScene(Game* game)
     tableView.rowCount = 0;
 
     labelView.frame.origin.y = 250;
-    labelView.maxWidth = 640;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = 3;
     labelView.setString("Coming Soon");
@@ -32,6 +31,8 @@ SettingsScene::SettingsScene(Game* game)
 }
 
 void SettingsScene::updateViews(const RenderInfo&) {
+    labelView.maxWidth = view.frame.size.width;
+    
     scrollbarView->contentHeight = 0;
     scrollbarView->scrollPosition = 0;
 }

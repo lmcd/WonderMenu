@@ -40,6 +40,8 @@ void SelectionTransitionScene::didBeginScene(SceneEntry entry) {
         transition.progress = 1.0f;
     }
 
+    gameLaunchScene->view.frame = view.frame;
+
     view.addSubview(&listScene->view);
     view.addSubview(&gameLaunchScene->view);
 }

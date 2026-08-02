@@ -282,7 +282,6 @@ void ListScene::setupViews() {
     int numberOfRows = layoutInfo.numberOfRows;
 
     labelView.frame.origin.y = 250;
-    labelView.maxWidth = 640;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = 3;
     labelView.setString("No Games Found");
@@ -319,6 +318,8 @@ void ListScene::setupViews() {
 }
 
 void ListScene::updateViews(const RenderInfo& renderInfo) {
+    labelView.maxWidth = view.frame.size.width;
+
     const int frameNumber = renderInfo.frameNumber;
 
     const int numberOfRows = layoutInfo.numberOfRows;
@@ -393,14 +394,13 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
     }
 
     int overscan = 7;
-    Size displaySize = renderInfo.screenRect.size;
     int scrollbarWidth = 8;
 
     scrollbarView.frame = Rect(
-        displaySize.width - scrollbarWidth - overscan,
+        view.frame.size.width - scrollbarWidth - overscan,
         0,
         scrollbarWidth,
-        displaySize.height
+        view.frame.size.height
     );
     scrollbarView.contentHeight = contentHeight();
     scrollbarView.scrollPosition = scrollPosition;

@@ -34,11 +34,9 @@ void GameInfoScene::didBeginScene(SceneEntry) {
 }
 
 void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
-    Size displaySize = renderInfo.screenRect.size;
-
     Size tabControlSize = Size(332, 36);
     Vec2 tabControlPosition = Vec2(
-        (displaySize.width - tabControlSize.width) / 2,
+        (view.frame.size.width - tabControlSize.width) / 2,
         19
     );
 
@@ -53,10 +51,10 @@ void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
     int scrollbarWidth = 8;
 
     scrollbarView.frame = Rect(
-        displaySize.width - scrollbarWidth - overscan,
+        view.frame.size.width - scrollbarWidth - overscan,
         0,
         scrollbarWidth,
-        displaySize.height
+        view.frame.size.height
     );
 
     if (currentTabScene != nullptr) {
@@ -120,6 +118,7 @@ void GameInfoScene::setCurrentTab(Tab _currentTab) {
     }
 
     if (currentTabScene != nullptr) {
+        currentTabScene->view.frame = view.frame;
         currentTabScene->scrollbarView = &scrollbarView;
 
         addChildScene(currentTabScene);

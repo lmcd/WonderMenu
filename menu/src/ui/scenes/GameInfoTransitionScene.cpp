@@ -41,6 +41,7 @@ void GameInfoTransitionScene::didBeginScene(SceneEntry entry) {
         transition.direction = Transition::BACKWARDS;
     }
 
+    gameInfoScene->view.frame = view.frame;
     gameInfoScene->renderer = renderer;
     gameInfoScene->setCurrentTab(GameInfoScene::TAB_CHEATS);
 

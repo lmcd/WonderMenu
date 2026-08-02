@@ -23,7 +23,6 @@ SpeedrunsScene::SpeedrunsScene(Game* game)
     tableView.rowHeight = 52;
 
     labelView.frame.origin.y = 250;
-    labelView.maxWidth = 640;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = 3;
     labelView.textColor = Color(128);
@@ -55,16 +54,20 @@ void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
 }
 
 void SpeedrunsScene::updateViews(const RenderInfo&) {
+    int yPosition = 84;
+
+    labelView.maxWidth = view.frame.size.width;
+
     tableView.rowCount = game->m64Files.size();
+    tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
 
     bool tableIsHidden = (tableView.rowCount == 0);
-    
+
+    tableView.isHidden = tableIsHidden;
+
     if (tableIsHidden) {
         labelView.setString(game->supportsSpeedruns() ? "No Speedruns Found" : "Not Supported for this Game");
     }
-
-    tableView.frame = Rect(0, 84, 640, 480);
-    tableView.isHidden = tableIsHidden;
 
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;

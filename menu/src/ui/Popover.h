@@ -159,7 +159,7 @@ public:
     }
 
     void updateViews(const RenderInfo& renderInfo) {
-        Size screenSize = renderInfo.screenRect.size;
+        Rect sceneRect = baseScene->view.frame;
 
         Color backgroundColor = Color(17);
         Color titleColor = Color(252, 204, 007);
@@ -178,8 +178,8 @@ public:
         Size size(260, height);
         Rect rect(
             Vec2(
-                (screenSize.width  - size.width ) / 2,
-                (screenSize.height - size.height) / 2
+                (sceneRect.size.width  - size.width ) / 2,
+                (sceneRect.size.height - size.height) / 2
             ),
             size
         );

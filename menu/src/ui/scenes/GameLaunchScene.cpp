@@ -66,19 +66,18 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 
     float value = TimingFunctions::easeInOutQuad(transitionProgress);
 
-    Size displaySize = renderInfo.screenRect.size;
     Size cartSize = cartRenderer->sizeForScale(ZOOMED_CART_SCALE);
 
-    Vec2 screenPosition = displaySize.mid();
+    Vec2 screenPosition = view.frame.size.mid();
 
     float bgnY = screenPosition.y;
-    float endY = displaySize.height + cartSize.midY() + 5;
+    float endY = view.frame.size.height + cartSize.midY() + 5;
 
     screenPosition.y = std::lerp(bgnY, endY, value);
 
     Rect trackRect(0, 0, 150, 8);
-    trackRect.origin.x = (displaySize.width  - trackRect.size.width)  / 2;
-    trackRect.origin.y = (displaySize.height - trackRect.size.height) / 2;
+    trackRect.origin.x = (view.frame.size.width  - trackRect.size.width)  / 2;
+    trackRect.origin.y = (view.frame.size.height - trackRect.size.height) / 2;
 
     progressBarView.frame = trackRect;
 

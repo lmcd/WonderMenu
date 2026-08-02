@@ -18,7 +18,6 @@ ScreenshotsScene::ScreenshotsScene(Game* game)
       game(game) {
 
     labelView.frame.origin.y = 250;
-    labelView.maxWidth = 640;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = 3;
     labelView.setString("Coming Soon");
@@ -61,6 +60,8 @@ void ScreenshotsScene::didBeginScene(SceneEntry) {
 }
 
 void ScreenshotsScene::updateViews(const RenderInfo&) {
+    labelView.maxWidth = view.frame.size.width;
+    
     bool hasScreenshots = (screenshotSprites[0] != nullptr);
 
     Color barColor = Color(26);

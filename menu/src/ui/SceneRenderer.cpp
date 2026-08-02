@@ -18,6 +18,7 @@ SceneRenderer::SceneRenderer(Scene* initialScene) : currentScene(initialScene), 
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
+        currentScene->view.frame = Rect(Vec2(), displaySize());
 
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_SET);
@@ -52,6 +53,7 @@ void SceneRenderer::changeScene(Scene* scene) {
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
+        currentScene->view.frame = Rect(Vec2(), displaySize());
 
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_SET);
@@ -72,6 +74,7 @@ void SceneRenderer::pushScene(Scene* scene) {
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
+        currentScene->view.frame = Rect(Vec2(), displaySize());
         
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_PUSH);

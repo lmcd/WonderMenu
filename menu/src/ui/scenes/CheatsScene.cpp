@@ -28,7 +28,6 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
     rebuildRows();
 
     labelView.frame.origin.y = 250;
-    labelView.maxWidth = 640;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = 3;
     labelView.setString("No Cheats Found");
@@ -155,17 +154,22 @@ void CheatsScene::rebuildRows() {
 }
 
 void CheatsScene::updateViews(const RenderInfo&) {
+    labelView.maxWidth = view.frame.size.width;
+    
     bool needsRowRebuild = tableView.updateGroupTransition();
 
     if (needsRowRebuild) {
         rebuildRows();
     }
 
+    int yPosition = 84;
+
     tableView.rowCount = rows.size();
-    tableView.frame = Rect(0, 84, 640, 480);
+    tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
 
     bool tableIsHidden = (tableView.rowCount == 0);
 
+    // TODO: have TableView hide itself if there are no rows
     tableView.isHidden = tableIsHidden;
 
     labelView.isHidden = !tableIsHidden;

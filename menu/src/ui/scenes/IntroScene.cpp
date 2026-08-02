@@ -42,13 +42,13 @@ IntroScene::~IntroScene() {
 }
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
-    Rect screenRect = renderInfo.screenRect;
+    Rect sceneRect = view.frame;
 
     rectView.fillColor = Color::BLACK;
-    rectView.frame = screenRect;
+    rectView.frame = sceneRect;
 
-    float x = screenRect.midX() - logoSprite->width  / 2.0f;
-    float y = screenRect.midY() - logoSprite->height / 2.0f;
+    float x = sceneRect.midX() - logoSprite->width  / 2.0f;
+    float y = sceneRect.midY() - logoSprite->height / 2.0f;
 
     imageView.sprite = logoSprite;
     imageView.frame.origin = Vec2(x, y);
