@@ -49,7 +49,7 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
     );
 
     Vec2 subtitlePosition = titlePosition;
-    subtitlePosition.x = 260;
+    subtitlePosition.x = 249;
 
     Vec2 checkboxPosition(
         titlePosition.x - 26,

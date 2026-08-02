@@ -40,9 +40,9 @@ void GameRowView::update(const RenderInfo&) {
     cart2DView.position = cartPosition;
     cart2DView.scale = cartScale;
 
-    int xPosition = 120;
+    int xPosition = 112;
     int yPosition;
-    int16_t maxLabelWidth = (640 - xPosition) - 90;
+    int16_t maxLabelWidth = (frame.size.width - xPosition) - 82;
     
     yPosition = 31;
 
