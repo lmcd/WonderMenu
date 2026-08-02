@@ -29,13 +29,12 @@ void ListTransitionScene::didBeginScene(SceneEntry entry) {
         transition.direction = Transition::BACKWARDS;
     }
 
+    listScene->view.frame = view.frame;
     listScene->didBeginScene(entry);
 
     for (int i = 0; i < MAX_VISIBLE_LIST_ITEMS; i++) {
         listScene->tableView.rowViews[i].opacity = 0.0f;
     }
-
-    listScene->view.frame = view.frame;
 
     // view.addSubview(&introScene->view);
     view.addSubview(&listScene->view);

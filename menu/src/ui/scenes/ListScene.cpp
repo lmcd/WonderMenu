@@ -15,35 +15,13 @@
 #include "ui/scenes/SelectionTransitionScene.h"
 #include "ui/popovers/ChooseVersionPopover.h"
 
-LayoutInfo::LayoutInfo(float cartScale, Size displaySize, uint8_t numberOfRows, Size cartSize) {
-    float rowHeight = nearbyint(displaySize.height / numberOfRows);
-
-    Rect selectedRowRect(
-        0,
-        (displaySize.height - rowHeight) / 2,
-        displaySize.width,
-        rowHeight
-    );
-    selectedRowRect = selectedRowRect.insetBy(Vec2(8, 0));
-
-    int cartInsetX = 40 - 6;
-
-    this->numberOfRows = numberOfRows;
-    this->numberOfOffEdgeRows = std::ceil((float)(numberOfRows - 1) / 2);
-    this->cartScale = cartScale;
-    this->cartSize = cartSize;
-    this->rowHeight = rowHeight;
-    this->cartMiddleX = cartSize.midX() + cartInsetX;
-    this->selectedRowRect = selectedRowRect;
-}
-
 ListScene::ListScene(CartRenderer* cartRenderer, GameLibrary* gameLibrary, GameDatabase* database)
     : Scene(),
     cartRenderer(cartRenderer),
     database(database),
     gameLibrary(gameLibrary) {
 
-    layoutInfo.numberOfRows = 0;
+    numberOfRows = 0;
 
     slowScrollRepeater.type = InputRepeater::JOYSTICK_UP_DOWN;
     fastScrollRepeater.type = InputRepeater::C_UP_DOWN;
@@ -72,42 +50,42 @@ Vec3f ListScene::rotationForFrame(int frameNumber) {
 }
 
 Range ListScene::getRange(int inset) {
-    int numberOfOffEdgeRows = layoutInfo.numberOfOffEdgeRows - inset;
+    int insetOffEdgeRows = numberOfOffEdgeRows - inset;
     int selectedRow = getSelectedRow();
 
-    int startIndex = std::max(0, selectedRow - numberOfOffEdgeRows);
-    int endIndex   = std::clamp(selectedRow + numberOfOffEdgeRows, 0, (int)gameGroups->size() - 1);
+    int startIndex = std::max(0, selectedRow - insetOffEdgeRows);
+    int endIndex   = std::clamp(selectedRow + insetOffEdgeRows, 0, (int)gameGroups->size() - 1);
 
     return Range(startIndex, endIndex);
 }
 
 int ListScene::pageMoveAmount() {
-    return (layoutInfo.numberOfRows - 1);
+    return (numberOfRows - 1);
 }
 
 int ListScene::contentHeight() {
-    int contentHeight = (gameGroups->size() * layoutInfo.rowHeight);
-    contentHeight += (layoutInfo.selectedRowRect.minY() * 2);
+    int contentHeight = (gameGroups->size() * rowHeight);
+    contentHeight += (selectedRowRect.minY() * 2);
 
     return contentHeight;
 }
 
 int ListScene::getSelectedRow() {
-    return scrollPosition / layoutInfo.rowHeight;
+    return scrollPosition / rowHeight;
 }
 
 // Maps a list row index to the on-screen row slot (0 = top, numberOfDisplayableRows - 1 = bottom).
-// The selected row is always centred, so its slot is layoutInfo.numberOfOffEdgeRows.
+// The selected row is always centred, so its slot is numberOfOffEdgeRows.
 int ListScene::getVisibleRow(int rowIndex) {
-    Rect rect = layoutInfo.rectForRow(rowIndex, scrollPosition);
-    return (int)std::round(rect.minY() / layoutInfo.rowHeight);
+    Rect rect = rectForRow(rowIndex, scrollPosition);
+    return (int)std::round(rect.minY() / rowHeight);
 }
 
 // Translates an on-screen row slot (0..numberOfRows-1) to an gameGroups index using
 // the scroll position. The selected row sits at slot numberOfOffEdgeRows, so each
 // slot offsets from there. Returns -1 if the slot falls off the start/end of the list.
 int ListScene::getEntryIndexForVisibleRow(int visibleRow) {
-    int entryIndex = getSelectedRow() + (visibleRow - layoutInfo.numberOfOffEdgeRows);
+    int entryIndex = getSelectedRow() + (visibleRow - numberOfOffEdgeRows);
 
     if (entryIndex < 0 || entryIndex >= (int)gameGroups->size()) {
         return -1;
@@ -117,12 +95,12 @@ int ListScene::getEntryIndexForVisibleRow(int visibleRow) {
 }
 
 int ListScene::getMaxScrollPosition() {
-    return (gameGroups->size() - 1) * layoutInfo.rowHeight;
+    return (gameGroups->size() - 1) * rowHeight;
 }
 
 Vec2 ListScene::cartPositionForSelectedRow() {
     int selectedRow = getSelectedRow();
-    return layoutInfo.cartPositionForEntry(selectedRow, scrollPosition);
+    return cartPositionForEntry(selectedRow, scrollPosition);
 }
 
 void ListScene::loadVisibleCarts() {
@@ -135,7 +113,7 @@ void ListScene::loadVisibleCarts() {
 
         Game* game = gameGroups->at(i).preferredGame();
 
-        cartRenderer->prerender2DCart(layoutInfo.cartScale, game);
+        cartRenderer->prerender2DCart(cartScale, game);
 
         dma_wait();
     }
@@ -144,17 +122,15 @@ void ListScene::loadVisibleCarts() {
 }
 
 void ListScene::didBeginScene(SceneEntry) {
-    float cartScale = 0.005286;
-
     Size displaySize = renderer->displaySize();
-    Size cartSize = cartRenderer->sizeForScale(cartScale);
 
-    layoutInfo = LayoutInfo(
-        cartScale,
-        displaySize,
-        numberOfDisplayableRows,
-        cartSize
-    );
+    rowHeight = nearbyint(displaySize.height / numberOfDisplayableRows);
+
+    numberOfRows = numberOfDisplayableRows;
+    numberOfOffEdgeRows = std::ceil((float)(numberOfDisplayableRows - 1) / 2);
+    cartScale = 0.005286;
+    cartSize = cartRenderer->sizeForScale(cartScale);
+    cartMiddleX = cartSize.midX() + 34;
 
     loadVisibleCarts();
     setupViews();
@@ -227,7 +203,7 @@ void ListScene::update(const UpdateInfo& updateInfo) {
         Game* game = gameGroups->at(i).preferredGame();
 
         if (game->cartLabel == nullptr || game->cartLabel->status == CartLabel::LABEL_PURGABLE) {
-            int loadedTileCount = cartRenderer->prerender2DCart(layoutInfo.cartScale, game);
+            int loadedTileCount = cartRenderer->prerender2DCart(cartScale, game);
             
             totalLoadedTileCount += loadedTileCount;
 
@@ -279,7 +255,13 @@ void ListScene::update(const UpdateInfo& updateInfo) {
 }
 
 void ListScene::setupViews() {
-    int numberOfRows = layoutInfo.numberOfRows;
+    selectedRowRect = Rect(
+        0,
+        (view.frame.size.height - rowHeight) / 2,
+        view.frame.size.width,
+        rowHeight
+    );
+    selectedRowRect = selectedRowRect.insetBy(Vec2(8, 0));
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
@@ -287,25 +269,10 @@ void ListScene::setupViews() {
     labelView.setString("No Games Found");
     labelView.textColor = Color(128);
 
-    selectionRectView.frame = layoutInfo.selectedRowRect;
+    selectionRectView.frame = selectedRowRect;
     selectionRectView.fillColor = SELECTED_ROW_COLOR;
     selectionRectView.radius = 16;
     selectionRectView.isSmooth = true;
-
-    for (int i = 0; i < numberOfRows; i++) {
-        const int entryIndex = getEntryIndexForVisibleRow(i);
-        const bool isRowSelected = (entryIndex == getSelectedRow());
-
-        GameRowView& rowView = tableView.rowViews[i];
-
-        rowView.cartPosition = layoutInfo.cartPositionForRow(i);
-        rowView.cartScale = layoutInfo.cartScale;
-
-        if (isRowSelected) {
-            cart3DView.position = rowView.cartPosition;
-            cart3DView.scale = rowView.cartScale;
-        }
-    }
     
     tabControlView.tabs[0] = TabInfo(69,  "GAMES");
     tabControlView.tabs[1] = TabInfo(111, "HOMEBREW");
@@ -330,8 +297,6 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
     labelView.maxWidth = view.frame.size.width;
 
     const int frameNumber = renderInfo.frameNumber;
-
-    const int numberOfRows = layoutInfo.numberOfRows;
 
     if (gameGroups->size() == 0) {
         tableView.isHidden = true;
@@ -377,11 +342,13 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
             rowView.gameGroup = nullptr;
         }
 
-        Rect rowRect = layoutInfo.rectForRow2(i);
+        Rect rowRect = rectForRow2(i);
 
         rowView.frame = rowRect;
         rowView.isSelected = isRowSelected;
         rowView.isHidden = isRowHidden;
+        rowView.cartPosition = cartPositionForRow(i);
+        rowView.cartScale = cartScale;
 
         if (isRowSelected) {
             selectionRectView.isHidden = isRowHidden;
@@ -393,6 +360,8 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
 
             wobbler.speed = std::lerp(1.0f, 0.5f, popoverProgress);
 
+            cart3DView.position = rowView.cartPosition;
+            cart3DView.scale = rowView.cartScale;
             cart3DView.backgroundColor = selectionBlendColor;
             cart3DView.rotation = rotationForFrame(frameNumber);
             cart3DView.opacity = rowOpacity;
@@ -481,7 +450,7 @@ void ListScene::performSelection() {
             return;
         }
 
-        cartRenderer->prerender2DCart(layoutInfo.cartScale, game);
+        cartRenderer->prerender2DCart(cartScale, game);
 
         dma_wait();
     }
@@ -517,7 +486,7 @@ void ListScene::toggleRetailGroupings() {
         }
     }
 
-    setScrollPosition(newRow * layoutInfo.rowHeight);
+    setScrollPosition(newRow * rowHeight);
     loadVisibleCarts();
 }
 
@@ -534,5 +503,5 @@ void ListScene::toggleFavourite() {
 }
 
 void ListScene::moveSelectionBy(int offset) {
-    setScrollPosition(scrollPosition + (layoutInfo.rowHeight * offset));
+    setScrollPosition(scrollPosition + (rowHeight * offset));
 }

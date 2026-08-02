@@ -44,48 +44,6 @@ struct Range {
     bool contains(int i) const { return i >= startIndex && i <= endIndex; }
 };
 
-struct LayoutInfo {
-    uint8_t numberOfRows;
-    uint8_t numberOfOffEdgeRows;
-
-    float cartScale;
-    Size cartSize;
-    uint8_t rowHeight;
-    uint8_t cartMiddleX;
-
-    Rect selectedRowRect;
-
-    LayoutInfo() = default;
-    LayoutInfo(float cartScale, Size displaySize, uint8_t numberOfRows, Size cartSize);
-
-    Rect rectForRow2(int rowIndex) {
-        Rect returnRect = selectedRowRect;
-        returnRect.origin.y = (rowIndex * rowHeight);
-        returnRect.origin.y += 2;
-
-        return returnRect;
-    }
-
-    Rect rectForRow(int rowIndex, int scrollPosition) {
-        Rect returnRect = selectedRowRect;
-        returnRect.origin.y += (rowIndex * rowHeight) - scrollPosition;
-
-        return returnRect;
-    }
-
-    Vec2 cartPositionForRow(int rowIndex) {
-        Rect rect = rectForRow2(rowIndex);
-
-        return Vec2(cartMiddleX, rect.midY());
-    }
-
-    Vec2 cartPositionForEntry(int rowIndex, int scrollPosition) {
-        Rect rect = rectForRow(rowIndex, scrollPosition);
-
-        return Vec2(cartMiddleX, rect.midY());
-    }
-};
-
 /**
  * Main list scene showing all games
  */
@@ -106,8 +64,17 @@ private:
     InputRepeater slowScrollRepeater;
     InputRepeater fastScrollRepeater;
 
-    LayoutInfo layoutInfo;
     LabelView<64> labelView;
+
+    uint8_t numberOfRows;
+    uint8_t numberOfOffEdgeRows;
+
+    float cartScale;
+    Size cartSize;
+    uint8_t rowHeight;
+    uint8_t cartMiddleX;
+
+    Rect selectedRowRect;
 
     bool didChangeScrollOffset = false;
 
@@ -130,7 +97,32 @@ private:
     /**
      * Get the current drawing rect (in pixels) for any row in the list.
      */
-    Rect rectForRow(int rowIndex, int _scrollPosition);
+    Rect rectForRow(int rowIndex, int scrollPosition) {
+        Rect returnRect = selectedRowRect;
+        returnRect.origin.y += (rowIndex * rowHeight) - scrollPosition;
+
+        return returnRect;
+    }
+
+    Rect rectForRow2(int rowIndex) {
+        Rect returnRect = selectedRowRect;
+        returnRect.origin.y = (rowIndex * rowHeight);
+        returnRect.origin.y += 2;
+
+        return returnRect;
+    }
+
+    Vec2 cartPositionForRow(int rowIndex) {
+        Rect rect = rectForRow2(rowIndex);
+
+        return Vec2(cartMiddleX, rect.midY());
+    }
+
+    Vec2 cartPositionForEntry(int rowIndex, int scrollPosition) {
+        Rect rect = rectForRow(rowIndex, scrollPosition);
+
+        return Vec2(cartMiddleX, rect.midY());
+    }
 
     Range getRange(int inset = 0);
 
