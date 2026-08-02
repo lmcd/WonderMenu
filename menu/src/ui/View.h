@@ -70,7 +70,7 @@ protected:
      */
     void clearSubtree(const RenderInfo& renderInfo, bool force = false);
 
-    void updateSubtree(const RenderInfo& renderInfo, float finalOpacity = 1.0f, bool finalIsHidden = false, Vec2 finalPosition = Vec2(), Color finalBlendColor = Color::BLACK, bool finalIsBlendedWithMemory = false);
+    void updateSubtree(const RenderInfo& renderInfo, float finalOpacity = 1.0f, bool finalIsHidden = false, Vec2 finalPosition = Vec2::ZERO, Color finalBlendColor = Color::BLACK, bool finalIsBlendedWithMemory = false);
 
     /**
      * Erase this view's drawn pixels unconditionally

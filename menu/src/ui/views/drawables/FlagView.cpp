@@ -55,7 +55,7 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
     Size size(20, 20);
     Rect rect(finalFrame.origin, size);
 
-    Rect spriteRect = Rect(Vec2(), size);
+    Rect spriteRect = Rect(Vec2::ZERO, size);
     Rect drawRect = rect;
     
 	bool shouldFlip = false;

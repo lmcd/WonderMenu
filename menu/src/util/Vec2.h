@@ -27,7 +27,11 @@ struct Vec2 {
     bool operator!=(const Vec2& other) const {
         return !(*this == other);
     }
+
+    static const Vec2 ZERO;
 };
+
+inline const Vec2 Vec2::ZERO {0, 0};
 
 inline Vec2 lerp(const Vec2& a, const Vec2& b, float t) {
     return {(int)std::lerp((float)a.x, (float)b.x, t), (int)std::lerp((float)a.y, (float)b.y, t)};

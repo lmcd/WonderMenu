@@ -17,7 +17,7 @@ struct Rect {
     Vec2 origin;
     Size size;
 
-    Rect(Vec2 origin = Vec2(), Size size = Size()) : origin(origin), size(size) {}
+    Rect(Vec2 origin = Vec2::ZERO, Size size = Size()) : origin(origin), size(size) {}
     Rect(int x, int y, int width, int height) : origin(x, y), size(width, height) {}
 
     /**

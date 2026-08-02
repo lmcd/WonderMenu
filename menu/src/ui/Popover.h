@@ -53,7 +53,7 @@ public:
         ownedByRenderer = true;
 
         tableView.drawsBackground = false;
-        tableView.selectionInset = Vec2();
+        tableView.selectionInset = Vec2::ZERO;
         tableView.selectedRowView.isRounded = true;
 
         titleLabelView.align = ALIGN_CENTER;

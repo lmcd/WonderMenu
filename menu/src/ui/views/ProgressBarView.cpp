@@ -29,11 +29,11 @@ Rect ProgressBarView::progressRect() {
 }
 
 void ProgressBarView::update(const RenderInfo&) {
-    rectView1.frame = Rect(Vec2(), frame.size);
+    rectView1.frame = Rect(Vec2::ZERO, frame.size);
     rectView1.fillColor = trackColor;
     rectView1.setNeedsDisplay();
 
-    rectView2.frame = Rect(Vec2(), frame.size);
+    rectView2.frame = Rect(Vec2::ZERO, frame.size);
     rectView2.fillColor = barColor;
     rectView2.setNeedsDisplay();
 }
