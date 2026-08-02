@@ -37,7 +37,7 @@ GameRowView::GameRowView() {
 }
 
 void GameRowView::update(const RenderInfo&) {
-    cart2DView.position = cartPosition;
+    cart2DView.frame.origin = cartPosition - frame.origin;
     cart2DView.scale = cartScale;
 
     int xPosition = 112;

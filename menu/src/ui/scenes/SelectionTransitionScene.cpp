@@ -81,8 +81,8 @@ void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
     Vec3f srcRotation = listScene->cart3DView.rotation;
     Vec3f dstRotation = gameLaunchScene->cart3DView.rotation;
 
-    Vec2 srcPosition = listScene->cart3DView.position;
-    Vec2 dstPosition = gameLaunchScene->cart3DView.position;
+    Vec2 srcPosition = listScene->cart3DView.frame.origin;
+    Vec2 dstPosition = gameLaunchScene->cart3DView.frame.origin;
 
     float scale = std::lerp(srcScale, dstScale, value);
     Vec3f rotation = lerp(srcRotation, dstRotation, value);
@@ -91,7 +91,7 @@ void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
     gameLaunchScene->cart3DView.game = gameShown;
     gameLaunchScene->cart3DView.flags = flags;
     gameLaunchScene->cart3DView.scale = scale;
-    gameLaunchScene->cart3DView.position = screenPosition;
+    gameLaunchScene->cart3DView.frame.origin = screenPosition;
     gameLaunchScene->cart3DView.rotation = rotation;
 }
 

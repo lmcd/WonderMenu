@@ -84,7 +84,7 @@ void Cart2DView::renderCartSide(const RenderInfo&, int spriteIndex) {
         setPrimitiveColor(color);
     }
 
-    Vec2 sidePosition = position - sizeMidpoint;
+    Vec2 sidePosition = finalFrame.origin - sizeMidpoint;
     Size sideSize(size.width / 2, size.height);
 
     sidePosition.x += (spriteIndex * sideSize.width);
@@ -119,7 +119,7 @@ void Cart2DView::renderCartLabel(const RenderInfo& renderInfo) {
         Rect boundingBox = cartRenderer->render2DCart(
             frameNumber,
             scale,
-            position,
+            finalFrame.origin,
             0,
             game,
             finalOpacity,

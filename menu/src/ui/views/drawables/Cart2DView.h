@@ -68,7 +68,6 @@ public:
 
     CartRenderer* cartRenderer;
 
-    Vec2 position = Vec2(0, 0);
     float scale = 1.0f;
     Game* game = nullptr;
 

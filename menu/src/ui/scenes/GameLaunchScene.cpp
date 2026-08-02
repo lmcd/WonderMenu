@@ -116,7 +116,7 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 
     cart3DView.scale = ZOOMED_CART_SCALE;
     cart3DView.rotation = rotation;
-    cart3DView.position = screenPosition;
+    cart3DView.frame.origin = screenPosition;
     cart3DView.game = game;
     cart3DView.flags = flags;
 }

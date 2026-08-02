@@ -70,7 +70,7 @@ void Cart3DView::render(const RenderInfo& renderInfo) {
         scale,
         Vec3f(0.0f, 0.0f, -DISTANCE_FROM_CAMERA),
         rotation,
-        position,
+        finalFrame.origin,
         game,
         intensity,
         flags

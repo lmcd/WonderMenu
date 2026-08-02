@@ -360,7 +360,7 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
 
             wobbler.speed = std::lerp(1.0f, 0.5f, popoverProgress);
 
-            cart3DView.position = rowView.cartPosition;
+            cart3DView.frame.origin = rowView.cartPosition;
             cart3DView.scale = rowView.cartScale;
             cart3DView.backgroundColor = selectionBlendColor;
             cart3DView.rotation = rotationForFrame(frameNumber);
