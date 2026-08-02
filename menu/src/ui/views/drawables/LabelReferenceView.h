@@ -29,12 +29,6 @@ struct LabelReferenceView : public Drawable {
 private:
     const char* lastStringReference[BUFF_COUNT] = {};
 
-    // Persistent backing storage for the paragraph layout. Must outlive the
-    // function that builds it (it's read later in render()), so it can't be alloca'd.
-    alignas(8) char layoutStorage[sizeof(rdpq_paragraph_t) + sizeof(rdpq_paragraph_char_t) * MAX_LAYOUT_CHARS];
-
-    rdpq_paragraph_t* layout = nullptr;
-
     void renderLabel(const RenderInfo&) {
         Color color = textColor;
         color.a *= finalOpacity;
@@ -88,6 +82,13 @@ private:
 
         rdpq_mode_pop();
     }
+
+protected:
+    // Persistent backing storage for the paragraph layout. Must outlive the
+    // function that builds it (it's read later in render()), so it can't be alloca'd.
+    alignas(8) char layoutStorage[sizeof(rdpq_paragraph_t) + sizeof(rdpq_paragraph_char_t) * MAX_LAYOUT_CHARS];
+
+    rdpq_paragraph_t* layout = nullptr;
 
 public:
     const char* name() const override { return "LabelReferenceView"; }
