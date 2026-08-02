@@ -12,9 +12,9 @@ class ScreenshotsImportPopover : public AlertPopover {
 public:
     const char* name() override { return "ScreenshotsImportPopover"; }
 
-    ScreenshotThumbnailView imageView1;
-    ScreenshotThumbnailView imageView2;
-    ScreenshotThumbnailView imageView3;
+    ScreenshotThumbnailView thumbnailView1;
+    ScreenshotThumbnailView thumbnailView2;
+    ScreenshotThumbnailView thumbnailView3;
 
     sprite_t* mario1Sprite = nullptr;
     sprite_t* mario2Sprite = nullptr;

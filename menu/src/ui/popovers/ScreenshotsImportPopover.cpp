@@ -12,9 +12,9 @@ ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene)
     setButtons("Save", "Delete");
     destructiveButtonIndex = 1;
 
-    contentView.addSubview(&imageView3);
-    contentView.addSubview(&imageView2);
-    contentView.addSubview(&imageView1);
+    contentView.addSubview(&thumbnailView3);
+    contentView.addSubview(&thumbnailView2);
+    contentView.addSubview(&thumbnailView1);
 
     mario1Sprite = sprite_load("rom:/ui/mario1.RGBA16.sprite");
     mario2Sprite = sprite_load("rom:/ui/mario2.RGBA16.sprite");
@@ -22,17 +22,17 @@ ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene)
 
     {
         surface_t surface = sprite_get_pixels(mario1Sprite);
-        imageView1.surface = surface;
+        thumbnailView1.surface = surface;
     }
 
     {
         surface_t surface = sprite_get_pixels(mario2Sprite);
-        imageView2.surface = surface;
+        thumbnailView2.surface = surface;
     }
 
     {
         surface_t surface = sprite_get_pixels(mario3Sprite);
-        imageView3.surface = surface;
+        thumbnailView3.surface = surface;
     }
 }
 
@@ -51,24 +51,24 @@ void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
         rectView.frame.minY() + 30
     );
 
-    imageView1.frame.origin = imagePosition;
-    imageView1.frame.size = imageSize;
-    imageView1.opacity = 1.0;
-    imageView1.backgroundColor = rectView.fillColor;
+    thumbnailView1.frame.origin = imagePosition;
+    thumbnailView1.frame.size = imageSize;
+    thumbnailView1.opacity = 1.0;
+    thumbnailView1.backgroundColor = rectView.fillColor;
 
-    imageView2.frame.origin = imagePosition;
-    imageView2.frame.origin.x = imageView1.frame.minX();
-    imageView2.frame.origin.x -= 12;
-    imageView2.frame.origin.y += 6;
-    imageView2.frame.size = smallerImageSize;
-    imageView2.opacity = 0.5;
-    imageView2.backgroundColor = rectView.fillColor;
+    thumbnailView2.frame.origin = imagePosition;
+    thumbnailView2.frame.origin.x = thumbnailView1.frame.minX();
+    thumbnailView2.frame.origin.x -= 12;
+    thumbnailView2.frame.origin.y += 6;
+    thumbnailView2.frame.size = smallerImageSize;
+    thumbnailView2.opacity = 0.5;
+    thumbnailView2.backgroundColor = rectView.fillColor;
 
-    imageView3.frame.origin = imagePosition;
-    imageView3.frame.origin.x = imageView1.frame.maxX() - smallerImageSize.width;
-    imageView3.frame.origin.x += 12;
-    imageView3.frame.origin.y += 6;
-    imageView3.frame.size = smallerImageSize;
-    imageView3.opacity = 0.5;
-    imageView3.backgroundColor = rectView.fillColor;
+    thumbnailView3.frame.origin = imagePosition;
+    thumbnailView3.frame.origin.x = thumbnailView1.frame.maxX() - smallerImageSize.width;
+    thumbnailView3.frame.origin.x += 12;
+    thumbnailView3.frame.origin.y += 6;
+    thumbnailView3.frame.size = smallerImageSize;
+    thumbnailView3.opacity = 0.5;
+    thumbnailView3.backgroundColor = rectView.fillColor;
 }
