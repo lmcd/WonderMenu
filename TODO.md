@@ -2,7 +2,7 @@
 
 ## General
 
-- [ ] Views all currently have absolute positions. Should instead respect relative positions and draw using `finalFrame`
+- [x] Views all currently have absolute positions. Should instead respect relative positions and draw using `finalFrame`
 - [ ] When this is done, remove `yRenderOffset` and fix broken scissor during `GameInfoTransitionScene`.
 - [ ] Off-screen rendered views. Views should be able to opt-in to off-screen rendering. The final view will be composited as a texture. This is useful when fake-making views with rounded corners that need variable-opacity - like ScreenshotThumbnailView
 - [ ] When this is done, finish `ScreenshotsImportPopover`
@@ -12,13 +12,16 @@
 - [ ] Come up with a way of determining if overclocking is enabled for A3D, and infer 32-bit colour from that
 - [ ] Investigate buttonDown and buttonUp methods on `Scene` in place of `InputWatcher`
 - [ ] Use references everywhere where appropriate instead of pointers (I was a C++ noob entering this project)
+- [ ] Account for overscan in Scene::view
 
 ## Views
-- [ ] `ScrollbarView` should be simplified with a `RectView`
+- [x] `ScrollbarView` should be simplified with a `RectView`
 - [ ] Two-stage combiner for `NumberView`
 - [ ] `TabControlView` should be refactored to use `LabelView`s
 - [ ] Combine drawing logic of `LabelView` and `LabelReferenceView`
 - [ ] `ListScene` should use a `TableView` like everything else
+- [ ] Add `VStackView` and `HStackView`
+- [ ] Add `ScrollView` that manages scrollbars automatically
 
 ## Models
 
