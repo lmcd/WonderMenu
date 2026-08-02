@@ -91,5 +91,10 @@ public:
      */
     Size displaySize();
 
+    /**
+     * Rect assigned to each scene's `frame`
+     */
+    Rect sceneRect();
+
     void removeChildScene(Scene* scene);
 };

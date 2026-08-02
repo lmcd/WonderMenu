@@ -18,7 +18,7 @@ SceneRenderer::SceneRenderer(Scene* initialScene) : currentScene(initialScene), 
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
-        currentScene->view.frame = Rect(Vec2(), displaySize());
+        currentScene->view.frame = sceneRect();
 
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_SET);
@@ -53,7 +53,7 @@ void SceneRenderer::changeScene(Scene* scene) {
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
-        currentScene->view.frame = Rect(Vec2(), displaySize());
+        currentScene->view.frame = sceneRect();
 
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_SET);
@@ -74,7 +74,7 @@ void SceneRenderer::pushScene(Scene* scene) {
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
-        currentScene->view.frame = Rect(Vec2(), displaySize());
+        currentScene->view.frame = sceneRect();
         
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_PUSH);
@@ -211,6 +211,12 @@ void SceneRenderer::render(int frameNumber) {
 
 Size SceneRenderer::displaySize() {
     return {640, 480};
+}
+
+Rect SceneRenderer::sceneRect() {
+    Rect baseRect = Rect(Vec2::ZERO, displaySize());
+
+    return baseRect.insetBy(Vec2(0, 0));
 }
 
 void SceneRenderer::removeChildScene(Scene* childScene) {
