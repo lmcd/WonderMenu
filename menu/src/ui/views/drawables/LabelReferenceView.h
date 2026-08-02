@@ -9,8 +9,10 @@
 #include <cmath>
 #include <libdragon.h>
 
-#include "ui/text.h"
+#include "../libdragon/rdpq_font_internal.h"
 #include "ui/View.h"
+
+extern "C" rdpq_paragraph_t* __rdpq_paragraph_build(const rdpq_textparms_t *parms, uint8_t initial_font_id, const char *utf8_text, int *nbytes, rdpq_paragraph_t *layout);
 
 // struct Paragraph {
 //     struct Character {

@@ -10,7 +10,6 @@
 #include <cmath>
 #include <libdragon.h>
 
-#include "ui/text.h"
 #include "ui/View.h"
 #include "ui/views/drawables/LabelReferenceView.h"
 

@@ -10,10 +10,14 @@
 #include "animation/Animation.h"
 #include "general/InputRepeater.h"
 #include "ui/View.h"
+#include "ui/views/drawables/LabelView.h"
+
+static constexpr int MAX_TAB_SEGMENTS = 6;
+static constexpr int MAX_TAB_LABEL_CHARS = 20;
 
 struct TabInfo {
 	uint8_t width;
-	char label[20];
+	char label[MAX_TAB_LABEL_CHARS];
 };
 
 struct TabControlView : public Drawable {
@@ -34,14 +38,18 @@ private:
 
 	surface_t lrSheet;
 
+	LabelView<MAX_TAB_LABEL_CHARS> labelViews[MAX_TAB_SEGMENTS];
+
 	rspq_block_t* labelsBlock = nullptr;
 
-	void renderLabels(float opacity);
+	void freeLabelsBlock();
+	void layoutLabels();
+	void renderLabels(const RenderInfo& renderInfo);
 
 public:
 	const char* name() const override { return "TabControlView"; }
 
-	TabInfo tabs[6];
+	TabInfo tabs[MAX_TAB_SEGMENTS];
 
 	int numberOfSegments = 0;
 	int selectedSegment = 0;

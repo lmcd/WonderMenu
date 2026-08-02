@@ -7,8 +7,6 @@
 
 #include "TabControlView.h"
 
-#include "ui/text.h"
-
 TabControlView::TabControlView() {
     buttonRepeater.type = InputRepeater::L_R;
     buttonRepeater.repeatInterval = 10;
@@ -21,16 +19,29 @@ TabControlView::TabControlView() {
     }
 
     lrSheet = sprite_get_pixels(lrSprite);
+
+    for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
+        labelView.fontID = 4;
+        labelView.align = ALIGN_LEFT;
+
+        addSubview(&labelView);
+    }
+}
+
+void TabControlView::freeLabelsBlock() {
+    if (labelsBlock == nullptr) {
+        return;
+    }
+
+    rspq_wait();
+    rspq_block_free(labelsBlock);
+    labelsBlock = nullptr;
 }
 
 TabControlView::~TabControlView() {
     debugf("[%s] Destruct\n", name());
 
-    if (labelsBlock != nullptr) {
-        rspq_wait();
-        rspq_block_free(labelsBlock);
-        labelsBlock = nullptr;
-    }
+    freeLabelsBlock();
 
     if (scrollAnimation != nullptr) {
         delete scrollAnimation;
@@ -63,11 +74,7 @@ void TabControlView::setSelectedSegment(int index, bool animated) {
         timingFunction
     );
 
-    if (labelsBlock != nullptr) {
-        rspq_wait();
-        rspq_block_free(labelsBlock);
-        labelsBlock = nullptr;
-    }
+    freeLabelsBlock();
 
     if (selectedSegment > 0 && index == 0) {
         lLabelAnimation = new Animation<float>(
@@ -173,6 +180,8 @@ void TabControlView::update(const RenderInfo& renderInfo) {
     if (needsRender) {
         needsClear = true;
     }
+
+    layoutLabels();
 }
 
 void TabControlView::clear(const RenderInfo& renderInfo) {
@@ -183,9 +192,9 @@ void TabControlView::clear(const RenderInfo& renderInfo) {
     drawnBoundingBox[bufferIndex] = Rect();
 }
 
-void TabControlView::renderLabels(float opacity) {
+void TabControlView::layoutLabels() {
     Color textColor = Color::WHITE;
-    textColor.rgb *= (0.45 * opacity);
+    textColor.rgb *= 0.45f;
 
     Color selectedColor = Color(252, 204, 007);
 
@@ -193,10 +202,80 @@ void TabControlView::renderLabels(float opacity) {
         selectedColor = Color(119);
     }
 
-    selectedColor.rgb *= opacity;
+    for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
+        labelView.isHidden = true;
+    }
 
+    if (numberOfSegments <= 0) {
+        return;
+    }
+
+    int spacing = 25;
+
+    float tweenPos;
+
+    if (scrollAnimation != nullptr) {
+        tweenPos = scrollAnimation->value();
+    }
+    else {
+        tweenPos = (float)selectedSegment;
+    }
+
+    // Precompute cumulative center offsets (tab 0 at origin)
+    float centers[MAX_TAB_SEGMENTS];
+    centers[0] = 0;
+
+    for (int i = 1; i < numberOfSegments; i++) {
+        centers[i] = centers[i-1] + (tabs[i-1].width + tabs[i].width) / 2.0f + spacing;
+    }
+
+    // Interpolate the visual anchor from tweenPos
+    int lo = (int)tweenPos % numberOfSegments;
+    int hi = (lo + 1) % numberOfSegments;
+    float t = tweenPos - floorf(tweenPos);
+    float anchor = centers[lo] + t * (centers[hi] - centers[lo]);
+
+    Color textColor2 = selectedColor.lerpTo(textColor, t);
+    Color textColor3 = selectedColor.lerpTo(textColor, (1 - t));
+
+    // The label strip is inset by the width of the two L/R buttons, and is what
+    // render() scissors against.
+    int stripMinX = 40;
+    int stripMaxX = frame.size.width - 40;
+
+    float centerX = frame.size.width / 2.0f;
+
+    for (int i = 0; i < numberOfSegments; i++) {
+        LabelView<MAX_TAB_LABEL_CHARS>& labelView = labelViews[i];
+
+        float x = centerX + centers[i] - anchor - tabs[i].width / 2.0f;
+
+        // Skip segments that fall entirely outside the clipping rect
+        if (x + tabs[i].width < stripMinX || x > stripMaxX) {
+            continue;
+        }
+
+        if (i == lo) {
+            labelView.textColor = textColor2;
+        }
+        else if (i == hi) {
+            labelView.textColor = textColor3;
+        }
+        else {
+            bool isSelected = (i == lo && t < 0.5f) || (i == hi && t >= 0.5f);
+            labelView.textColor = isSelected ? selectedColor : textColor;
+        }
+
+        labelView.frame.origin = Vec2(x, 22);
+        labelView.maxWidth = 200;
+        labelView.setString("%s", tabs[i].label);
+        labelView.isHidden = false;
+    }
+}
+
+void TabControlView::renderLabels(const RenderInfo& renderInfo) {
     int buttonWidth = 60;
-    
+
     Rect leftButtonRect(
         finalFrame.minX(),
         finalFrame.minY(),
@@ -213,68 +292,15 @@ void TabControlView::renderLabels(float opacity) {
 
     pushScissor(barRect);
 
-    int y = finalFrame.minY() + 22;
+    for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
+        // Force the label to render even when it thinks it's clean
+        labelView.setNeedsDisplay();
+        // Render the label
+        labelView.render(renderInfo);
 
-    int spacing = 25;
-
-    float tweenPos;
-
-    if (scrollAnimation != nullptr) {
-        tweenPos = scrollAnimation->value();
+        // TODO: This view still needs a refactor. Rendering the labelView like
+        // this is not the correct way to use the view system
     }
-    else {
-        tweenPos = (float)selectedSegment;
-    }
-
-    float centerX = finalFrame.midX();
-
-    // Precompute cumulative center offsets (tab 0 at origin)
-    float centers[numberOfSegments];
-    centers[0] = 0;
-    
-    for (int i = 1; i < numberOfSegments; i++) {
-        centers[i] = centers[i-1] + (tabs[i-1].width + tabs[i].width) / 2.0f + spacing;
-    }
-
-    // Interpolate the visual anchor from tweenPos
-    int lo = (int)tweenPos % numberOfSegments;
-    int hi = (lo + 1) % numberOfSegments;
-    float t = tweenPos - floorf(tweenPos);
-    float anchor = centers[lo] + t * (centers[hi] - centers[lo]);
-
-    Color textColor2 = selectedColor.lerpTo(textColor, t);
-    Color textColor3 = selectedColor.lerpTo(textColor, (1 - t));
-
-    rdpq_textparms_t params = {
-        .disable_aa_fix = true
-    };
-
-    rdpq_mode_push();
-
-    // Single pass — no special-casing for selected vs left vs right
-    for (int i = 0; i < numberOfSegments; i++) {
-        float x = centerX + centers[i] - anchor - tabs[i].width / 2.0f;
-
-        // Skip segments that fall entirely outside the clipping rect
-        if (x + tabs[i].width < barRect.minX() || x > barRect.maxX()) {
-            continue;
-        }
-
-        if (i == lo) {
-            setPrimitiveColor(textColor2);
-        }
-        else if (i == hi) {
-            setPrimitiveColor(textColor3);
-        }
-        else {
-            bool isSelected = (i == lo && t < 0.5f) || (i == hi && t >= 0.5f);
-            setPrimitiveColor(isSelected ? selectedColor : textColor);
-        }
-
-        rdpq_textmetrics_t metrics = rdpq_text_printf2(&params, 4, x, y, tabs[i].label);
-    }
-
-    rdpq_mode_pop();
 
     popScissor();
 }
@@ -385,14 +411,14 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     if (finalOpacity == 1.0f && scrollAnimation == nullptr) {
         if (labelsBlock == nullptr) {
             rspq_block_begin();
-            renderLabels(finalOpacity);
+            renderLabels(renderInfo);
             labelsBlock = rspq_block_end();
         }
 
         rspq_block_run(labelsBlock);
     }
     else {
-        renderLabels(finalOpacity);
+        renderLabels(renderInfo);
     }
 
     rdpq_mode_begin();
