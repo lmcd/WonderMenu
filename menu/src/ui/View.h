@@ -34,6 +34,8 @@ class View {
 private:
     static void applyScissor(const Rect& rect);
 
+    inline static std::vector<RemovedView> removedViews;
+
     void updateRecursive(const RenderInfo& renderInfo);
 
     // Root-only: clear the whole tree (via clearSubtree) plus any detached views
@@ -87,8 +89,6 @@ public:
     inline static bool hasScissor = false;
 
     inline static std::vector<Rect> scissorStack;
-
-    inline static std::vector<RemovedView> removedViews;
 
     static void pushScissor(Rect rect);
 
