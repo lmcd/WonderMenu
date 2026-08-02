@@ -44,8 +44,8 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
     selectedSubtitleColor.rgb *= 0.50f;
 
     Vec2 titlePosition(
-        frame.minX() + 50 + (indentLevel * INDENT_WIDTH),
-        frame.minY() + 22
+        50 + (indentLevel * INDENT_WIDTH),
+        22
     );
 
     Vec2 subtitlePosition = titlePosition;

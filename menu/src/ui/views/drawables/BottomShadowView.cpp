@@ -33,7 +33,7 @@ void BottomShadowView::renderRect(const RenderInfo& renderInfo, Rect currentRect
 
 	sprite_t* currentSprite = isRounded ? spriteRounded : sprite;
 
-    Rect shadowRect = frame;
+    Rect shadowRect = finalFrame;
     shadowRect.origin.y = shadowRect.maxY() - currentSprite->height + 3;
     shadowRect.size.height = currentSprite->height;
 
@@ -99,10 +99,10 @@ void BottomShadowView::update(const RenderInfo& renderInfo) {
         }
     }
 
-    if (frame != lastRect[bufferIndex]) {
+    if (finalFrame != lastRect[bufferIndex]) {
         needsClear = true;
         setNeedsDisplay();
-        lastRect[bufferIndex] = frame;
+        lastRect[bufferIndex] = finalFrame;
     }
     else if (needsRender) {
         needsClear = true;
@@ -111,7 +111,7 @@ void BottomShadowView::update(const RenderInfo& renderInfo) {
             int i = 0;
 
             for (const Rect& renderRect : pendingRenderRects) {
-                rectsToClear[i++] = renderRect.intersection(frame);
+                rectsToClear[i++] = renderRect.intersection(finalFrame);
 
                 needsPartialClear = true;
             }
@@ -159,7 +159,7 @@ void BottomShadowView::render(const RenderInfo& renderInfo) {
     }
 
     if (isPendingFullRender) {
-        this->renderRect(renderInfo, frame);
+        this->renderRect(renderInfo, finalFrame);
     }
     else {
         for (const Rect& renderRect : pendingRenderRects) {

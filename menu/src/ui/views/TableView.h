@@ -106,8 +106,6 @@ struct TableView : public View {
 
     int lastSelectedRowIndex[BUFF_COUNT] = {};
 
-    int yRenderOffset = 0;
-    
     bool isADown = false;
     
     bool rowChangeAmount = 0;
@@ -270,6 +268,7 @@ struct TableView : public View {
 
     void render(const RenderInfo& renderInfo) override {
         Rect expandingGroupRect = rectForExpandingGroup();
+        expandingGroupRect.origin = expandingGroupRect.origin + finalFrame.origin;
 
 		backgroundRectView.render(renderInfo);
         selectedRowView.render(renderInfo);
@@ -379,7 +378,7 @@ struct TableView : public View {
 
     Rect rectForExpandingGroup() {
         return Rect(
-            frame.origin.x,
+            0,
             rawYForRow(expandStartIndex),
             frame.size.width,
             heightForExpandingGroup()
@@ -411,12 +410,11 @@ struct TableView : public View {
         int visibleCount = visibleRowCount();
 
         int xInset = 8 + 3;
-        int xPosition = frame.origin.x + xInset;
         int barWidth = frame.size.width - (xInset * 2);
 
         Rect rect(
-            xPosition,
-            frame.origin.y - TABLE_Y_PADDING,
+            xInset,
+            -TABLE_Y_PADDING,
             barWidth,
             (visibleCount * paddedRowHeight()) + (TABLE_Y_PADDING * 2) - ROW_SPACING
         );
@@ -425,8 +423,6 @@ struct TableView : public View {
             rect.size.height -= (expandRowCount * paddedRowHeight());
             rect.size.height += heightForExpandingGroup();
         }
-
-        rect.origin.y += yRenderOffset;
 
         return rect;
     }

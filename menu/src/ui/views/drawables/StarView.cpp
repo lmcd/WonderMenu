@@ -48,7 +48,7 @@ void StarView::renderIcon(const RenderInfo& renderInfo) {
     color.rgb *= finalOpacity;
 
     Size size(20, 20);
-    Rect rect(frame.origin, size);
+    Rect rect(finalFrame.origin, size);
 
     int offset = isOn ? 0 : 1;
     int s0 = (offset * size.width);

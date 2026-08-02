@@ -99,13 +99,13 @@ void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
     imageView1.spriteVersion++;
     imageView2.spriteVersion++;
 
-    imageView1.frame = frame;
-    imageView2.frame = frame;
+    imageView1.frame = Rect(Vec2(), frame.size);
+    imageView2.frame = Rect(Vec2(), frame.size);
 
-    roundedRectView.frame = frame;
+    roundedRectView.frame = Rect(Vec2(), frame.size);
     roundedRectView.fillColor = backgroundColor;
 
-    borderView.frame = frame;
+    borderView.frame = Rect(Vec2(), frame.size);
 
     roundedRectView.setNeedsDisplay();
     borderView.setNeedsDisplay();

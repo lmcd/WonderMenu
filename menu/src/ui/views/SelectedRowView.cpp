@@ -37,20 +37,20 @@ void SelectedRowView::setNeedsDisplay(Rect dirtyRect) {
 void SelectedRowView::update(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
     
-    leftOutsetRectView.frame = frame;
+    leftOutsetRectView.frame = Rect(Vec2(), frame.size);
     leftOutsetRectView.frame.size.width = -inset.x;
     leftOutsetRectView.frame.size.height += 5;
 
-    rightOutsetRectView.frame = frame;
+    rightOutsetRectView.frame = Rect(Vec2(), frame.size);
     rightOutsetRectView.frame.origin.x += frame.size.width + inset.x;
     rightOutsetRectView.frame.size.width = -inset.x;
     rightOutsetRectView.frame.size.height += 5;
 
-    rectView.frame = frame;
+    rectView.frame = Rect(Vec2(), frame.size);
     rectView.radius = isRounded ? 17 : 8;
     rectView.fillColor = fillColor;
 
-    shadowView.frame = frame;
+    shadowView.frame = Rect(Vec2(), frame.size);
     // shadowView.frame.size.height += 5;
     shadowView.isRounded = isRounded;
 
@@ -72,7 +72,7 @@ void SelectedRowView::update(const RenderInfo& renderInfo) {
         lastExpandProgress[bufferIndex] = expandProgress;
     }
     
-    setNeedsDisplay(leftOutsetRectView.frame);
+    setNeedsDisplay(Rect(finalFrame.origin, leftOutsetRectView.frame.size));
 }
 
 void SelectedRowView::render(const RenderInfo& renderInfo) {

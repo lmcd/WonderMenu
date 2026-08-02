@@ -22,23 +22,23 @@ void CheatOptionRowView::update(const RenderInfo& renderInfo) {
     Color selectedTitleColor = Color::WHITE;
     
     Vec2 checkboxPosition(
-        frame.minX() + 8 + 2,
-        frame.minY() + 7 + 2
+        8 + 2,
+        7 + 2
     );
 
 	checkboxView.frame.origin = checkboxPosition;
     checkboxView.isRadio = true;
 
     Vec2 titlePosition(
-        frame.minX() + 21,
-        frame.minY() + 22
+        21,
+        22
     );
 	titlePosition.x += 15;
 
     Color _titleColor = isSelected ? selectedTitleColor : titleColor;
 
     titleView.frame.origin = titlePosition;
-    titleView.maxWidth = frame.maxX() - 20;
+    titleView.maxWidth = frame.size.width - 20;
     titleView.maxWidth = 195;
     titleView.textColor = _titleColor;
 }

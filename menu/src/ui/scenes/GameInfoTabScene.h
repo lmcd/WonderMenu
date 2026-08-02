@@ -12,6 +12,4 @@
 class GameInfoTabScene : public Scene {
 public:
     ScrollbarView* scrollbarView = nullptr;
-
-    int yRenderOffset = 0;
 };

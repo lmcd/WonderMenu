@@ -32,8 +32,6 @@ SettingsScene::SettingsScene(Game* game)
 }
 
 void SettingsScene::updateViews(const RenderInfo&) {
-    tableView.yRenderOffset = yRenderOffset;
-
     scrollbarView->contentHeight = 0;
     scrollbarView->scrollPosition = 0;
 }

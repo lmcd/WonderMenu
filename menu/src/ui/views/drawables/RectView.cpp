@@ -43,36 +43,36 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
     }
 
     Rect topLeftRect(
-        frame.minX(),
-        frame.minY(),
+        finalFrame.minX(),
+        finalFrame.minY(),
         spriteRadius,
         spriteRadius
     );
     Rect topRightRect(
-        frame.maxX() - spriteRadius,
-        frame.minY(),
+        finalFrame.maxX() - spriteRadius,
+        finalFrame.minY(),
         spriteRadius,
         spriteRadius
     );
     Rect bottomRightRect(
-        frame.maxX() - spriteRadius,
-        frame.maxY() - spriteRadius,
+        finalFrame.maxX() - spriteRadius,
+        finalFrame.maxY() - spriteRadius,
         spriteRadius,
         spriteRadius
     );
     Rect bottomLeftRect(
-        frame.minX(),
-        frame.maxY() - spriteRadius,
+        finalFrame.minX(),
+        finalFrame.maxY() - spriteRadius,
         spriteRadius,
         spriteRadius
     );
-    Rect middleRect = frame.insetBy(Vec2(spriteRadius, 0));
+    Rect middleRect = finalFrame.insetBy(Vec2(spriteRadius, 0));
 
-    Rect leftRect = frame.insetBy(Vec2(0, spriteRadius));
+    Rect leftRect = finalFrame.insetBy(Vec2(0, spriteRadius));
     leftRect.size.width = spriteRadius;
 
     Rect rightRect = leftRect;
-    rightRect.origin.x = frame.maxX() - spriteRadius;
+    rightRect.origin.x = finalFrame.maxX() - spriteRadius;
 
     rdpq_mode_push();
 
@@ -187,7 +187,7 @@ void RectView::update(const RenderInfo& renderInfo) {
         lastFillColor[bufferIndex] = fillColor;
     }
     
-    if (frame != lastFrame[bufferIndex]) {
+    if (finalFrame != lastFrame[bufferIndex]) {
         needsClear = true;
 
         if (isInverted || isBlendedWithBackground) {
@@ -198,36 +198,36 @@ void RectView::update(const RenderInfo& renderInfo) {
             
             Rect _lastFrame = lastFrame[bufferIndex];
 
-            if (frame.size.width != _lastFrame.size.width) {
-                _lastFrame.size.width = std::min(frame.size.width, _lastFrame.size.width) - radius;
+            if (finalFrame.size.width != _lastFrame.size.width) {
+                _lastFrame.size.width = std::min(finalFrame.size.width, _lastFrame.size.width) - radius;
             }
 
-            if (frame.size.height != _lastFrame.size.height) {
-                _lastFrame.size.height = std::min(frame.size.height, _lastFrame.size.height) - radius;
+            if (finalFrame.size.height != _lastFrame.size.height) {
+                _lastFrame.size.height = std::min(finalFrame.size.height, _lastFrame.size.height) - radius;
             }
 
             // Moving takes both edges with it, so the trailing corners have to be
             // given up as well as the leading ones.
-            if (frame.origin.x != _lastFrame.origin.x) {
-                int originX = std::max(frame.origin.x, _lastFrame.origin.x) + radius;
-                int maxX = std::min(frame.maxX(), lastFrame[bufferIndex].maxX()) - radius;
+            if (finalFrame.origin.x != _lastFrame.origin.x) {
+                int originX = std::max(finalFrame.origin.x, _lastFrame.origin.x) + radius;
+                int maxX = std::min(finalFrame.maxX(), lastFrame[bufferIndex].maxX()) - radius;
 
                 _lastFrame.origin.x = originX;
                 _lastFrame.size.width = std::max(0, maxX - originX);
             }
 
-            if (frame.origin.y != _lastFrame.origin.y) {
-                int originY = std::max(frame.origin.y, _lastFrame.origin.y) + radius;
-                int maxY = std::min(frame.maxY(), lastFrame[bufferIndex].maxY()) - radius;
+            if (finalFrame.origin.y != _lastFrame.origin.y) {
+                int originY = std::max(finalFrame.origin.y, _lastFrame.origin.y) + radius;
+                int maxY = std::min(finalFrame.maxY(), lastFrame[bufferIndex].maxY()) - radius;
 
                 _lastFrame.origin.y = originY;
                 _lastFrame.size.height = std::max(0, maxY - originY);
             }
 
-            lastFrame[bufferIndex].subtract(frame, rectsToClear);
+            lastFrame[bufferIndex].subtract(finalFrame, rectsToClear);
 
             Rect rectsToRender[4];
-            int count = frame.subtract(_lastFrame, rectsToRender);
+            int count = finalFrame.subtract(_lastFrame, rectsToRender);
 
             for (int i = 0; i < count; i++) {
                 Rect rect = rectsToRender[i];
@@ -236,7 +236,7 @@ void RectView::update(const RenderInfo& renderInfo) {
             }
         }
 
-        lastFrame[bufferIndex] = frame;
+        lastFrame[bufferIndex] = finalFrame;
     }
     else if (needsRender && isBlendedWithBackground) {
         needsClear = true;
@@ -245,7 +245,7 @@ void RectView::update(const RenderInfo& renderInfo) {
             int i = 0;
             
             for (const Rect& renderRect : pendingRenderRects) {
-                rectsToClear[i++] = renderRect.intersection(frame);
+                rectsToClear[i++] = renderRect.intersection(finalFrame);
 
                 needsPartialClear = true;
             }
@@ -291,7 +291,7 @@ void RectView::render(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
     if (isPendingFullRender) {
-        this->renderRect(renderInfo, frame);
+        this->renderRect(renderInfo, finalFrame);
     }
     else {
         for (const Rect& renderRect : pendingRenderRects) {
@@ -300,7 +300,7 @@ void RectView::render(const RenderInfo& renderInfo) {
     }
 
     pendingRenderRects.clear();
-    drawnBoundingBox[bufferIndex] = frame;
+    drawnBoundingBox[bufferIndex] = finalFrame;
 
     finishRender();
 }

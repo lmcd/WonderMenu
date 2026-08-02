@@ -60,7 +60,7 @@ void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
     );
 
     if (currentTabScene != nullptr) {
-        currentTabScene->yRenderOffset = yRenderOffset;
+        currentTabScene->view.frame.origin.y = yRenderOffset;
         currentTabScene->updateViews(renderInfo);
     }
 }

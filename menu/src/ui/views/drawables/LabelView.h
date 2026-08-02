@@ -33,8 +33,8 @@ private:
         Color blendColor = finalBlendColor;
         blendColor.a = 0;
 
-        int x0 = frame.origin.x + layout->x0;
-        int y0 = frame.origin.y + layout->y0;
+        int x0 = finalFrame.origin.x + layout->x0;
+        int y0 = finalFrame.origin.y + layout->y0;
 
         const rdpq_font_t* font = rdpq_text_get_font(fontID);
 
@@ -180,8 +180,8 @@ public:
             advanceX = maxWidth;
         }
 
-        int textX = frame.origin.x;
-        int textY = frame.origin.y - pointSize;
+        int textX = finalFrame.origin.x;
+        int textY = finalFrame.origin.y - pointSize;
 
         if (align == ALIGN_RIGHT) {
             textX += (maxWidth - advanceX);

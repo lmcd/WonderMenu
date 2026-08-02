@@ -37,13 +37,13 @@ void GameVersionRowView::update(const RenderInfo& renderInfo) {
     Color _subtitleColor = isSelected ? selectedSubtitleColor : subtitleColor;
 
     Vec2 flagPosition(
-        frame.minX() + 8,
-        frame.minY() + 7
+        8,
+        7
     );
 
     Vec2 titlePosition(
-        frame.minX() + 21,
-        frame.minY() + 22
+        21,
+        22
     );
 
 	Vec2 subtitlePosition = titlePosition;
@@ -54,7 +54,7 @@ void GameVersionRowView::update(const RenderInfo& renderInfo) {
     flagView.frame.origin = flagPosition;
     
     titleView.frame = titlePosition;
-    titleView.maxWidth = frame.maxX() - 20;
+    titleView.maxWidth = frame.size.width - 20;
     titleView.maxWidth = 195;
     titleView.textColor = _titleColor;
 

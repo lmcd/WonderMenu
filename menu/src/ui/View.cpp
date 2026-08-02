@@ -163,6 +163,7 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
         subview->finalOpacity      = finalOpacity * subview->opacity;
         subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
         subview->finalFrame.origin = finalPosition + subview->frame.origin;
+        subview->finalFrame.size   = subview->frame.size;
         subview->finalIsBlendedWithMemory = finalIsBlendedWithMemory ? true : !subview->isOpaque;
 
         Color blendedColor = finalBlendColor2;
@@ -338,7 +339,7 @@ void Drawable::setNeedsDisplay() {
     needsRender = true;
 
     pendingRenderRects.clear();
-    pendingRenderRects.push_back(frame);
+    pendingRenderRects.push_back(finalFrame);
 
     isPendingFullRender = true;
 }

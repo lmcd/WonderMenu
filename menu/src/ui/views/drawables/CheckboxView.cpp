@@ -72,7 +72,7 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
     int s0 = isRadio ? 32 : 0;
 
     Size size(16, 16);
-    Rect rect(frame.origin, size);
+    Rect rect(finalFrame.origin, size);
 
     drawTexturedRect(TILE0, rect, s0);
 

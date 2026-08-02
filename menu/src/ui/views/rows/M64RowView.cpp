@@ -36,8 +36,8 @@ void M64RowView::update(const RenderInfo& renderInfo) {
     selectedSubtitleColor.rgb *= 0.50f;
 
     Vec2 titlePosition(
-        frame.minX() + 50,
-        frame.minY() + 22
+        50,
+        22
     );
 
     Vec2 subtitlePosition = titlePosition;

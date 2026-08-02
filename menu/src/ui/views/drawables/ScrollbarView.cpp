@@ -8,14 +8,14 @@
 #include "ScrollbarView.h"
 
 float ScrollbarView::knobSize() {
-    int containerHeight = frame.size.height;
+    int containerHeight = finalFrame.size.height;
 
     if (contentHeight <= containerHeight) {
-        return frame.size.height;
+        return finalFrame.size.height;
     }
 
     float proportion = (float)containerHeight / (float)contentHeight;
-    float knobSize = std::ceil(proportion * frame.size.height);
+    float knobSize = std::ceil(proportion * finalFrame.size.height);
 
     return std::max(knobSize, MINIMUM_KNOB_SIZE);
 }
@@ -23,22 +23,22 @@ float ScrollbarView::knobSize() {
 Rect ScrollbarView::knobRect() {
     float _knobSize = knobSize();
 
-    float trackSpace = frame.size.height - _knobSize;
-    int maxScrollPosition = contentHeight - frame.size.height;
+    float trackSpace = finalFrame.size.height - _knobSize;
+    int maxScrollPosition = contentHeight - finalFrame.size.height;
 
     float knobY = 0;
     if (maxScrollPosition > 0) {
         knobY = ((float)scrollPosition / (float)maxScrollPosition) * trackSpace;
     }
 
-    Vec2 knobOrigin = frame.origin;
+    Vec2 knobOrigin = finalFrame.origin;
     knobOrigin.y += (int)ceil(knobY);
 
     int yInsets = 6;
 
     Rect rect = Rect(
         knobOrigin,
-        Size(frame.size.width, _knobSize)
+        Size(finalFrame.size.width, _knobSize)
     );
 
     return rect.insetBy(Vec2(0, yInsets));
@@ -46,8 +46,8 @@ Rect ScrollbarView::knobRect() {
 
 Rect ScrollbarView::effectiveKnobRect() {
     // Compared before knobRect()'s vertical inset is applied -- the knob fills
-    // the track (nothing to scroll) when knobSize() is the full frame height.
-    if (knobSize() == frame.size.height) {
+    // the track (nothing to scroll) when knobSize() is the full finalFrame height.
+    if (knobSize() == finalFrame.size.height) {
         return Rect();
     }
 
@@ -59,9 +59,9 @@ void ScrollbarView::update(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    if (frame != lastFrame[bufferIndex]) {
+    if (finalFrame != lastFrame[bufferIndex]) {
         needsRender = true;
-        lastFrame[bufferIndex] = frame;
+        lastFrame[bufferIndex] = finalFrame;
     }
 
     if (contentHeight != lastContentHeight[bufferIndex]) {
@@ -104,7 +104,7 @@ void ScrollbarView::render(const RenderInfo& renderInfo) {
     Color _color = color;
     _color.rgb *= finalOpacity;
 
-    int width = frame.size.width;
+    int width = finalFrame.size.width;
 
     Rect _knobRect = effectiveKnobRect();
 

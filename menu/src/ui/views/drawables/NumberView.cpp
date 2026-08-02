@@ -48,7 +48,7 @@ void NumberView::renderIcon(const RenderInfo& renderInfo) {
     color.a *= finalOpacity;
 
     Size size(20, 20);
-    Rect rect(frame.origin, size);
+    Rect rect(finalFrame.origin, size);
 
     Rect numberRect = rect;
     numberRect.size.width = 8;

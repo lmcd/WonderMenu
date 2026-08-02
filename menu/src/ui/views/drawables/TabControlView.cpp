@@ -198,22 +198,22 @@ void TabControlView::renderLabels(float opacity) {
     int buttonWidth = 60;
     
     Rect leftButtonRect(
-        frame.minX(),
-        frame.minY(),
+        finalFrame.minX(),
+        finalFrame.minY(),
         buttonWidth,
         36
     );
 
     Rect barRect(
         leftButtonRect.minX() + 40,
-        frame.minY() + 1,
-        frame.size.width - 80,
+        finalFrame.minY() + 1,
+        finalFrame.size.width - 80,
         31
     );
 
     pushScissor(barRect);
 
-    int y = frame.minY() + 22;
+    int y = finalFrame.minY() + 22;
 
     int spacing = 25;
 
@@ -226,7 +226,7 @@ void TabControlView::renderLabels(float opacity) {
         tweenPos = (float)selectedSegment;
     }
 
-    float centerX = frame.midX();
+    float centerX = finalFrame.midX();
 
     // Precompute cumulative center offsets (tab 0 at origin)
     float centers[numberOfSegments];
@@ -335,37 +335,37 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     int buttonWidth = 60;
 
     Rect leftButtonRect(
-        frame.minX(),
-        frame.minY(),
+        finalFrame.minX(),
+        finalFrame.minY(),
         buttonWidth,
         36
     );
 
     Rect rightButtonRect(
-        frame.maxX() - buttonWidth,
-        frame.minY(),
+        finalFrame.maxX() - buttonWidth,
+        finalFrame.minY(),
         buttonWidth,
         36
     );
 
     Rect leftFadeRect(
         leftButtonRect.maxX() - 4,
-        frame.minY() + 10,
+        finalFrame.minY() + 10,
         32,
         16
     );
     
     Rect rightFadeRect(
         rightButtonRect.minX() + 4 - 32,
-        frame.minY() + 10,
+        finalFrame.minY() + 10,
         32,
         16
     );
 
     Rect barRect(
         leftButtonRect.minX() + 40,
-        frame.minY() + 1,
-        frame.size.width - 80,
+        finalFrame.minY() + 1,
+        finalFrame.size.width - 80,
         31
     );
 
@@ -466,7 +466,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
 
         Rect lLetterRect = leftButtonRect;
         lLetterRect.origin.x += 25;
-        lLetterRect.origin.y = frame.minY() + 9;
+        lLetterRect.origin.y = finalFrame.minY() + 9;
         lLetterRect.size.width = 12;
         lLetterRect.size.height = 16;
 
@@ -485,7 +485,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
 
     rdpq_mode_pop();
 
-    drawnBoundingBox[bufferIndex] = frame.insetBy(Vec2(-3, -3));
+    drawnBoundingBox[bufferIndex] = finalFrame.insetBy(Vec2(-3, -3));
 
     finishRender();
 }

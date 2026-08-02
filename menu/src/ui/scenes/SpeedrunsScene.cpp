@@ -65,7 +65,6 @@ void SpeedrunsScene::updateViews(const RenderInfo&) {
 
     tableView.frame = Rect(0, 84, 640, 480);
     tableView.isHidden = tableIsHidden;
-    tableView.yRenderOffset = yRenderOffset;
 
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;

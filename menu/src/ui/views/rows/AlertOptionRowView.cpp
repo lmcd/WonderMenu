@@ -25,8 +25,8 @@ void AlertOptionRowView::update(const RenderInfo& renderInfo) {
     // Centred across the full row rather than inset for a leading control, so
     // the origin is the row's left edge and maxWidth spans it.
     Vec2 titlePosition(
-        frame.minX(),
-        frame.minY() + 22
+        0,
+        22
     );
 
     titleView.frame.origin = titlePosition;

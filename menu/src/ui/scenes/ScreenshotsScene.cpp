@@ -67,7 +67,7 @@ void ScreenshotsScene::updateViews(const RenderInfo&) {
 
     barView.frame = Rect(
         BAR_ORIGIN_X,
-        BAR_ORIGIN_Y + yRenderOffset,
+        BAR_ORIGIN_Y,
         SCREENSHOT_WIDTH  + (BAR_X_PADDING * 2),
         SCREENSHOT_HEIGHT + (BAR_Y_PADDING * 2)
     );

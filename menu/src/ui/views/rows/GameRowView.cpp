@@ -44,12 +44,12 @@ void GameRowView::update(const RenderInfo&) {
     int yPosition;
     int16_t maxLabelWidth = (640 - xPosition) - 90;
     
-    yPosition = frame.minY() + 31;
+    yPosition = 31;
 
     titleView.frame.origin = Vec2(xPosition, yPosition);
     titleView.maxWidth = maxLabelWidth;
 
-    yPosition = frame.minY() + 51;
+    yPosition = 51;
 
     subtitleView.frame.origin = Vec2(xPosition, yPosition);
     subtitleView.maxWidth = maxLabelWidth;
@@ -60,7 +60,7 @@ void GameRowView::update(const RenderInfo&) {
     int starWidth = 20;
     int accessorySpacing = 12;
 
-    int flagX  = frame.maxX() - flagWidth - 15;
+    int flagX  = frame.size.width - flagWidth - 15;
     int starX  = flagX - starWidth  - accessorySpacing;
 
     Vec2 versionPosition = subtitleView.frame.origin;
@@ -68,12 +68,12 @@ void GameRowView::update(const RenderInfo&) {
 
     starView.frame.origin = Vec2(
         starX,
-        frame.minY() + 35
+        35
     );
 
     flagView.frame.origin = Vec2(
         flagX,
-        frame.minY() + 35
+        35
     );
 
     versionNumberView.frame.origin = versionPosition;

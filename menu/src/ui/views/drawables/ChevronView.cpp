@@ -70,7 +70,8 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
     setBlendColor(finalBlendColor);
 
     Size size(16, 16);
-    Rect rect(frame.origin, size);
+    Rect rect(finalFrame.origin, size);
+    Vec2 blitOrigin = finalFrame.origin;
 
     rdpq_blitparms_t p = {
         .width  = size.width,
@@ -97,13 +98,13 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
         p.cx = (p.width  / 2);
         p.cy = (p.height / 2);
 
-        frame.origin.x += p.cx;
-        frame.origin.y += p.cy;
+        blitOrigin.x += p.cx;
+        blitOrigin.y += p.cy;
     }
 
     surface_t surface = sprite_get_pixels(sprite);
 
-    rdpq_tex_blit(&surface, frame.origin.x, frame.origin.y, &p);
+    rdpq_tex_blit(&surface, blitOrigin.x, blitOrigin.y, &p);
 
     rdpq_mode_pop();
 

@@ -53,7 +53,7 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
     Size size(20, 20);
-    Rect rect(frame.origin, size);
+    Rect rect(finalFrame.origin, size);
 
     Rect spriteRect = Rect(Vec2(), size);
     Rect drawRect = rect;

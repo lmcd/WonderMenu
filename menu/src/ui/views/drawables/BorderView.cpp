@@ -12,10 +12,10 @@ void BorderView::update(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    if (frame != lastFrame[bufferIndex]) {
+    if (finalFrame != lastFrame[bufferIndex]) {
         needsRender = true;
         needsClear = true;
-        lastFrame[bufferIndex] = frame;
+        lastFrame[bufferIndex] = finalFrame;
     }
 }
 
@@ -43,26 +43,26 @@ void BorderView::render(const RenderInfo& renderInfo) {
     int spriteRadius = sprite->width;
 
     Rect topLeftRect(
-        frame.minX(),
-        frame.minY(),
+        finalFrame.minX(),
+        finalFrame.minY(),
         spriteRadius,
         spriteRadius
     );
     Rect topRightRect(
-        frame.maxX() - spriteRadius,
-        frame.minY(),
+        finalFrame.maxX() - spriteRadius,
+        finalFrame.minY(),
         spriteRadius,
         spriteRadius
     );
     Rect bottomRightRect(
-        frame.maxX() - spriteRadius,
-        frame.maxY() - spriteRadius,
+        finalFrame.maxX() - spriteRadius,
+        finalFrame.maxY() - spriteRadius,
         spriteRadius,
         spriteRadius
     );
     Rect bottomLeftRect(
-        frame.minX(),
-        frame.maxY() - spriteRadius,
+        finalFrame.minX(),
+        finalFrame.maxY() - spriteRadius,
         spriteRadius,
         spriteRadius
     );
@@ -87,28 +87,28 @@ void BorderView::render(const RenderInfo& renderInfo) {
     // BOTTOM LEFT
     drawTexturedRect(TILE0, bottomLeftRect.flipY());
 
-    float lineWidth  = frame.size.width  - (spriteRadius * 2);
-    float lineHeight = frame.size.height - (spriteRadius * 2);
+    float lineWidth  = finalFrame.size.width  - (spriteRadius * 2);
+    float lineHeight = finalFrame.size.height - (spriteRadius * 2);
 
     setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, PRIM)));
 
     if (lineWidth > 0) {
         // TOP
-        drawFilledRect(Rect(frame.minX() + spriteRadius, frame.minY(), lineWidth, 1));
+        drawFilledRect(Rect(finalFrame.minX() + spriteRadius, finalFrame.minY(), lineWidth, 1));
 
         // BOTTOM
-        drawFilledRect(Rect(frame.minX() + spriteRadius, frame.maxY() - 1, lineWidth, 1));
+        drawFilledRect(Rect(finalFrame.minX() + spriteRadius, finalFrame.maxY() - 1, lineWidth, 1));
     }
 
     if (lineHeight > 0) {
         // LEFT
-        drawFilledRect(Rect(frame.minX(), frame.minY() + spriteRadius, 1, lineHeight));
+        drawFilledRect(Rect(finalFrame.minX(), finalFrame.minY() + spriteRadius, 1, lineHeight));
 
         // RIGHT
-        drawFilledRect(Rect(frame.maxX() - 1, frame.minY() + spriteRadius, 1, lineHeight));
+        drawFilledRect(Rect(finalFrame.maxX() - 1, finalFrame.minY() + spriteRadius, 1, lineHeight));
     }
 
-    drawnBoundingBox[bufferIndex] = frame;
+    drawnBoundingBox[bufferIndex] = finalFrame;
 
     finishRender();
 }

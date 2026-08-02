@@ -18,22 +18,22 @@ ProgressBarView::ProgressBarView() {
 }
 
 Rect ProgressBarView::progressRect() {
-    Rect rect = frame;
-    
+    Rect rect = finalFrame;
+
     float fraction = (maxValue != 0.0f) ? (progress / maxValue) : 0.0f;
     fraction = std::clamp(fraction, 0.0f, 1.0f);
 
-    rect.size.width = (frame.size.width * fraction);
+    rect.size.width = (finalFrame.size.width * fraction);
 
     return rect;
 }
 
 void ProgressBarView::update(const RenderInfo&) {
-    rectView1.frame = frame;
+    rectView1.frame = Rect(Vec2(), frame.size);
     rectView1.fillColor = trackColor;
     rectView1.setNeedsDisplay();
 
-    rectView2.frame = frame;
+    rectView2.frame = Rect(Vec2(), frame.size);
     rectView2.fillColor = barColor;
     rectView2.setNeedsDisplay();
 }

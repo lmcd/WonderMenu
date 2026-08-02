@@ -167,7 +167,6 @@ void CheatsScene::updateViews(const RenderInfo&) {
     bool tableIsHidden = (tableView.rowCount == 0);
 
     tableView.isHidden = tableIsHidden;
-    tableView.yRenderOffset = yRenderOffset;
 
     labelView.isHidden = !tableIsHidden;
 
