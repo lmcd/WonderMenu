@@ -47,7 +47,7 @@ void ScreenshotsScene::loadSprites() {
 }
 
 void ScreenshotsScene::didBeginScene(SceneEntry) {
-    loadSprites();
+    // loadSprites();
 
     view.addSubview(&barView);
 
@@ -61,7 +61,7 @@ void ScreenshotsScene::didBeginScene(SceneEntry) {
 
 void ScreenshotsScene::updateViews(const RenderInfo&) {
     labelView.maxWidth = view.frame.size.width;
-    
+
     bool hasScreenshots = (screenshotSprites[0] != nullptr);
 
     Color barColor = Color(26);
