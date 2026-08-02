@@ -7,18 +7,15 @@
 
 #include <libdragon.h>
 
-#include "ui/View.h"
+#include "ui/views/BaseView.h"
+#include "ui/views/drawables/RectView.h"
 
-struct ScrollbarView : public Drawable {
+struct ScrollbarView : public BaseView {
 private:
-    inline static sprite_t* cornerSprite = nullptr;
-
     static constexpr Color DEFAULT_FILL_COLOR = Color{128};
     static constexpr float MINIMUM_KNOB_SIZE = 40.0f;
 
-    Rect lastFrame[BUFF_COUNT] = {};
-    int lastContentHeight[BUFF_COUNT] = {};
-    int lastScrollPosition[BUFF_COUNT] = {};
+    RectView knobView;
 
 public:
     const char* name() const override { return "ScrollbarView"; }
@@ -26,6 +23,11 @@ public:
     int contentHeight = 0;
     int scrollPosition = 0;
     Color color = DEFAULT_FILL_COLOR;
+
+    ScrollbarView();
+
+    void setNeedsDisplay();
+    void setNeedsDisplay(Rect dirtyRect);
 
     float knobSize();
     Rect knobRect();
@@ -35,6 +37,4 @@ public:
     Rect effectiveKnobRect();
 
     void update(const RenderInfo& renderInfo) override;
-    void clear(const RenderInfo& renderInfo);
-    void render(const RenderInfo& renderInfo) override;
 };
