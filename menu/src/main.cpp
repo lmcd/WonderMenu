@@ -40,10 +40,10 @@ int main()
     // Init USB logging
     debug_init_usblog();
 
-    // Init DragonFS (rom:// filesystem)
+    // Init DragonFS (rom:/ filesystem)
     dfs_init(DFS_DEFAULT_LOCATION);
 
-    // Init sfds (sd:// filesystem)
+    // Init sfds (sd:/ filesystem)
     debug_init_sdfs("sd:/", -1);
 
     const char* storagePrefix;
