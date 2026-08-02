@@ -1,0 +1,203 @@
+/**
+* @copyright 2026 - Lee McDermott
+* @license AGPLv3
+*/
+
+#pragma once
+
+#include <cstring>
+#include <cmath>
+#include <libdragon.h>
+
+#include "ui/text.h"
+#include "ui/View.h"
+
+// struct Paragraph {
+//     struct Character {
+//         uint8_t atlasID;
+//         Vec2 position;
+//         int16_t glyphIndex;
+//     };
+
+//     Vec2 position;
+//     int16_t advanceX;
+//     Character characters[];
+// };
+
+template <int MAX_LAYOUT_CHARS = 256>
+struct LabelReferenceView : public Drawable {
+private:
+    const char* lastStringReference[BUFF_COUNT] = {};
+
+    // Persistent backing storage for the paragraph layout. Must outlive the
+    // function that builds it (it's read later in render()), so it can't be alloca'd.
+    alignas(8) char layoutStorage[sizeof(rdpq_paragraph_t) + sizeof(rdpq_paragraph_char_t) * MAX_LAYOUT_CHARS];
+
+    rdpq_paragraph_t* layout = nullptr;
+
+    void renderLabel(const RenderInfo&) {
+        Color color = textColor;
+        color.a *= finalOpacity;
+
+        Color blendColor = finalBlendColor;
+        blendColor.a = 0;
+
+        int x0 = frame.origin.x + layout->x0;
+        int y0 = frame.origin.y + layout->y0;
+
+        const rdpq_font_t* font = rdpq_text_get_font(fontID);
+
+        int i = -1;
+
+        rdpq_mode_push();
+
+        const rdpq_paragraph_char_t* character = layout->chars;
+
+        while (character->font_id == fontID) {
+            const glyph_t* glyph = &font->glyphs[character->glyph];
+
+            if (glyph->natlas != i) {
+                i++;
+
+                atlas_t* atlas = &font->atlases[i];
+                rspq_block_run(atlas->up);
+
+                rdpq_mode_begin();
+                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
+                    setBlender(finalIsBlendedWithMemory ? WITH_FRAMEBUFFER : WITH_BLEND_COLOR);
+                    rdpq_mode_alphacompare(1);
+                rdpq_mode_end();
+
+                setPrimitiveColor(color);
+                setBlendColor(blendColor);
+            }
+
+            int tile = glyph->ntile;
+
+            Rect rect = Rect(
+                x0 + (character->x + glyph->xoff),
+                y0 + (character->y + glyph->yoff),
+                glyph->xoff2 - glyph->xoff,
+                glyph->yoff2 - glyph->yoff
+            );
+
+            drawTexturedRect((rdpq_tile_t)tile, rect, glyph->s, glyph->t);
+
+            character++;
+        }
+
+        rdpq_mode_pop();
+    }
+
+public:
+    const char* name() const override { return "LabelReferenceView"; }
+
+    uint16_t maxWidth = 200;
+    rdpq_align_t align = ALIGN_LEFT;
+    uint8_t fontID = 1;
+    Color textColor = Color::WHITE;
+    const char* stringReference = nullptr;
+
+    void update(const RenderInfo& renderInfo) override {
+        Drawable::update(renderInfo);
+
+        int bufferIndex = renderInfo.bufferIndex;
+
+        if (finalFrame != lastFinalFrame[bufferIndex]) {
+            needsClear = true;
+            needsRender = true;
+            lastFinalFrame[bufferIndex] = finalFrame;
+        }
+
+        if (stringReference != lastStringReference[bufferIndex]) {
+            needsClear = true;
+            needsRender = true;
+
+            rdpq_textparms_t params = {
+                .width = (int16_t)maxWidth,
+                .align = align,
+                .wrap = WRAP_ELLIPSES,
+                .disable_aa_fix = true
+            };
+
+            // __rdpq_paragraph_build takes &n as the number of chars to lay out
+            // (in) and returns the count laid out (out). Unlike LabelView there's
+            // no vsnprintf to set it, so seed it from the referenced string --
+            // otherwise n stays 0 and the layout comes back empty (nothing draws).
+            int n = stringReference ? (int)strlen(stringReference) : 0;
+
+            if (n > MAX_LAYOUT_CHARS - 1) {
+                n = MAX_LAYOUT_CHARS - 1;
+            }
+
+            rdpq_paragraph_t *_layout = (rdpq_paragraph_t*)layoutStorage;
+            memset(_layout, 0, sizeof(*_layout));
+            _layout->capacity = n + 1;
+
+            layout = __rdpq_paragraph_build(&params, fontID, stringReference, &n, _layout);
+
+            lastStringReference[bufferIndex] = stringReference;
+        }
+    }
+
+    void clear(const RenderInfo& renderInfo) {
+        int bufferIndex = renderInfo.bufferIndex;
+
+        clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+
+        drawnBoundingBox[bufferIndex] = Rect();
+    }
+
+    void render(const RenderInfo& renderInfo) override {
+        if (finalIsHidden) {
+            return;
+        }
+
+        if (!needsRender) {
+            return;
+        }
+
+        if (layout == nullptr) {
+            return;
+        }
+
+        int bufferIndex = renderInfo.bufferIndex;
+
+        renderLabel(renderInfo);
+
+        int advanceX = (int)ceil(layout->advance_x);
+
+        if (advanceX == 0) {
+            advanceX = maxWidth;
+        }
+
+        int width = (int)(layout->bbox.x1 - layout->bbox.x0);
+        int height = (int)(layout->bbox.y1 - layout->bbox.y0);
+
+        int textX = frame.origin.x;
+        int textY = frame.origin.y + layout->bbox.y0;
+
+        if (align == ALIGN_RIGHT) {
+            textX += (maxWidth - advanceX);
+        }
+        else if (align == ALIGN_CENTER) {
+            textX += (maxWidth - advanceX) / 2;
+        }
+
+        Rect boundingBox = Rect(
+            textX,
+            textY,
+            width,
+            height
+        );
+        boundingBox = boundingBox;
+
+        if (hasScissor) {
+            boundingBox = boundingBox.intersection(scissorStack.back());
+        }
+
+        drawnBoundingBox[bufferIndex] = boundingBox;
+
+        finishRender();
+    }
+};

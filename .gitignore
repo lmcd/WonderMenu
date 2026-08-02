@@ -1,0 +1,45 @@
+.DS_Store
+.vscode
+tools
+payload
+design-resources
+release-builds
+menu/WonderMenu.z64
+menu/assets/sd/*.v64
+menu/assets/sd/*.n64
+menu/assets/sd/*.z64
+menu/filesystem
+menu/build
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app

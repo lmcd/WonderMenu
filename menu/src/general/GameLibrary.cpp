@@ -1,0 +1,560 @@
+/**
+* @copyright 2026 - Lee McDermott
+* @license AGPLv3
+*/
+
+#include <algorithm>
+#include <climits>
+#include <cstring>
+#include <strings.h>
+
+#include "GameLibrary.h"
+
+CacheResult cache[MAX_NUMBER_OF_FILES] = {0};
+
+static GameIDMap<int, -1> entryIndexMap;
+
+GameLibrary::GameLibrary(GameDatabase& database, const char* path) :
+    database(database),
+    path(path) {
+    allGames.reserve(1000);
+    retailGroups.reserve(1000);
+    homebrewGroups.reserve(64);
+    favouriteGroups.reserve(64);
+    recentGroups.reserve(64);
+}
+
+void GameLibrary::loadCache() {
+    #ifndef RELEASE_BUILD
+    readFromCache = false;
+    return;
+    #endif
+
+    char cachePath[512];
+    snprintf(cachePath, sizeof(cachePath), "sd:/cache.bin");
+
+    FILE* cacheFile = fopen(cachePath, "rb");
+
+    if (!cacheFile) {
+        debugf("[GameLibrary] Failed to open cache file: %s\n", cachePath);
+        readFromCache = false;
+        return;
+    }
+
+    struct stat st;
+    if (fstat(fileno(cacheFile), &st)) {
+        debugf("[GameLibrary] Failed to stat cache file: %s\n", cachePath);
+        readFromCache = false;
+        return;
+    }
+
+    debugf("[GameLibrary] Found cache file. Size: %li\n", st.st_size);
+
+    if (fread(&temporaryCacheHeader, 1, sizeof(CacheHeader), cacheFile) != sizeof(CacheHeader)) {
+        debugf("[GameLibrary] Failed to read cache header\n");
+        readFromCache = false;
+        fclose(cacheFile);
+        return;
+    }
+
+    // Don't read past the bounds of the cache array
+    size_t bytesToRead = std::min((size_t)st.st_size, sizeof(cache));
+    bytesToRead -= sizeof(CacheHeader);
+
+    size_t bytesRead = fread(cache, 1, bytesToRead, cacheFile);
+    if (bytesRead != bytesToRead) {
+        debugf("[GameLibrary] Failed to read cache file (read %zu of %zu bytes)\n", bytesRead, bytesToRead);
+        fclose(cacheFile);
+        return;
+    }
+
+    fclose(cacheFile);
+
+    readFromCache = true;
+}
+
+bool GameLibrary::writeCache() {
+    char cachePath[512];
+    snprintf(cachePath, sizeof(cachePath), "sd:/cache.bin");
+
+    FILE* cacheFile = fopen(cachePath, "wb");
+
+    if (!cacheFile) {
+        debugf("[GameLibrary] Failed to open cache file for writing: %s\n", cachePath);
+
+        return false;
+    }
+
+    // Reserve the header slot with a blank (zeroed) header; the real values are
+    // filled in later by writeCacheHeader(). The entries follow it.
+    CacheHeader header = {};
+    if (fwrite(&header, 1, sizeof(CacheHeader), cacheFile) != sizeof(CacheHeader)) {
+        debugf("[GameLibrary] Failed to write blank cache header\n");
+        fclose(cacheFile);
+        return false;
+    }
+
+    size_t entriesToWrite = std::min((size_t)cachedFileCount, (size_t)MAX_NUMBER_OF_FILES);
+
+    size_t entriesWritten = fwrite(cache, sizeof(CacheResult), entriesToWrite, cacheFile);
+
+    fclose(cacheFile);
+
+    if (entriesWritten != entriesToWrite) {
+        debugf("[GameLibrary] Failed to write cache file (wrote %zu of %zu entries)\n", entriesWritten, entriesToWrite);
+
+        return false;
+    }
+    else {
+        debugf("[GameLibrary] Wrote cache file. Entries: %i\n", entriesWritten);
+
+        return true;
+    }
+}
+
+bool GameLibrary::writeCacheHeader() {
+    if (lastLaunchedGame == nullptr) {
+        debugf("[GameLibrary] No last launched game; cannot write cache header\n");
+        return false;
+    }
+
+    ROMFile& romFile = lastLaunchedGame->romFile;
+
+    CacheHeader header = {};
+    header.lastUniqueID[0] = romFile.uniqueID[0];
+    header.lastUniqueID[1] = romFile.uniqueID[1];
+    header.lastRegionCode = romFile.regionCode;
+
+    char cachePath[512];
+    snprintf(cachePath, sizeof(cachePath), "sd:/cache.bin");
+
+    // Update the header in place so the cache entries that follow are preserved.
+    FILE* cacheFile = fopen(cachePath, "r+b");
+    if (!cacheFile) {
+        debugf("[GameLibrary] Failed to open cache file for header write: %s\n", cachePath);
+        return false;
+    }
+
+    fseek(cacheFile, 0, SEEK_SET);
+    size_t bytesWritten = fwrite(&header, 1, sizeof(CacheHeader), cacheFile);
+
+    fclose(cacheFile);
+
+    if (bytesWritten != sizeof(CacheHeader)) {
+        debugf("[GameLibrary] Failed to write cache header (wrote %zu of %zu bytes)\n", bytesWritten, sizeof(CacheHeader));
+        return false;
+    }
+
+    debugf("[GameLibrary] Wrote cache header. Game: %c%c\n", header.lastUniqueID[0], header.lastUniqueID[1]);
+    return true;
+}
+
+void GameLibrary::loadHistoryAndFavourites() {
+    if (!path) {
+        return;
+    }
+
+    char iniPath[512];
+    snprintf(iniPath, sizeof(iniPath), "%smenu/history.ini", path);
+
+    debugf("[GameLibrary] Loading INI file: %s\n", iniPath);
+
+    INIParser parser(iniPath);
+    INIParser::Entry iniEntry;
+    
+    parser.beginSection("history");
+
+    while (parser.read(iniEntry)) {
+        if (iniEntry.primaryPath.empty()) {
+            continue;
+        }
+
+        recentsPaths.push_back(iniEntry.primaryPath);
+    }
+
+    parser.beginSection("favorite");
+
+    while (parser.read(iniEntry)) {
+        if (iniEntry.primaryPath.empty()) {
+            continue;
+        }
+
+        favouritesPaths.push_back(iniEntry.primaryPath);
+    }
+
+    parser.close();
+}
+
+bool GameLibrary::saveHistoryAndFavourites() {
+    if (!path) {
+        return false;
+    }
+
+    char iniPath[512];
+    snprintf(iniPath, sizeof(iniPath), "%smenu/history.ini", path);
+
+    debugf("[GameLibrary] Saving INI file: %s\n", iniPath);
+
+    FILE* file = fopen(iniPath, "w");
+
+    if (!file) {
+        debugf("[GameLibrary] Failed to open INI file for writing: %s\n", iniPath);
+        return false;
+    }
+
+    // See `INIParser.h` for file format example
+    auto writeSection = [file](const char* section, const std::vector<GameGroup>& groups) {
+        fprintf(file, "[%s]\n", section);
+
+        int index = 0;
+
+        for (const GameGroup& group : groups) {
+            const Game* game = group.preferredGame();
+
+            if (game == nullptr) {
+                continue;
+            }
+
+            fprintf(file, "%d_primary_path=%s\n", index, game->romFile.path.c_str());
+            fprintf(file, "%d_secondary_path=\n", index);
+            fprintf(file, "%d_type=1\n", index);
+
+            index++;
+        }
+    };
+
+    writeSection("history", recentGroups);
+    fprintf(file, "\n");
+    writeSection("favorite", favouriteGroups);
+
+    fclose(file);
+
+    return true;
+}
+
+void GameLibrary::addToRecents(GameGroup gameGroup) {
+    Game* game = gameGroup.preferredGame();
+
+    recentGroups.erase(
+        std::remove(recentGroups.begin(), recentGroups.end(), gameGroup),
+        recentGroups.end()
+    );
+
+    recentGroups.emplace(recentGroups.begin(), *game);
+
+    saveHistoryAndFavourites();
+}
+
+// TODO: should be reference
+// TODO: should be `Game`
+void GameLibrary::toggleFavourite(GameGroup gameGroup) {
+    Game* game = gameGroup.preferredGame();
+    game->isFavourite = !game->isFavourite;
+
+    if (!game->isFavourite) {
+        auto it = std::find(favouriteGroups.begin(), favouriteGroups.end(), gameGroup);
+        if (it != favouriteGroups.end()) {
+            favouriteGroups.erase(it);
+        }
+    }
+    else {
+        favouriteGroups.emplace(favouriteGroups.begin(), *game);
+    }
+
+    saveHistoryAndFavourites();
+}
+
+void GameLibrary::toggleRetailGroupings() {
+    groupRetailGames = !groupRetailGames;
+
+    retailGroups.clear();
+
+    static GameIDMap<int, -1> entryIndexMap2;
+    // Reset to the -1 "unset" sentinel (memset 0 would leave cells reading as a
+    // valid index 0, sending the first game down the .at() path on empty data).
+    entryIndexMap2.reset();
+
+    int entryIndex = 0;
+
+    for (Game& game : allGames) {
+        if (game.hasHomebrewGameCode()) {
+            continue;
+        }
+
+        ROMFile& romFile = game.romFile;
+
+        char* uniqueID = romFile.uniqueID;
+        int foundRetailEntryIndex = entryIndexMap2[uniqueID];
+
+        if (!groupRetailGames) {
+            foundRetailEntryIndex = -1;
+        }
+
+        if (foundRetailEntryIndex == -1) {
+            entryIndexMap2[uniqueID] = entryIndex;
+
+            retailGroups.emplace_back(game);
+            entryIndex++;
+        }
+        else {
+            GameGroup& gameGroup = retailGroups.at(foundRetailEntryIndex);
+            gameGroup.addGame(game);
+        }
+    }
+
+    // Sort retail games alphabetically by display title (case-insensitive)
+    std::sort(retailGroups.begin(), retailGroups.end(), [](const GameGroup& a, const GameGroup& b) {
+        return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
+    });
+}
+
+void GameLibrary::loadGames() {
+    retailGroups.clear();
+
+    entryIndexMap.reset();
+
+    dir_t entry;
+    // Find the first file in the directory
+    int result = dir_findfirst(path, &entry);
+
+    debugf("[GameLibrary] Reading ROM files in %s\n", path);
+
+    // If directory is empty or doesn't exist, return
+    if (result != 0) {
+        debugf("[GameLibrary] No ROM files found\n");
+        return;
+    }
+
+    int fileIndex = -1;
+    int entryIndex = 0;
+
+    std::vector<Game*> speedrunGames;
+
+    // Process the first entry and continue with the rest
+    do {
+        // Skip directories
+        if (entry.d_type == DT_DIR) {
+            continue;
+        }
+        
+        const char* filename = entry.d_name;
+
+        // Skip files without a valid extension (e.g. .z64)
+        if (!ROMFile::hasROMExtension(filename)) {
+            continue;
+        }
+
+        // Build full path
+        char fullPath[512];
+        snprintf(fullPath, sizeof(fullPath), "%s%s", path, filename);
+
+        ROMFile* romFile = new ROMFile(fullPath);
+
+        GameDatabase::Entry* databaseEntry = nullptr;
+
+        uint32_t hash = GameDatabase::djb2((const unsigned char*)filename, strlen(filename));
+        uint32_t fileSize = entry.d_size;
+
+        // Set the ROM size here so it is populated on the cache-hit path too;
+        // loadHeader() (cache-miss only) would otherwise be the sole place it is
+        // set, leaving romFile->size uninitialised for cached games.
+        romFile->size = fileSize;
+
+        fileIndex++;
+
+        CacheResult cacheResult = cache[fileIndex];
+
+        cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
+
+        if (readFromCache) {
+            if (cacheResult.hash != hash || cacheResult.fileSize != fileSize) {
+                readFromCache = false;
+
+                debugf("[GameLibrary] Hash mismatch for file: %s\n", filename);
+                debugf("[GameLibrary] Abandoning cache.\n");
+            }
+        }
+
+        if (readFromCache) {
+            if (cacheResult.entryIndex != -1) {
+                databaseEntry = database.readEntryAtIndex(cacheResult.entryIndex);
+            }
+
+            romFile->version = cacheResult.version;
+            romFile->crc1 = cacheResult.crc1;
+
+            cache[fileIndex].entryIndex = cacheResult.entryIndex;
+            cache[fileIndex].version = cacheResult.version;
+            cache[fileIndex].crc1 = cacheResult.crc1;
+        }
+        else {
+            if (romFile->loadHeader()) {
+                databaseEntry = database.entryForROMFile(romFile);
+
+                cache[fileIndex].entryIndex = (databaseEntry == nullptr) ? -1 : databaseEntry->entryIndex;
+                cache[fileIndex].version = romFile->version;
+                cache[fileIndex].crc1 = romFile->crc1;
+            } else {
+                debugf("[GameLibrary] Failed to load ROM file: %s\n", filename);
+
+                // Failed to load, clean up
+                delete romFile;
+
+                cache[fileIndex].entryIndex = -1;
+                cache[fileIndex].version = 0;
+                cache[fileIndex].crc1 = 0;
+
+                continue;
+            }
+        }
+
+        if (databaseEntry != nullptr) {
+            romFile->uniqueID[0] = databaseEntry->uniqueID[0];
+            romFile->uniqueID[1] = databaseEntry->uniqueID[1];
+            romFile->regionCode = databaseEntry->regionCode;
+        }
+
+        Game& lastGame = allGames.emplace_back(*romFile, databaseEntry);
+
+        if (databaseEntry != nullptr) {
+            if (databaseEntry->supportsSpeedruns) {
+                speedrunGames.push_back(&lastGame);
+            }
+        }
+
+        char* uniqueID = romFile->uniqueID;
+
+        int foundRetailEntryIndex = entryIndexMap[uniqueID];
+
+        if (romFile->hasHomebrewGameCode()) {
+            foundRetailEntryIndex = -1;
+        }
+
+        if (foundRetailEntryIndex == -1) {
+            if (romFile->hasHomebrewGameCode() || databaseEntry == nullptr) {
+                // Version field  for homebrew roms can't be trusted, so keep it a 1
+                lastGame.romFile.version = 1;
+
+                homebrewGroups.emplace_back(lastGame);
+            }
+            else {
+                entryIndexMap[uniqueID] = entryIndex;
+
+                retailGroups.emplace_back(lastGame);
+                entryIndex++;
+            }
+        }
+        else {
+            GameGroup& gameGroup = retailGroups.at(foundRetailEntryIndex);
+            gameGroup.addGame(lastGame);
+        }
+
+        if (std::find(recentsPaths.begin(), recentsPaths.end(), fullPath) != recentsPaths.end()) {
+            recentGroups.emplace_back(lastGame);
+        }
+
+        if (std::find(favouritesPaths.begin(), favouritesPaths.end(), fullPath) != favouritesPaths.end()) {
+            lastGame.isFavourite = true;
+
+            favouriteGroups.emplace_back(lastGame);
+        }
+    } while (dir_findnext(path, &entry) == 0);
+
+    // fileIndex is the last 0-based index; the count is one more than that
+    cachedFileCount = fileIndex + 1;
+
+    // Restore the last launched game recorded in the cache header, matching on
+    // the unique ID and region code. Left null if no game matches.
+    lastLaunchedGame = nullptr;
+    for (Game& game : allGames) {
+        if (game.romFile.uniqueID[0] == temporaryCacheHeader.lastUniqueID[0] &&
+            game.romFile.uniqueID[1] == temporaryCacheHeader.lastUniqueID[1] &&
+            game.romFile.regionCode == temporaryCacheHeader.lastRegionCode) {
+            lastLaunchedGame = &game;
+
+            debugf("[GameLibrary] Found last launched game: %s\n", game.title());
+            break;
+        }
+    }
+
+    if (!readFromCache) {
+        writeCache();
+    }
+
+    // Sort retail games alphabetically by display title (case-insensitive)
+    std::sort(retailGroups.begin(), retailGroups.end(), [](const GameGroup& a, const GameGroup& b) {
+        return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
+    });
+
+    // Sort homebrew games alphabetically by display title (case-insensitive)
+    std::sort(homebrewGroups.begin(), homebrewGroups.end(), [](const GameGroup& a, const GameGroup& b) {
+        return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
+    });
+
+    auto orderIn = [](const std::vector<std::string>& paths, const GameGroup& group) {
+        auto it = std::find(paths.begin(), paths.end(), group.preferredGame()->romFile.path);
+        return it != paths.end() ? (int)std::distance(paths.begin(), it) : INT_MAX;
+    };
+
+    // Sort recent games by the order they appear in the INI file
+    std::sort(recentGroups.begin(), recentGroups.end(), [&](const GameGroup& a, const GameGroup& b) {
+        return orderIn(recentsPaths, a) < orderIn(recentsPaths, b);
+    });
+
+    // Sort favourite games by the order they appear in the INI file
+    std::sort(favouriteGroups.begin(), favouriteGroups.end(), [&](const GameGroup& a, const GameGroup& b) {
+        return orderIn(favouritesPaths, a) < orderIn(favouritesPaths, b);
+    });
+
+    // .m64 files live in the speedruns/ folder on the SD card
+    char m64sPath[512];
+    snprintf(m64sPath, sizeof(m64sPath), "%sspeedruns/", path);
+
+    debugf("[GameLibrary] Reading M64 files in %s\n", m64sPath);
+
+    result = dir_findfirst(m64sPath, &entry);
+
+    // Only proceed if folder exists
+    if (result == 0) {
+        do {
+            // Skip directories
+            if (entry.d_type == DT_DIR) {
+                continue;
+            }
+
+            const char* filename = entry.d_name;
+
+            // Skip files without a valid extension (e.g. .m64)
+            if (!M64File::hasM64Extension(filename)) {
+                continue;
+            }
+
+            // Sized so m64sPath (up to 511) + d_name (up to 255) can't truncate,
+            // keeping -Werror=format-truncation happy.
+            char m64Path[768];
+            snprintf(m64Path, sizeof(m64Path), "%s%s", m64sPath, filename);
+
+            M64File m64File = M64File(m64Path);
+
+            if (m64File.loadHeader()) {
+                uint32_t crc = m64File.romCRC32;
+
+                // Attach this recording to the first loaded speedrun game whose
+                // ROM CRC matches it.
+                for (Game* game : speedrunGames) {
+                    if (game->romFile.crc1 == crc) {
+                        allM64Files.push_back(std::move(m64File));
+                        game->m64Files.push_back(&allM64Files.back());
+                        break;
+                    }
+                }
+            }
+        } while (dir_findnext(m64sPath, &entry) == 0);
+    }
+
+    debugf("[GameLibrary] File count %i\n", fileIndex);
+    debugf("[GameLibrary] Loaded %i Retail Games\n", retailGroups.size());
+    debugf("[GameLibrary] Loaded %i Homebrew Games\n", homebrewGroups.size());
+    debugf("[GameLibrary] Loaded %i Recent Games\n", recentGroups.size());
+    debugf("[GameLibrary] Loaded %i Favourite Games\n", favouriteGroups.size());
+}
