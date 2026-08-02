@@ -58,6 +58,16 @@ void View::popScissor() {
     }
 }
 
+Rect View::worldFrame() const {
+    Rect rect = frame;
+
+    for (const View* view = superview; view != nullptr; view = view->superview) {
+        rect.origin = rect.origin + view->frame.origin;
+    }
+
+    return rect;
+}
+
 const char* View::name() const {
     return "View";
 }

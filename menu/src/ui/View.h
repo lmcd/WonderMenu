@@ -105,6 +105,8 @@ public:
     bool isOpaque = true;
     Color backgroundColor = Color::CLEAR;
 
+    Rect worldFrame() const;
+
     /**
      * Child views, ordered back-to-front (index 0 is drawn first / behind).
      */
