@@ -13,10 +13,10 @@
 #include "ui/Scene.h"
 #include "ui/SceneRenderer.h"
 #include "ui/views/GameListView.h"
+#include "ui/views/ScrollbarView.h"
 #include "ui/views/drawables/Cart3DView.h"
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/drawables/RectView.h"
-#include "ui/views/drawables/ScrollbarView.h"
 #include "ui/views/drawables/TabControlView.h"
 
 class CartRenderer;

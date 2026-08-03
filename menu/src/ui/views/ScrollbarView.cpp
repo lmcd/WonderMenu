@@ -75,3 +75,13 @@ void ScrollbarView::update(const RenderInfo&) {
 
     setNeedsDisplay();
 }
+
+void ScrollbarView::render(const RenderInfo& renderInfo) {
+    if (finalIsHidden) {
+        return;
+    }
+
+    for (View* subview : subviews) {
+        subview->render(renderInfo);
+    }
+}

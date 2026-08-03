@@ -6,7 +6,7 @@
 #pragma once
 
 #include "ui/Scene.h"
-#include "ui/views/drawables/ScrollbarView.h"
+#include "ui/views/ScrollbarView.h"
 
 // Base class for the scenes shown inside GameInfoScene's tab container.
 class GameInfoTabScene : public Scene {

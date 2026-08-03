@@ -14,7 +14,7 @@
 #include "general/Game.h"
 #include "ui/popovers/ChooseCheatOptionPopover.h"
 #include "ui/SceneRenderer.h"
-#include "ui/views/drawables/ScrollbarView.h"
+#include "ui/views/ScrollbarView.h"
 
 CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
     : GameInfoTabScene(),

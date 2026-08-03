@@ -12,7 +12,7 @@
 #include <cstring>
 
 #include "general/Game.h"
-#include "ui/views/drawables/ScrollbarView.h"
+#include "ui/views/ScrollbarView.h"
 
 SettingsScene::SettingsScene(Game* game)
     : GameInfoTabScene(),

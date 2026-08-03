@@ -14,7 +14,7 @@
 #include "general/Game.h"
 #include "general/M64File.h"
 #include "ui/scenes/GameLaunchScene.h"
-#include "ui/views/drawables/ScrollbarView.h"
+#include "ui/views/ScrollbarView.h"
 
 SpeedrunsScene::SpeedrunsScene(Game* game)
     : GameInfoTabScene(),

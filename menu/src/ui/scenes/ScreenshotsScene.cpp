@@ -11,7 +11,7 @@
 
 #include "main.h"
 #include "general/Game.h"
-#include "ui/views/drawables/ScrollbarView.h"
+#include "ui/views/ScrollbarView.h"
 
 ScreenshotsScene::ScreenshotsScene(Game* game)
     : GameInfoTabScene(),

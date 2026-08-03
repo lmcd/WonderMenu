@@ -10,7 +10,7 @@
 #include "ui/views/BaseView.h"
 #include "ui/views/drawables/RectView.h"
 
-struct ScrollbarView : public BaseView {
+struct ScrollbarView : public View {
 private:
     static constexpr Color DEFAULT_FILL_COLOR = Color{128};
     static constexpr float MINIMUM_KNOB_SIZE = 40.0f;
@@ -37,4 +37,5 @@ public:
     Rect effectiveKnobRect();
 
     void update(const RenderInfo& renderInfo) override;
+    void render(const RenderInfo& renderInfo) override;
 };

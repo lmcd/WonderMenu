@@ -8,7 +8,7 @@
 #include "ui/Scene.h"
 #include "ui/scenes/GameInfoTabScene.h"
 #include "ui/View.h"
-#include "ui/views/drawables/ScrollbarView.h"
+#include "ui/views/ScrollbarView.h"
 #include "ui/views/drawables/TabControlView.h"
 
 class Game;
