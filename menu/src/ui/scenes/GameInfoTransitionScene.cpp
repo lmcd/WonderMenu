@@ -36,14 +36,14 @@ void GameInfoTransitionScene::didEndScene(){
 void GameInfoTransitionScene::didBeginScene(SceneEntry entry) {
     if (entry == SCENE_PUSH) {
         transition.direction = Transition::FORWARDS;
+
+        gameInfoScene->view.frame = view.frame;
+        gameInfoScene->renderer = renderer;
+        gameInfoScene->setCurrentTab(GameInfoScene::TAB_CHEATS);
     }
     else {
         transition.direction = Transition::BACKWARDS;
     }
-
-    gameInfoScene->view.frame = view.frame;
-    gameInfoScene->renderer = renderer;
-    gameInfoScene->setCurrentTab(GameInfoScene::TAB_CHEATS);
 
     view.addSubview(&gameLaunchScene->view);
     view.addSubview(&gameInfoScene->view);
