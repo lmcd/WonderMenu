@@ -245,9 +245,8 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
 
                     auto result = presentPopover<ChooseCheatOptionPopover>(firstOption, wildcardCount);
 
-                    row.multipleChoiceIndex = result.value;
-
                     if (result.didSucceed()) {
+                        row.multipleChoiceIndex = result.value;
                         enabledCheatIndexes.insert(index);
                     }
                 }
