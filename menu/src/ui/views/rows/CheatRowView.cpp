@@ -48,8 +48,10 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
         22
     );
 
+    int subtitleRightInset = 19;
+
     Vec2 subtitlePosition = titlePosition;
-    subtitlePosition.x = 249;
+    subtitlePosition.x = frame.size.width - subtitleView.maxWidth - subtitleRightInset;
 
     Vec2 checkboxPosition(
         titlePosition.x - 26,
