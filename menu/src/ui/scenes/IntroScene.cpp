@@ -118,7 +118,8 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
             std::sort(entries.begin(), entries.end(),
                 [](const GameDatabase::Entry* a, const GameDatabase::Entry* b) {
                     return a->labelTileOffset < b->labelTileOffset;
-                });
+                }
+            );
 
             for (GameDatabase::Entry* entry : entries) {
                 // Cache FAT cluster offsets of each label in the database
