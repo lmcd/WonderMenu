@@ -233,8 +233,11 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
 
             const Cheat& cheat = cheatsDatabase->cheats[row.index];
 
-            if (!enabledCheatIndexes.erase(index)) {
-                if (cheat.wildcardCount > 0) {
+            if (cheat.wildcardCount > 0) {
+                if (enabledCheatIndexes.contains(index)) {
+                    enabledCheatIndexes.erase(index);
+                }
+                else {
                     tableView.isADown = false;
 
                     CheatWildcardOption* firstOption = &cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex];
@@ -245,32 +248,12 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
                     row.multipleChoiceIndex = result.value;
 
                     if (result.didSucceed()) {
-                         enabledCheatIndexes.insert(index);
+                        enabledCheatIndexes.insert(index);
                     }
                 }
-                else {
-                    enabledCheatIndexes.insert(index);
-                }
             }
 
-            // Traverse up the row hierarchy and refresh each parent group's count
-            int parentIndex = row.parentRowIndex;
-
-            while (parentIndex >= 0) {
-                RowInfo& parent = rows[parentIndex];
-                
-                parent.enabledCheatCount = countEnabledCheatsForGroup(parent.index);
-                
-                // TODO: why do we need this
-                if (parent.parentRowIndex == 0) {
-                    // Skip root group
-                    break;
-                }
-
-                parentIndex = parent.parentRowIndex;
-            }
-
-            enableSelectedCheats();
+            finishCheatSelection(row);
         }
     }
     else if (aButtonEvent == InputWatcher::BUTTON_DOWN) {
@@ -290,6 +273,19 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
             else {
                 tableView.closeSelectedGroup(rowCountForGroup(index));
             }
+        }
+        else {
+             const Cheat& cheat = cheatsDatabase->cheats[row.index];
+
+             if (cheat.wildcardCount == 0) {
+                int index = row.index;
+
+                if (!enabledCheatIndexes.erase(index)) {
+                    enabledCheatIndexes.insert(index);
+                }
+
+                finishCheatSelection(row);
+             }
         }
     }
 
@@ -317,6 +313,27 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
         //     scrollPosition = selectedIndex - ROWS_VISIBLE + 1;
         // }
     }
+}
+
+void CheatsScene::finishCheatSelection(const RowInfo& row) {
+    // Traverse up the row hierarchy and refresh each parent group's count
+    int parentIndex = row.parentRowIndex;
+
+    while (parentIndex >= 0) {
+        RowInfo& parent = rows[parentIndex];
+
+        parent.enabledCheatCount = countEnabledCheatsForGroup(parent.index);
+
+        // TODO: why do we need this
+        if (parent.parentRowIndex == 0) {
+            // Skip root group
+            break;
+        }
+
+        parentIndex = parent.parentRowIndex;
+    }
+
+    enableSelectedCheats();
 }
 
 void CheatsScene::enableSelectedCheats() {

@@ -59,6 +59,7 @@ private:
     void buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex, int indent);
     int countEnabledCheatsForGroup(uint16_t groupIndex);
 
+    void finishCheatSelection(const RowInfo& row);
     void enableSelectedCheats();
 
 public:
