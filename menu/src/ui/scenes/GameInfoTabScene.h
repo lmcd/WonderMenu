@@ -12,4 +12,5 @@
 class GameInfoTabScene : public Scene {
 public:
     ScrollbarView* scrollbarView = nullptr;
+    View* mainContentView = nullptr;
 };

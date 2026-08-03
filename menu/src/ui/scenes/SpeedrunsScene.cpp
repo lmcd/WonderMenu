@@ -20,6 +20,8 @@ SpeedrunsScene::SpeedrunsScene(Game* game)
     : GameInfoTabScene(),
       game(game) {
 
+    mainContentView = &tableView;
+
     tableView.rowHeight = 52;
 
     labelView.frame.origin.y = 250;

@@ -60,7 +60,7 @@ void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
     );
 
     if (currentTabScene != nullptr) {
-        currentTabScene->view.frame.origin.y = yRenderOffset;
+        currentTabScene->view.frame.origin.y = contentYOffset;
         currentTabScene->updateViews(renderInfo);
     }
 }
@@ -122,6 +122,8 @@ void GameInfoScene::setCurrentTab(Tab _currentTab) {
     if (currentTabScene != nullptr) {
         currentTabScene->view.frame = view.frame;
         currentTabScene->scrollbarView = &scrollbarView;
+
+        mainContentView = currentTabScene->mainContentView;
 
         addChildScene(currentTabScene);
         

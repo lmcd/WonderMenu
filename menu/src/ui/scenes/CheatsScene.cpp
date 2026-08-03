@@ -27,6 +27,8 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
 
     rebuildRows();
 
+    mainContentView = &tableView;
+
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;

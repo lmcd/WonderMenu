@@ -57,18 +57,26 @@ void GameInfoTransitionScene::updateViews(const RenderInfo& renderInfo) {
 
     float yOffset = std::lerp(renderInfo.screenRect.size.height, 0, value);
 
-    Rect scissorRect = renderInfo.screenRect;
-    scissorRect.size.height = yOffset;
-
-    gameLaunchScene->view.scissorRect = scissorRect;
     gameLaunchScene->cart3DView.intensity = opacityOut;
 
-    gameInfoScene->yRenderOffset = yOffset;
+    gameInfoScene->contentYOffset = yOffset;
     gameInfoScene->tabControlView.opacity = opacityIn;
     gameInfoScene->scrollbarView.opacity = opacityIn;
 
     gameLaunchScene->updateViews(renderInfo);
     gameInfoScene->updateViews(renderInfo);
+
+    View* mainContentView = gameInfoScene->mainContentView;
+    bool needsScissor = (mainContentView != nullptr);
+
+    if (needsScissor) {
+        Rect screenRect = renderInfo.screenRect;
+        Rect worldFrame = mainContentView->worldFrame();
+        Rect scissorRect = screenRect;
+        scissorRect.size.height = std::min(screenRect.size.height, worldFrame.origin.y);
+
+        gameLaunchScene->view.scissorRect = scissorRect;
+    }
 }
 
 void GameInfoTransitionScene::update(const UpdateInfo& updateInfo) {

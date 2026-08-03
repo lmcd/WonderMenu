@@ -35,10 +35,11 @@ public:
 
     GameInfoScene(Game* game, GameDatabase* database);
 
-    int yRenderOffset = 0;
+    int contentYOffset = 0;
     Tab currentTab = TAB_SETTINGS;
     TabControlView tabControlView;
     ScrollbarView scrollbarView;
+    View* mainContentView;
 
     void setCurrentTab(Tab _currentTab);
 
