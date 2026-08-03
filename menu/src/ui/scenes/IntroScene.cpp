@@ -13,6 +13,7 @@
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 #include "general/GameLibrary.h"
+#include "ui/Fonts.h"
 #include "ui/popovers/ScreenshotsImportPopover.h"
 #include "ui/scenes/ListScene.h"
 #include "ui/scenes/ListTransitionScene.h"
@@ -129,11 +130,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Label Cluster Offsets: %.3fs\n", seconds);
 
         seconds = measure([&] {
-            rdpq_text_register_font(2, rdpq_font_load("rom:/fonts/Unbounded-Black95-16.font64"));
-            rdpq_text_register_font(3, rdpq_font_load("rom:/fonts/InterDisplay-SemiBold-15.font64"));
-            rdpq_text_register_font(4, rdpq_font_load("rom:/fonts/Unbounded-Black-14.font64"));
-            rdpq_text_register_font(5, rdpq_font_load("rom:/fonts/InterDisplay-SemiBold-digits-15.font64"));
-            rdpq_text_register_font(6, rdpq_font_load("rom:/fonts/InterDisplay-SemiBold-12.font64"));
+            Fonts::loadAll();
         });
 
         debugf("[IntroScene] Loaded Fonts: %.3fs\n", seconds);

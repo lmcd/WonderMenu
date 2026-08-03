@@ -173,7 +173,7 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     labelView.setString("Processing Screenshots");
     labelView.textColor = Color(128);
     labelView.align = ALIGN_CENTER;
-    labelView.fontID = 6;
+    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
 
     Rect sceneRect = view.frame;
 

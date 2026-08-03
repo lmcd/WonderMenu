@@ -60,7 +60,7 @@ public:
         tableView.selectedRowView.isRounded = true;
 
         titleLabelView.align = ALIGN_CENTER;
-        titleLabelView.fontID = 4;
+        titleLabelView.fontID = Fonts::UNBOUNDED_BLACK_14;
 
         rectView.radius = 30;
         rectView.isSmooth = true;

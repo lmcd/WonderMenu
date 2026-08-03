@@ -265,7 +265,7 @@ void ListScene::setupViews() {
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
-    labelView.fontID = 3;
+    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     labelView.setString("No Games Found");
     labelView.textColor = Color(128);
 

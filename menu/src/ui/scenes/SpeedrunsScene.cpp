@@ -24,7 +24,7 @@ SpeedrunsScene::SpeedrunsScene(Game* game)
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
-    labelView.fontID = 3;
+    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     labelView.textColor = Color(128);
 }
 

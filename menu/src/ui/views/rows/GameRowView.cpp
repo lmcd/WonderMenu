@@ -12,13 +12,13 @@ GameRowView::GameRowView() {
     Color subtitleColor = Color::WHITE;
     subtitleColor.a *= 0.5;
 
-    titleView.fontID = 2;
+    titleView.fontID = Fonts::UNBOUNDED95_BLACK_16;
     titleView.textColor = titleColor;
 
-    subtitleView.fontID = 3;
+    subtitleView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     subtitleView.textColor = subtitleColor;
 
-    versionNumberView.fontID = 3;
+    versionNumberView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     versionNumberView.textColor = subtitleColor;
     versionNumberView.align = ALIGN_RIGHT;
 

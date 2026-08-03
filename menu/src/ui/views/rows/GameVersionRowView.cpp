@@ -11,7 +11,7 @@ GameVersionRowView::GameVersionRowView() {
     titleView.fontID = FONT_ID;
     titleView.align = ALIGN_LEFT;
 
-    subtitleView.fontID = 5;
+    subtitleView.fontID = Fonts::INTERDISPLAY_DIGITS_SEMIBOLD_15;
     subtitleView.align = ALIGN_LEFT;
 
 	addSubview(&flagView);

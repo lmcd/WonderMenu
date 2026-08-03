@@ -21,7 +21,7 @@ TabControlView::TabControlView() {
     lrSheet = sprite_get_pixels(lrSprite);
 
     for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
-        labelView.fontID = 4;
+        labelView.fontID = Fonts::UNBOUNDED_BLACK_14;
         labelView.align = ALIGN_LEFT;
         labelView.maxWidth = 200;
 
