@@ -21,10 +21,12 @@ GameInfoScene::GameInfoScene(Game* game, GameDatabase* database)
     view.addSubview(&tabControlView);
     view.addSubview(&scrollbarView);
 
-    tabControlView.tabs[0] = TabInfo(74,  "CHEATS");
-    tabControlView.tabs[1] = TabInfo(136, "SCREENSHOTS");
-    tabControlView.tabs[2] = TabInfo(109, "SPEEDRUNS");
-    tabControlView.tabs[3] = TabInfo(92,  "SETTINGS");
+    tabControlView.setTabs(
+        "CHEATS",
+        "SCREENSHOTS",
+        "SPEEDRUNS",
+        "SETTINGS"
+    );
 
     tabControlView.numberOfSegments = 4;
 }

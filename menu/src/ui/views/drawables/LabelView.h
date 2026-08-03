@@ -44,6 +44,8 @@ public:
         }
 
         memcpy(string, temp, n + 1);
+
+        this->stringReference = string;
     }
 
     void update(const RenderInfo& renderInfo) override {
@@ -60,21 +62,10 @@ public:
         if (strcmp(string, lastString[bufferIndex]) != 0) {
             this->needsClear = true;
             this->needsRender = true;
+
             memcpy(lastString[bufferIndex], string, n + 1);
 
-            rdpq_textparms_t params = {
-                .width = (int16_t)this->maxWidth,
-                .align = this->align,
-                .wrap = WRAP_ELLIPSES,
-                .disable_aa_fix = true
-            };
-
-            n = std::min(n, MAX_LAYOUT_CHARS - 1);
-
-            rdpq_paragraph_t *_layout = (rdpq_paragraph_t*)this->layoutStorage;
-            _layout->capacity = n + 1;
-
-            this->layout = __rdpq_paragraph_build(&params, this->fontID, string, &n, _layout);
+            this->updateParagraphLayout();
         }
     }
 };

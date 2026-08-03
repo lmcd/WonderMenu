@@ -58,6 +58,34 @@ public:
 	TabControlView();
 	~TabControlView();
 
+	/**
+	 * Set every tab from a list of titles
+	 */
+	template <typename... Args>
+	void setTabs(Args&&... titles) {
+		numberOfSegments = 0;
+
+		([&] {
+			if (numberOfSegments >= MAX_TAB_SEGMENTS) {
+				return;
+			}
+
+			int index = numberOfSegments;
+
+			LabelView<MAX_TAB_LABEL_CHARS>& labelView = labelViews[index];
+
+			labelView.setString("%s", titles);
+			labelView.sizeToFit();
+
+			snprintf(tabs[index].label, MAX_TAB_LABEL_CHARS, "%s", titles);
+			tabs[index].width = labelView.frame.size.width;
+
+			numberOfSegments++;
+		}(), ...);
+
+		freeLabelsBlock();
+	}
+
 	void setSelectedSegment(int index, bool animated);
 	bool handleInputs(const UpdateInfo& updateInfo);
 	

@@ -23,6 +23,7 @@ TabControlView::TabControlView() {
     for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
         labelView.fontID = 4;
         labelView.align = ALIGN_LEFT;
+        labelView.maxWidth = 200;
 
         addSubview(&labelView);
     }

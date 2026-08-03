@@ -274,12 +274,12 @@ void ListScene::setupViews() {
     selectionRectView.radius = 16;
     selectionRectView.isSmooth = true;
     
-    tabControlView.tabs[0] = TabInfo(69,  "GAMES");
-    tabControlView.tabs[1] = TabInfo(111, "HOMEBREW");
-    tabControlView.tabs[2] = TabInfo(80,  "HISTORY");
-    tabControlView.tabs[3] = TabInfo(116, "FAVOURITES");
-
-    tabControlView.numberOfSegments = 4;
+    tabControlView.setTabs(
+        "GAMES",
+        "HOMEBREW",
+        "HISTORY",
+        "FAVOURITES"
+    );
 }
 
 void ListScene::updateViews(const RenderInfo& renderInfo) {

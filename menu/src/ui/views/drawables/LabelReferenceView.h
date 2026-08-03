@@ -92,6 +92,27 @@ protected:
 
     rdpq_paragraph_t* layout = nullptr;
 
+    void updateParagraphLayout() {
+        rdpq_textparms_t params = {
+            .width = (int16_t)maxWidth,
+            .align = align,
+            .wrap = WRAP_ELLIPSES,
+            .disable_aa_fix = true
+        };
+
+        int n = stringReference ? (int)strlen(stringReference) : 0;
+
+        if (n > MAX_LAYOUT_CHARS - 1) {
+            n = MAX_LAYOUT_CHARS - 1;
+        }
+
+        rdpq_paragraph_t *_layout = (rdpq_paragraph_t*)layoutStorage;
+        memset(_layout, 0, sizeof(*_layout));
+        _layout->capacity = n + 1;
+
+        layout = __rdpq_paragraph_build(&params, fontID, stringReference, &n, _layout);
+    }
+
 public:
     const char* name() const override { return "LabelReferenceView"; }
 
@@ -100,6 +121,18 @@ public:
     uint8_t fontID = 1;
     Color textColor = Color::WHITE;
     const char* stringReference = nullptr;
+
+    /**
+     * Size the frame to the laid-out text
+     */
+    void sizeToFit() {
+        updateParagraphLayout();
+
+        frame.size = Size(
+            (int)(layout->bbox.x1 - layout->bbox.x0),
+            (int)(layout->bbox.y1 - layout->bbox.y0)
+        );
+    }
 
     void update(const RenderInfo& renderInfo) override {
         Drawable::update(renderInfo);
@@ -116,28 +149,7 @@ public:
             needsClear = true;
             needsRender = true;
 
-            rdpq_textparms_t params = {
-                .width = (int16_t)maxWidth,
-                .align = align,
-                .wrap = WRAP_ELLIPSES,
-                .disable_aa_fix = true
-            };
-
-            // __rdpq_paragraph_build takes &n as the number of chars to lay out
-            // (in) and returns the count laid out (out). Unlike LabelView there's
-            // no vsnprintf to set it, so seed it from the referenced string --
-            // otherwise n stays 0 and the layout comes back empty (nothing draws).
-            int n = stringReference ? (int)strlen(stringReference) : 0;
-
-            if (n > MAX_LAYOUT_CHARS - 1) {
-                n = MAX_LAYOUT_CHARS - 1;
-            }
-
-            rdpq_paragraph_t *_layout = (rdpq_paragraph_t*)layoutStorage;
-            memset(_layout, 0, sizeof(*_layout));
-            _layout->capacity = n + 1;
-
-            layout = __rdpq_paragraph_build(&params, fontID, stringReference, &n, _layout);
+            updateParagraphLayout();
 
             lastStringReference[bufferIndex] = stringReference;
         }
