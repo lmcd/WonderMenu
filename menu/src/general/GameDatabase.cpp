@@ -335,35 +335,34 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
         return nullptr;
     }
 
-    uint16_t groupCount = 0;
-    uint16_t cheatCount = 0;
-    uint16_t codeCount  = 0;
-    uint16_t wildcardOptionsCount = 0;
+    uint16_t counts[4] = {};
 
-    fread(&groupCount, 1, 2, databaseFile);
-    fread(&cheatCount, 1, 2, databaseFile);
-    fread(&codeCount,  1, 2, databaseFile);
-    fread(&wildcardOptionsCount, 1, 2, databaseFile);
+    // TODO: Read straight into database header instead
+    if (fread(counts, sizeof(uint16_t), 4, databaseFile) != 4) {
+        debugf("[GameDatabase] Failed to read cheat counts\n");
+        return nullptr;
+    }
+
+    uint16_t groupCount = counts[0];
+    uint16_t cheatCount = counts[1];
+    uint16_t codeCount  = counts[2];
+    uint16_t wildcardOptionsCount = counts[3];
 
     cheatDatabaseInstance.groups.resize(groupCount);
     cheatDatabaseInstance.cheats.resize(cheatCount);
     cheatDatabaseInstance.codes.resize(codeCount);
     cheatDatabaseInstance.wildcardOptions.resize(wildcardOptionsCount);
 
-    for (uint16_t i = 0; i < groupCount; i++) {
-        fread(&cheatDatabaseInstance.groups[i], 1, sizeof(CheatGroup), databaseFile);
-    }
+    bool didReadAll =
+        fread(cheatDatabaseInstance.groups.data(),          sizeof(CheatGroup),          groupCount,           databaseFile) == groupCount
+     && fread(cheatDatabaseInstance.cheats.data(),          sizeof(Cheat),               cheatCount,           databaseFile) == cheatCount
+     && fread(cheatDatabaseInstance.codes.data(),           sizeof(CheatCode),           codeCount,            databaseFile) == codeCount
+     && fread(cheatDatabaseInstance.wildcardOptions.data(), sizeof(CheatWildcardOption), wildcardOptionsCount, databaseFile) == wildcardOptionsCount
+    ;
 
-    for (uint16_t i = 0; i < cheatCount; i++) {
-        fread(&cheatDatabaseInstance.cheats[i], 1, sizeof(Cheat), databaseFile);
-    }
-
-    for (uint16_t i = 0; i < codeCount; i++) {
-        fread(&cheatDatabaseInstance.codes[i], 1, sizeof(CheatCode), databaseFile);
-    }
-
-    for (uint16_t i = 0; i < wildcardOptionsCount; i++) {
-        fread(&cheatDatabaseInstance.wildcardOptions[i], 1, sizeof(CheatWildcardOption), databaseFile);
+    if (!didReadAll) {
+        debugf("[GameDatabase] Failed to read cheat database\n");
+        return nullptr;
     }
 
     return &cheatDatabaseInstance;
@@ -438,7 +437,8 @@ bool GameDatabase::load(const char* filename) {
     memcpy(&tileCount, &headerBuffer[cursor], 2);
     cursor += sizeof(tileCount);
     
-    // Read gameID lookup map
+    // READ GAME ID MAP
+    // 5184 bytes
     memcpy(&gameIDMap, &headerBuffer[cursor], sizeof(gameIDMap));
     cursor += sizeof(gameIDMap);
 

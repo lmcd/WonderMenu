@@ -18,6 +18,7 @@
 #define PRINTF printf
 #endif
 
+#ifndef N64
 static void setTitle(char* dest, size_t destSize, const std::string& src) {
     strncpy(dest, src.c_str(), destSize - 1);
     dest[destSize - 1] = '\0';
@@ -39,7 +40,6 @@ static void writeU32BE(std::vector<uint8_t>& out, uint32_t v) {
     out.push_back(v & 0xFF);
 }
 
-#ifndef N64
 // outKey is set to the bracketed header key (e.g. "1FBAF161-2C1C54F1-C:41").
 bool CheatDatabase::loadChtFile(const char* path, std::string& outKey)
 {
