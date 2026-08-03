@@ -182,8 +182,10 @@ void CheatsScene::updateViews(const RenderInfo&) {
 
         CheatRowView* rowView = &tableView.rowViews[i++];
 
+        bool isCheatEnabled = enabledCheatIndexes.contains(row.index);
+
         rowView->indentLevel = row.indentLevel;
-        rowView->isChecked = enabledCheatIndexes.contains(row.index);
+        rowView->isChecked = isCheatEnabled;
         rowView->isGroup = row.isGroup;
         rowView->isExpanded = expandedGroupIndexes.contains(row.index);
         
@@ -199,7 +201,7 @@ void CheatsScene::updateViews(const RenderInfo&) {
 
             rowView->titleView.stringReference = cheat.title;
 
-            if (row.multipleChoiceIndex != -1) {
+            if (row.multipleChoiceIndex != -1 && isCheatEnabled) {
                 const CheatWildcardOption option = cheatsDatabase->wildcardOptions[row.multipleChoiceIndex];
 
                 rowView->setSubtitle("%s", option.title);
