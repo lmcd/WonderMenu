@@ -6,6 +6,7 @@
 #pragma once
 
 #include <libdragon.h>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -28,17 +29,11 @@ private:
     struct RowInfo {
         bool isGroup;
         uint16_t index;      // index into CheatDatabase::groups or ::cheats
-        uint32_t uid;        // stable id: isGroup in the top bit + index
         int parentRowIndex;
         int indentLevel;
         int enabledCheatCount;
         int multipleChoiceIndex = -1;
-
-        // Unique across both groups and cheats: the top bit distinguishes the
-        // two index spaces, the low bits hold the group/cheat index.
-        static uint32_t makeUID(bool isGroup, uint16_t index) {
-            return ((uint32_t)isGroup << 31) | index;
-        }
+        int childRowCount = 0;   // visible descendant rows, 0 when collapsed
     };
 
     CheatDatabase* cheatsDatabase;
@@ -49,15 +44,18 @@ private:
     std::unordered_set<int> expandedGroupIndexes;
     std::unordered_set<int> enabledCheatIndexes;
 
+    // Option chosen for each multiple choice cheat, keyed by cheat index.
+    std::unordered_map<int, int> multipleChoiceIndexes;
+
     TableView<CheatRowView> tableView;
     LabelView<64> labelView;
 
     InputWatcher aButtonWatcher;
 
-    int rowCountForGroup(uint16_t baseGroupIndex);
     void rebuildRows();
     void buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex, int indent);
     int countEnabledCheatsForGroup(uint16_t groupIndex);
+    int multipleChoiceIndexForCheat(uint16_t cheatIndex);
 
     void finishCheatSelection(const RowInfo& row);
     void enableSelectedCheats();

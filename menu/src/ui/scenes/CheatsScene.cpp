@@ -39,43 +39,6 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
     view.addSubview(&labelView);
 }
 
-int CheatsScene::rowCountForGroup(uint16_t baseGroupIndex) {
-    const CheatGroup& group = cheatsDatabase->groups[baseGroupIndex];
-
-    uint16_t cheatEnd = group.cheatStartIndex + group.cheatCount;
-    uint16_t groupEnd = group.groupStartIndex + group.groupCount;
-
-    uint16_t cheatIndex = group.cheatStartIndex;
-    uint16_t groupIndex = group.groupStartIndex;
-
-    int count = 0;
-
-    while (cheatIndex < cheatEnd) {
-        uint16_t nextSGStart = (groupIndex < groupEnd)
-            ? cheatsDatabase->groups[groupIndex].cheatStartIndex
-            : cheatEnd;
-
-        if (cheatIndex == nextSGStart) {
-            bool isExpanded = expandedGroupIndexes.contains(groupIndex);
-
-            count++;
-
-            if (isExpanded) {
-                count += rowCountForGroup(groupIndex);
-            }
-
-            cheatIndex = cheatsDatabase->groups[groupIndex].cheatStartIndex + cheatsDatabase->groups[groupIndex].cheatCount;
-            groupIndex++;
-        }
-        else {
-            count++;
-            cheatIndex++;
-        }
-    }
-
-    return count;
-}
-
 int CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
     const CheatGroup& group = cheatsDatabase->groups[groupIndex];
     int count = 0;
@@ -87,6 +50,12 @@ int CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
     }
 
     return count;
+}
+
+int CheatsScene::multipleChoiceIndexForCheat(uint16_t cheatIndex) {
+    auto it = multipleChoiceIndexes.find(cheatIndex);
+
+    return (it != multipleChoiceIndexes.end()) ? it->second : -1;
 }
 
 void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex, int indent) {
@@ -113,7 +82,6 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
             rows.push_back({
                 isGroup,
                 groupIndex,
-                RowInfo::makeUID(isGroup, groupIndex),
                 parentRowIndex,
                 indent,
                 countEnabledCheatsForGroup(groupIndex)
@@ -125,6 +93,9 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
                 buildRowsForGroup(groupIndex, rowIndex - 1, indent + 1);
             }
 
+            // Everything pushed since the group row is a descendant of it
+            rows[rowIndex - 1].childRowCount = rows.size() - rowIndex;
+
             cheatIndex = cheatsDatabase->groups[groupIndex].cheatStartIndex + cheatsDatabase->groups[groupIndex].cheatCount;
             groupIndex++;
         }
@@ -132,9 +103,10 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
             rows.push_back({
                 isGroup,
                 cheatIndex,
-                RowInfo::makeUID(isGroup, cheatIndex),
                 parentRowIndex,
-                indent
+                indent,
+                0,
+                multipleChoiceIndexForCheat(cheatIndex)
             });
             
             cheatIndex++;
@@ -254,6 +226,8 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
 
                     if (result.didSucceed()) {
                         row.multipleChoiceIndex = result.value;
+                        multipleChoiceIndexes[index] = result.value;
+
                         enabledCheatIndexes.insert(index);
                     }
                 }
@@ -274,10 +248,11 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
 
                 rebuildRows();
 
-                tableView.openSelectedGroup(rowCountForGroup(index));
+                // rebuildRows() replaced the rows, so `row` can't be used here
+                tableView.openSelectedGroup(rows[selectedIndex].childRowCount);
             }
             else {
-                tableView.closeSelectedGroup(rowCountForGroup(index));
+                tableView.closeSelectedGroup(row.childRowCount);
             }
         }
         else {
