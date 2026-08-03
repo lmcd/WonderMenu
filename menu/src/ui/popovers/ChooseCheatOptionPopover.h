@@ -26,7 +26,7 @@ protected:
 public:
     const char* name() { return "ChooseCheatOptionPopover"; }
 
-    ChooseCheatOptionPopover(Scene* baseScene, CheatWildcardOption* firstOption, int wildcardCount);
+    ChooseCheatOptionPopover(Scene* baseScene, CheatWildcardOption* firstOption, int wildcardCount, int selectedIndex = 0);
 
     void updateViews(const RenderInfo& renderInfo);
     void update(const UpdateInfo& updateInfo) override;

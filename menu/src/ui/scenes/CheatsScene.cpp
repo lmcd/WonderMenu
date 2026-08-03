@@ -245,7 +245,10 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
                     CheatWildcardOption* firstOption = &cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex];
                     int wildcardCount = cheat.wildcardCount;
 
-                    auto result = presentPopover<ChooseCheatOptionPopover>(firstOption, wildcardCount);
+                    // Re-open on the previously chosen option, if there is one
+                    int optionIndex = (row.multipleChoiceIndex != -1) ? row.multipleChoiceIndex : 0;
+
+                    auto result = presentPopover<ChooseCheatOptionPopover>(firstOption, wildcardCount, optionIndex);
 
                     if (result.didSucceed()) {
                         row.multipleChoiceIndex = result.value;
@@ -288,11 +291,6 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
                 finishCheatSelection(row);
              }
         }
-    }
-
-    // A: toggle expand/collapse on a group, or on/off for a cheat
-    if (btn.a && !rows.empty()) {
-        
     }
     // B: close the scene
     else if (btn.b) {;

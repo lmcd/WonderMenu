@@ -5,13 +5,17 @@
 
 #include "ChooseCheatOptionPopover.h"
 
+#include <algorithm>
+
 #include "general/CheatDatabase.h"
 
-ChooseCheatOptionPopover::ChooseCheatOptionPopover(Scene* baseScene, CheatWildcardOption* firstOption, int wildcardCount)
+ChooseCheatOptionPopover::ChooseCheatOptionPopover(Scene* baseScene, CheatWildcardOption* firstOption, int wildcardCount, int selectedIndex)
     : Popover<CheatOptionRowView, int>(baseScene),
       firstOption(firstOption),
       wildcardCount(wildcardCount) {
     title = "CHOOSE OPTION";
+
+    initialSelectedRowIndex = std::clamp(selectedIndex, 0, wildcardCount - 1);
 }
 
 void ChooseCheatOptionPopover::updateViews(const RenderInfo& renderInfo) {

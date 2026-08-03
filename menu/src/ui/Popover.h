@@ -39,6 +39,9 @@ protected:
     int bottomPadding = 25;
     int tableY = 46;
 
+    // Row highlighted when the popover opens
+    int initialSelectedRowIndex = 0;
+
     /**
      * The value a successful selection resolves to
      */
@@ -99,7 +102,8 @@ private:
 
         hasMadeSelection = false;
         hasCancelled = false;
-        tableView.selectedRowIndex = 0;
+        tableView.selectedRowIndex = initialSelectedRowIndex;
+        tableView.clampScrollPosition();
 
         ResultStatus resultStatus;
 
