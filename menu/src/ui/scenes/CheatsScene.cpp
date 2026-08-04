@@ -39,9 +39,9 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
     view.addSubview(&labelView);
 }
 
-int CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
+uint8_t CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
     const CheatGroup& group = cheatsDatabase->groups[groupIndex];
-    int count = 0;
+    uint8_t count = 0;
 
     for (uint16_t i = group.cheatStartIndex; i < group.cheatStartIndex + group.cheatCount; i++) {
         if (enabledCheatIndexes.contains(i)) {
@@ -52,13 +52,13 @@ int CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
     return count;
 }
 
-int CheatsScene::multipleChoiceIndexForCheat(uint16_t cheatIndex) {
+int16_t CheatsScene::multipleChoiceIndexForCheat(uint16_t cheatIndex) {
     auto it = multipleChoiceIndexes.find(cheatIndex);
 
-    return (it != multipleChoiceIndexes.end()) ? it->second : -1;
+    return (it != multipleChoiceIndexes.end()) ? (int16_t)it->second : -1;
 }
 
-void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex, int indent) {
+void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, uint16_t parentRowIndex, uint8_t indent) {
     const CheatGroup& group = cheatsDatabase->groups[baseGroupIndex];
 
     uint16_t cheatEnd = group.cheatStartIndex + group.cheatCount;
@@ -67,7 +67,7 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
     uint16_t cheatIndex = group.cheatStartIndex;
     uint16_t groupIndex = group.groupStartIndex;
 
-    int rowIndex = parentRowIndex;
+    uint16_t rowIndex = parentRowIndex;
 
     while (cheatIndex < cheatEnd) {
         uint16_t nextSGStart = (groupIndex < groupEnd)
@@ -77,6 +77,8 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
         bool isGroup = (cheatIndex == nextSGStart);
 
         if (isGroup) {
+            const CheatGroup& childGroup = cheatsDatabase->groups[groupIndex];
+
             bool isExpanded = expandedGroupIndexes.contains(groupIndex);
 
             rows.push_back({
@@ -87,16 +89,17 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
                 countEnabledCheatsForGroup(groupIndex)
             });
 
-            rowIndex = rows.size();
+            rowIndex = (uint16_t)rows.size();
 
             if (isExpanded) {
                 buildRowsForGroup(groupIndex, rowIndex - 1, indent + 1);
             }
 
             // Everything pushed since the group row is a descendant of it
-            rows[rowIndex - 1].childRowCount = rows.size() - rowIndex;
+            rows[rowIndex - 1].childRowCount = (uint16_t)(rows.size() - rowIndex);
 
-            cheatIndex = cheatsDatabase->groups[groupIndex].cheatStartIndex + cheatsDatabase->groups[groupIndex].cheatCount;
+            // Skip past every cheat the child group covers
+            cheatIndex = childGroup.cheatStartIndex + childGroup.cheatCount;
             groupIndex++;
         }
         else {
@@ -112,7 +115,7 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex,
             cheatIndex++;
         }
 
-        rowIndex = rows.size();
+        rowIndex = (uint16_t)rows.size();
     }
 }
 
@@ -292,15 +295,14 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
 }
 
 void CheatsScene::finishCheatSelection(const RowInfo& row) {
-    // Traverse up the row hierarchy and refresh each parent group's count
-    int parentIndex = row.parentRowIndex;
+    // Traverse up the row hierarchy and refresh each parent group's count.
+    uint16_t parentIndex = row.parentRowIndex;
 
-    while (parentIndex >= 0) {
+    while (parentIndex < rows.size()) {
         RowInfo& parent = rows[parentIndex];
 
         parent.enabledCheatCount = countEnabledCheatsForGroup(parent.index);
 
-        // TODO: why do we need this
         if (parent.parentRowIndex == 0) {
             // Skip root group
             break;

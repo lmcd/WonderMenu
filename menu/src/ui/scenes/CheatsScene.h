@@ -25,15 +25,26 @@ struct CheatDatabase;
  */
 class CheatsScene : public GameInfoTabScene {
 private:
-    // Each item in the visible list is either a cheat entry or a child group
+    /**
+     * Data associated with a row in the cheats table.
+     */
     struct RowInfo {
+        // Does this row represent a group/folder?
+        // true if row represents a group
+        // false if row represents a cheat
         bool isGroup;
-        uint16_t index;      // index into CheatDatabase::groups or ::cheats
-        int parentRowIndex;
-        int indentLevel;
-        int enabledCheatCount;
-        int multipleChoiceIndex = -1;
-        int childRowCount = 0;   // visible descendant rows, 0 when collapsed
+        // Indexes `CheatDatabase::groups` when `isGroup` equals `true`
+        // Indexes `CheatDatabase::cheats` when `isGroup` equals `false`
+        uint16_t index;
+        uint16_t parentRowIndex;
+        uint8_t indentLevel = 0;
+        uint8_t enabledCheatCount = 0;
+        // Which multiple choice option did the user select in the popover?
+        // -1 if none.
+        int16_t multipleChoiceIndex = -1;
+        // Visible child rows.
+        // 0 when collapsed.
+        uint16_t childRowCount = 0;
     };
 
     CheatDatabase* cheatsDatabase;
@@ -53,9 +64,9 @@ private:
     InputWatcher aButtonWatcher;
 
     void rebuildRows();
-    void buildRowsForGroup(uint16_t baseGroupIndex, int parentRowIndex, int indent);
-    int countEnabledCheatsForGroup(uint16_t groupIndex);
-    int multipleChoiceIndexForCheat(uint16_t cheatIndex);
+    void buildRowsForGroup(uint16_t baseGroupIndex, uint16_t parentRowIndex, uint8_t indent);
+    uint8_t countEnabledCheatsForGroup(uint16_t groupIndex);
+    int16_t multipleChoiceIndexForCheat(uint16_t cheatIndex);
 
     void finishCheatSelection(const RowInfo& row);
     void enableSelectedCheats();
