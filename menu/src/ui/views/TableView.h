@@ -409,7 +409,7 @@ struct TableView : public View {
     Rect tableRect() {
         int visibleCount = visibleRowCount();
 
-        int xInset = 8 + 3;
+        int xInset = 1 + 3;
         int barWidth = frame.size.width - (xInset * 2);
 
         Rect rect(

@@ -40,6 +40,8 @@ private:
      */
     int sceneFrameNumber = 0;
 
+    int horizontalOverscan = 7;
+
     // Destruct/free scenes that have been removed and are pending deletion
     // Scenes owned by the renderer aren't immediately free'd on removal,
     // as they need a few frames to properly clear from all the framebuffers first

@@ -219,8 +219,7 @@ Size SceneRenderer::displaySize() {
 Rect SceneRenderer::sceneRect() {
     Rect baseRect = Rect(Vec2::ZERO, displaySize());
 
-    // TODO: update this to account for overscan
-    return baseRect.insetBy(Vec2(0, 0));
+    return baseRect.insetBy(Vec2(horizontalOverscan, 0));
 }
 
 void SceneRenderer::removeChildScene(Scene* childScene) {

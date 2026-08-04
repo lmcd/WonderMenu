@@ -49,11 +49,10 @@ void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
 
     tabControlView.isEnabled = (popoverProgress == 0.0f);
 
-    int overscan = 7;
     int scrollbarWidth = 8;
 
     scrollbarView.frame = Rect(
-        view.frame.size.width - scrollbarWidth - overscan,
+        view.frame.size.width - scrollbarWidth,
         0,
         scrollbarWidth,
         view.frame.size.height

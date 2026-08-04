@@ -192,8 +192,8 @@ void CheatsScene::updateViews(const RenderInfo&) {
     scrollbarView->contentHeight = tableView.contentHeight() + tableView.frame.minY();
     scrollbarView->scrollPosition = tableView.scrollPosition * tableView.paddedRowHeight();
 
-    tableView.backgroundRectView.setNeedsDisplay(scrollbarView->frame);
-    tableView.selectedRowView.setNeedsDisplay(scrollbarView->frame);
+    tableView.backgroundRectView.setNeedsDisplay(scrollbarView->worldFrame());
+    tableView.selectedRowView.setNeedsDisplay(scrollbarView->worldFrame());
 }
 
 void CheatsScene::update(const UpdateInfo& updateInfo) {

@@ -130,7 +130,7 @@ void ListScene::didBeginScene(SceneEntry) {
     numberOfOffEdgeRows = std::ceil((float)(numberOfDisplayableRows - 1) / 2);
     cartScale = 0.005286;
     cartSize = cartRenderer->sizeForScale(cartScale);
-    cartMiddleX = cartSize.midX() + 34;
+    cartMiddleX = cartSize.midX() + 27;
 
     loadVisibleCarts();
     setupViews();
@@ -261,7 +261,7 @@ void ListScene::setupViews() {
         view.frame.size.width,
         rowHeight
     );
-    selectedRowRect = selectedRowRect.insetBy(Vec2(8, 0));
+    selectedRowRect = selectedRowRect.insetBy(Vec2(1, 0));
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
@@ -371,11 +371,10 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
         }
     }
 
-    int overscan = 7;
     int scrollbarWidth = 8;
 
     scrollbarView.frame = Rect(
-        view.frame.size.width - scrollbarWidth - overscan,
+        view.frame.size.width - scrollbarWidth,
         0,
         scrollbarWidth,
         view.frame.size.height
@@ -383,7 +382,7 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
     scrollbarView.contentHeight = contentHeight();
     scrollbarView.scrollPosition = scrollPosition;
 
-    selectionRectView.setNeedsDisplay(scrollbarView.frame);
+    selectionRectView.setNeedsDisplay(scrollbarView.worldFrame());
 
     tableView.rowViews[0].titleView.setNeedsDisplay();
     tableView.rowViews[0].subtitleView.setNeedsDisplay();
