@@ -313,8 +313,6 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 }
 #endif
 
-static CheatDatabase cheatDatabaseInstance;
-
 CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     if (!databaseFile) {
         return nullptr;
@@ -331,7 +329,7 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     debugf("[GameDatabase] Global offset: %li\n", offset);
 
     if (fseek(databaseFile, offset, SEEK_SET) != 0) {
-        debugf("Failed to seek to offset %li\n", cheatsStartOffset);
+        debugf("[GameDatabase] Failed to seek to offset %li\n", cheatsStartOffset);
         return nullptr;
     }
 
@@ -348,24 +346,29 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     uint16_t codeCount  = counts[2];
     uint16_t wildcardOptionsCount = counts[3];
 
-    cheatDatabaseInstance.groups.resize(groupCount);
-    cheatDatabaseInstance.cheats.resize(cheatCount);
-    cheatDatabaseInstance.codes.resize(codeCount);
-    cheatDatabaseInstance.wildcardOptions.resize(wildcardOptionsCount);
+    CheatDatabase* cheatDatabase = new CheatDatabase();
+
+    cheatDatabase->groups.resize(groupCount);
+    cheatDatabase->cheats.resize(cheatCount);
+    cheatDatabase->codes.resize(codeCount);
+    cheatDatabase->wildcardOptions.resize(wildcardOptionsCount);
 
     bool didReadAll =
-        fread(cheatDatabaseInstance.groups.data(),          sizeof(CheatGroup),          groupCount,           databaseFile) == groupCount
-     && fread(cheatDatabaseInstance.cheats.data(),          sizeof(Cheat),               cheatCount,           databaseFile) == cheatCount
-     && fread(cheatDatabaseInstance.codes.data(),           sizeof(CheatCode),           codeCount,            databaseFile) == codeCount
-     && fread(cheatDatabaseInstance.wildcardOptions.data(), sizeof(CheatWildcardOption), wildcardOptionsCount, databaseFile) == wildcardOptionsCount
+        fread(cheatDatabase->groups.data(),          sizeof(CheatGroup),          groupCount,           databaseFile) == groupCount
+     && fread(cheatDatabase->cheats.data(),          sizeof(Cheat),               cheatCount,           databaseFile) == cheatCount
+     && fread(cheatDatabase->codes.data(),           sizeof(CheatCode),           codeCount,            databaseFile) == codeCount
+     && fread(cheatDatabase->wildcardOptions.data(), sizeof(CheatWildcardOption), wildcardOptionsCount, databaseFile) == wildcardOptionsCount
     ;
 
     if (!didReadAll) {
         debugf("[GameDatabase] Failed to read cheat database\n");
+
+        delete cheatDatabase;
+
         return nullptr;
     }
 
-    return &cheatDatabaseInstance;
+    return cheatDatabase;
 }
 
 #ifdef N64

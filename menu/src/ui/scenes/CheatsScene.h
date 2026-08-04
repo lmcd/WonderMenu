@@ -75,6 +75,7 @@ public:
     const char* name() override { return "CheatsScene"; }
 
     CheatsScene(CheatDatabase* cheatsDatabase = nullptr);
+    ~CheatsScene();
 
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;

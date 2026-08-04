@@ -39,6 +39,10 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
     view.addSubview(&labelView);
 }
 
+CheatsScene::~CheatsScene() {
+    delete cheatsDatabase;
+}
+
 uint8_t CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
     const CheatGroup& group = cheatsDatabase->groups[groupIndex];
     uint8_t count = 0;
