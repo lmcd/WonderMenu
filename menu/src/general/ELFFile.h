@@ -18,7 +18,9 @@ struct ELFFile {
     std::string filename;
 
     /**
-     * The ROM address for the ELF file.
+     * The ELF file lives in the DFS filesystem of the WonderMenu ROM.
+     * Return the ROM address associated with the file in DFS.
+     * 
      */
     uint32_t romAddress();
 
@@ -29,7 +31,7 @@ struct ELFFile {
 
     /**
      * DMA the uncompressed ELF payload out of ROM and into RDRAM.
-     * Once the payload is staged, it's live and can be jumped to.
+     * Once staged, the payload is live and can be jumped to for execution.
      */
     void stage();
 };

@@ -5,6 +5,7 @@
 
 #include "ELFFile.h"
 
+// From loader.c in libdragon
 #define PF_N64_COMPRESSED 0x1000
 
 uint32_t ELFFile::romAddress() {
