@@ -9,14 +9,16 @@
 
 #define MATRIX_COUNT 10
 
-surface_t texs[LABEL_CACHE_MAX_S_ENTRIES];
-
 int matIndexes[BUFF_COUNT] = {0};
 
-Rect getModelScreenBBox(T3DViewport& viewport, const T3DModel* model, const T3DMat4* modelMatrix)
-{
-    float minX = model->aabbMin[0], minY = model->aabbMin[1], minZ = model->aabbMin[2];
-    float maxX = model->aabbMax[0], maxY = model->aabbMax[1], maxZ = model->aabbMax[2];
+Rect getModelScreenBoundingBox(T3DViewport& viewport, const T3DModel* model, const T3DMat4* modelMatrix) {
+    float minX = model->aabbMin[0];
+    float minY = model->aabbMin[1];
+    float minZ = model->aabbMin[2];
+
+    float maxX = model->aabbMax[0];
+    float maxY = model->aabbMax[1];
+    float maxZ = model->aabbMax[2];
 
     T3DVec3 corners[8] = {
         {{minX, minY, minZ}},
@@ -29,7 +31,10 @@ Rect getModelScreenBBox(T3DViewport& viewport, const T3DModel* model, const T3DM
         {{maxX, maxY, maxZ}},
     };
 
-    float bMinX = FLT_MAX, bMinY = FLT_MAX, bMaxX = -FLT_MAX, bMaxY = -FLT_MAX;
+    float bMinX = +FLT_MAX;
+    float bMinY = +FLT_MAX;
+    float bMaxX = -FLT_MAX;
+    float bMaxY = -FLT_MAX;
 
     for (int i = 0; i < 8; i++) {
         T3DVec4 worldPos4;
@@ -45,7 +50,12 @@ Rect getModelScreenBBox(T3DViewport& viewport, const T3DModel* model, const T3DM
         if (screenPos.v[1] > bMaxY) bMaxY = screenPos.v[1];
     }
 
-    return Rect((int)bMinX, (int)bMinY, (int)(bMaxX - bMinX), (int)(bMaxY - bMinY));
+    return Rect(
+        (int)bMinX,
+        (int)bMinY,
+        (int)(bMaxX - bMinX),
+        (int)(bMaxY - bMinY)
+    );
 }
 
 static void dynamicTextureCallback(void* userData, const T3DMaterial* material, rdpq_texparms_t* tileParams, rdpq_tile_t tile) {
@@ -82,9 +92,7 @@ CartRenderer::CartRenderer(Size displaySize, LabelLoader& labelLoader)
 
     setupBlocks();
 
-    // cartSprite = sprite_load("rom:/ui/Cart7Up.RGBA16.sprite");
-
-    T3DVec3 camPos = {{0.0f, 0.0f, 0.0f}};
+    T3DVec3 camPosition = {{0.0f, 0.0f, 0.0f}};
     T3DVec3 camTarget = {{0.0f, 0.0f, -DISTANCE_FROM_CAMERA}};
     T3DVec3 cameraUp = {{0, 1, 0}};
 
@@ -100,23 +108,13 @@ CartRenderer::CartRenderer(Size displaySize, LabelLoader& labelLoader)
     // Setup orthographic viewport - used for 2D cartridge render
     t3d_viewport_set_ortho(&orthViewport, -30, 30, -22.5, 22.5, nearPlane, farPlane);
 
-    t3d_viewport_look_at(&persViewport, &camPos, &camTarget, &cameraUp);
-    t3d_viewport_look_at(&orthViewport, &camPos, &camTarget, &cameraUp);
+    t3d_viewport_look_at(&persViewport, &camPosition, &camTarget, &cameraUp);
+    t3d_viewport_look_at(&orthViewport, &camPosition, &camTarget, &cameraUp);
 
-    Size maxSize(70, 46);
     Size labelSize(32, 36);
 
     for (int i = 0; i < LABEL_CACHE_MAX_S_ENTRIES; i++) {
-        texs[i] = surface_alloc(FMT_RGBA16, labelSize.width, labelSize.height);
-    }
-}
-
-void CartRenderer::fillSurfaces() {
-    for (int i = 0; i < LABEL_CACHE_MAX_S_ENTRIES; i++) {
-        // Fill the surface red via the RDP
-        rdpq_attach(&texs[i], NULL);
-        rdpq_clear(Color(141));
-        rdpq_detach();
+        labelSurfaces[i] = surface_alloc(FMT_RGBA16, labelSize.width, labelSize.height);
     }
 }
 
@@ -124,6 +122,16 @@ CartRenderer::~CartRenderer() {
     if (cartListMatFP) {
         free_uncached(cartListMatFP);
         cartListMatFP = nullptr;
+    }
+}
+
+void CartRenderer::fillSurfaces() {
+    for (int i = 0; i < LABEL_CACHE_MAX_S_ENTRIES; i++) {
+        // Fill the surface red via the RDP
+        rdpq_attach(&labelSurfaces[i], NULL);
+        // TODO: Can we use the RGBA16 transparency bit?
+        rdpq_clear(Color(141));
+        rdpq_detach();
     }
 }
 
@@ -281,7 +289,7 @@ Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3
 
     rdpq_mode_pop();
 
-    return getModelScreenBBox(persViewport, fullCartModel, &modelMat);
+    return getModelScreenBoundingBox(persViewport, fullCartModel, &modelMat);
 }
 
 int CartRenderer::preloadLabelDataForGame(Game* game, bool preferHighRes, int tileCount) {
@@ -357,8 +365,6 @@ void CartRenderer::finishPreload() {
     Game* game = pendingCartPreload.game;
     float scale = pendingCartPreload.scale;
 
-    rdpq_attach(&texs[cacheIndex], nullptr);
-
     Size size = sizeForScale(scale);
 
     Vec2 sizeMidpoint = size.mid();
@@ -367,6 +373,8 @@ void CartRenderer::finishPreload() {
 
     sizeMidpoint.x -= (size.width  - labelSize.width)  / 2;
     sizeMidpoint.y -= (size.height - labelSize.height) / 2;
+
+    rdpq_attach(&labelSurfaces[cacheIndex], nullptr);
 
     render2DCart(
         0,
@@ -378,9 +386,9 @@ void CartRenderer::finishPreload() {
         -1
     );
 
-    pendingCartPreload.cacheIndex = -1;
-
     rdpq_detach();
+
+    pendingCartPreload.cacheIndex = -1;
 }
 
 int CartRenderer::prerender2DCart(float scale, Game* game) {
@@ -395,35 +403,6 @@ int CartRenderer::prerender2DCart(float scale, Game* game) {
     return tilesLoaded;
 }
 
-void CartRenderer::renderCartSprite(float scale, Vec2 screenPosition, float opacity) {
-    Size size = sizeForScale(scale);
-    Vec2 sizeMidpoint = size.mid();
-
-    rdpq_mode_push();
-
-    if (opacity == 1.0f) {
-        rdpq_set_mode_copy(false);
-    }
-    else {
-        rdpq_mode_begin();
-            rdpq_set_mode_standard();
-            rdpq_mode_combiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (0, 0, 0, PRIM)));
-            rdpq_mode_blender(RDPQ_BLENDER((IN_RGB, IN_ALPHA, BLEND_RGB, INV_MUX_ALPHA)));
-        rdpq_mode_end();
-
-        Color color = Color::WHITE;
-        color.a *= opacity;
-
-        rdpq_set_prim_color(color);
-    }
-
-    rdpq_sync_tile();
-
-    rdpq_sprite_blit(cartSprite, screenPosition.x - sizeMidpoint.x, screenPosition.y - sizeMidpoint.y, NULL);
-
-    rdpq_mode_pop();
-}
-
 Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPosition, float yRelativeToLight, Game* game, float opacity = 1.0f, int cacheIndex = -1) {
     Size size = sizeForScale(scale);
 
@@ -433,8 +412,21 @@ Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPositio
             finishPreload();
         }
 
-        // renderCartSprite(scale, screenPosition, opacity);
+        uint8_t fade = (uint8_t)(opacity * 255);
+        Color color = Color(fade);
+
+        Vec2 position = screenPosition - size.mid();
+
+        surface_t* labelSurface = &labelSurfaces[cacheIndex];
+
+        Size labelSize(
+            labelSurface->width,
+            labelSurface->height
+        );
         
+        position.x += (size.width  - labelSize.width)  / 2;
+        position.y += (size.height - labelSize.height) / 2;
+
         rdpq_mode_push();
         
         rdpq_mode_begin();
@@ -443,21 +435,11 @@ Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPositio
             rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (0, 0, 0, ONE)));
         rdpq_mode_end();
 
-        uint8_t fade = (uint8_t)(opacity * 255);
-        Color color = Color(fade);
-
         rdpq_set_prim_color(color);
-
-        Vec2 position = screenPosition - size.mid();
-
-        Size labelSize(32, 36);
-        
-        position.x += (size.width  - labelSize.width)  / 2;
-        position.y += (size.height - labelSize.height) / 2;
 
         rdpq_sync_tile();
 
-        rdpq_tex_blit(&texs[cacheIndex], position.x, position.y, NULL);
+        rdpq_tex_blit(labelSurface, position.x, position.y, NULL);
 
         rdpq_mode_pop();
     }

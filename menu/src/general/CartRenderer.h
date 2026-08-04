@@ -56,9 +56,16 @@ class CartRenderer {
 private:
     Size displaySize;
 
-    // Front facing geometry of an N64 cartridge
+    /**
+     * Front facing geometry of an N64 cartridge.
+     * Slightly cheaper with vertices than the full model.
+     */
     T3DModel* flatCartModel;
-    // Full N64 cartridge
+    
+    /**
+     * Full geometry of an N64 cartridge.
+     * This is the version that can be freely rotated.
+     */
     T3DModel* fullCartModel;
     
     // Geometry of just a 2x2 sprite label area of a cartridge
@@ -75,9 +82,20 @@ private:
     // constructor, and [15] is filled in only by the large-label path.
     surface_t placeholders[DB_L_LABEL_TILE_COUNT] = {};
 
+    surface_t labelSurfaces[LABEL_CACHE_MAX_S_ENTRIES];
+
     T3DMat4FP* cartListMatFP = nullptr;
 
+    /**
+     * Perspective viewport.
+     * Used for rendering 3D depictions of the cartridge/label.
+     */
     T3DViewport persViewport;
+
+    /**
+     * Orthographic viewport.
+     * Used for rendering flat/2D depictions of the cartridge/label.
+     */
     T3DViewport orthViewport;
 
     rspq_block_t* fullCartBlock;
@@ -88,8 +106,6 @@ private:
     rspq_block_t* fadedTexturedLabelBlock;
     rspq_block_t* texturedLabelBlock;
     rspq_block_t* highResTexturedLabelBlock;
-
-    sprite_t* cartSprite = nullptr;
 
     PendingCartPreload pendingCartPreload;
 
@@ -113,8 +129,6 @@ public:
 
     void finishPreload();
     int prerender2DCart(float scale, Game* game);
-
-    void renderCartSprite(float scale, Vec2 screenPosition, float opacity = 1.0f);
 
     /**
      * Render a 2D orthographic cartridge
