@@ -35,10 +35,7 @@ void M64RowView::update(const RenderInfo& renderInfo) {
     Color selectedSubtitleColor = Color::WHITE;
     selectedSubtitleColor.rgb *= 0.50f;
 
-    Vec2 titlePosition(
-        50,
-        22
-    );
+    Vec2 titlePosition(50, 22);
 
     Vec2 subtitlePosition = titlePosition;
     subtitlePosition.y += 20;
@@ -47,15 +44,12 @@ void M64RowView::update(const RenderInfo& renderInfo) {
         titlePosition.x - 26,
         titlePosition.y - 13
     );
-    
-    Color _titleColor = isSelected ? selectedTitleColor : titleColor;
-    Color _subtitleColor = isSelected ? selectedSubtitleColor : subtitleColor;
 
     titleView.frame.origin = titlePosition;
-    titleView.textColor = _titleColor;
+    titleView.textColor = isSelected ? selectedTitleColor : titleColor;
 
     subtitleView.frame.origin = subtitlePosition;
-    subtitleView.textColor = _subtitleColor;
+    subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor;
 
     checkboxView.frame.origin = checkboxPosition;
     checkboxView.isOn = isChecked;

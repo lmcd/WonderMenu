@@ -60,14 +60,11 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
     
     chevronView.expandProgress = expandProgress;
 
-    Color _titleColor = isSelected ? selectedTitleColor : titleColor;
-    Color _subtitleColor = isSelected ? selectedSubtitleColor : subtitleColor;
-
     titleView.frame.origin = titlePosition;
-    titleView.textColor = _titleColor;
+    titleView.textColor = isSelected ? selectedTitleColor : titleColor;
 
     subtitleView.frame.origin = subtitlePosition;
-    subtitleView.textColor = _subtitleColor;
+    subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor;
 
     checkboxView.frame.origin = checkboxPosition;
     checkboxView.isOn = isChecked;

@@ -33,18 +33,8 @@ void GameVersionRowView::update(const RenderInfo& renderInfo) {
     Color selectedSubtitleColor = Color::WHITE;
     selectedSubtitleColor.rgb *= 0.50f;
 
-    Color _titleColor = isSelected ? selectedTitleColor : titleColor;
-    Color _subtitleColor = isSelected ? selectedSubtitleColor : subtitleColor;
-
-    Vec2 flagPosition(
-        8,
-        7
-    );
-
-    Vec2 titlePosition(
-        21,
-        22
-    );
+    Vec2 flagPosition(8, 7);
+    Vec2 titlePosition(21, 22);
 
 	Vec2 subtitlePosition = titlePosition;
     subtitlePosition.x += 164;
@@ -56,11 +46,11 @@ void GameVersionRowView::update(const RenderInfo& renderInfo) {
     titleView.frame = titlePosition;
     titleView.maxWidth = frame.size.width - 20;
     titleView.maxWidth = 195;
-    titleView.textColor = _titleColor;
+    titleView.textColor = isSelected ? selectedTitleColor : titleColor;
 
     subtitleView.frame.origin = subtitlePosition;
     subtitleView.maxWidth = titleView.maxWidth;
-    subtitleView.textColor = _subtitleColor;
+    subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor;
 
     // TODO: remove
     if (game != nullptr) {

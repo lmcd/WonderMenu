@@ -22,12 +22,7 @@ void AlertOptionRowView::update(const RenderInfo& renderInfo) {
 
     Color selectedTitleColor = isDestructive ? destructiveColor : Color::WHITE;
 
-    // Centred across the full row rather than inset for a leading control, so
-    // the origin is the row's left edge and maxWidth spans it.
-    Vec2 titlePosition(
-        0,
-        22
-    );
+    Vec2 titlePosition(0, 22);
 
     titleView.frame.origin = titlePosition;
     titleView.maxWidth = frame.size.width;
