@@ -72,8 +72,11 @@ void BorderView::render(const RenderInfo& renderInfo) {
 
     setBlender(WITH_FRAMEBUFFER);
     setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (PRIM, 0, TEX0, 0)));
-    
-    setPrimitiveColor(color);
+
+    Color primitiveColor = color;
+    primitiveColor.a *= finalOpacity;
+
+    setPrimitiveColor(primitiveColor);
 
     // TOP LEFT
     drawTexturedRect(TILE0, topLeftRect);
