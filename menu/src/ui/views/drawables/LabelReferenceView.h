@@ -42,21 +42,33 @@ private:
         int x0 = finalFrame.origin.x + layout->x0;
         int y0 = finalFrame.origin.y + layout->y0;
 
-        const rdpq_font_t* font = rdpq_text_get_font(fontID);
+        const rdpq_font_t* font = nullptr;
 
-        int i = -1;
+        uint8_t currentFontID = 0;
+        int currentAtlas = -1;
 
         rdpq_mode_push();
 
         const rdpq_paragraph_char_t* character = layout->chars;
 
-        while (character->font_id == fontID) {
+        for (int c = 0; c < layout->nchars; c++, character++) {
+            if (font == nullptr || character->font_id != currentFontID) {
+                currentFontID = character->font_id;
+                font = rdpq_text_get_font(currentFontID);
+
+                currentAtlas = -1;
+            }
+
+            if (font == nullptr) {
+                continue;
+            }
+
             const glyph_t* glyph = &font->glyphs[character->glyph];
 
-            if (glyph->natlas != i) {
-                i++;
+            if (glyph->natlas != currentAtlas) {
+                currentAtlas = glyph->natlas;
 
-                atlas_t* atlas = &font->atlases[i];
+                atlas_t* atlas = &font->atlases[currentAtlas];
                 rspq_block_run(atlas->up);
 
                 rdpq_mode_begin();
@@ -79,8 +91,6 @@ private:
             );
 
             drawTexturedRect((rdpq_tile_t)tile, rect, glyph->s, glyph->t);
-
-            character++;
         }
 
         rdpq_mode_pop();
