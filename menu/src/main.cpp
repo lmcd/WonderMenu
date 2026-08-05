@@ -83,12 +83,17 @@ int main()
 
     GameLibrary gameLibrary(database, storagePrefix);
 
-    IntroScene* introScene = new IntroScene(&gameLibrary);
+    Scene* mainScene;
 
-	// TestScene* testScene = new TestScene();
+    if (true) {
+        mainScene = new IntroScene(&gameLibrary);
+    }
+    else {
+        mainScene = new TestScene();
+    }
 
     // Create scene renderer
-    SceneRenderer sceneRenderer(introScene);
+    SceneRenderer sceneRenderer(mainScene);
 
     // Main render loop
     sceneRenderer.begin();
