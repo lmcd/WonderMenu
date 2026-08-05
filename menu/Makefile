@@ -91,6 +91,8 @@ filesystem/%.sprite: assets/%.png
 	$(N64_MKSPRITE) $(MKSPRITE_FLAGS) -o $(dir $@) "$<"
 
 filesystem/fonts/InterDisplay-SemiBold-12.font64: MKFONT_FLAGS = -s 12
+filesystem/fonts/InterDisplay-Bold-14.font64: MKFONT_FLAGS = -s 14
+filesystem/fonts/InterDisplay-Medium-14.font64: MKFONT_FLAGS = -s 14
 filesystem/fonts/InterDisplay-SemiBold-15.font64: MKFONT_FLAGS = -s 15
 filesystem/fonts/InterDisplay-SemiBold-digits-15.font64: MKFONT_FLAGS = -s 15
 filesystem/fonts/Unbounded-Black-14.font64: MKFONT_FLAGS = -s 14

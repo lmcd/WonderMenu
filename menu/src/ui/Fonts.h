@@ -9,6 +9,8 @@
 #include <cstdio>
 
 namespace Fonts {
+    constexpr int INTERDISPLAY_MEDIUM_14          = 7;
+    constexpr int INTERDISPLAY_BOLD_14            = 8;
     constexpr int INTERDISPLAY_SEMIBOLD_12        = 6;
     constexpr int INTERDISPLAY_SEMIBOLD_15        = 3;
     constexpr int INTERDISPLAY_DIGITS_SEMIBOLD_15 = 5;
@@ -30,6 +32,8 @@ namespace Fonts {
      * Loads all fonts used in WonderMenu into memory
      */
     inline void loadAll() {
+        load(INTERDISPLAY_MEDIUM_14,          "InterDisplay-Medium", 14);
+        load(INTERDISPLAY_BOLD_14,            "InterDisplay-Bold", 14);
         load(INTERDISPLAY_SEMIBOLD_12,        "InterDisplay-SemiBold", 12);
         load(INTERDISPLAY_SEMIBOLD_15,        "InterDisplay-SemiBold", 15);
         load(INTERDISPLAY_DIGITS_SEMIBOLD_15, "InterDisplay-SemiBold-digits", 15);
