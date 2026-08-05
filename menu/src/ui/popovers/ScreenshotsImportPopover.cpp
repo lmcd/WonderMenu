@@ -10,6 +10,7 @@ ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene)
     : AlertPopover(baseScene, "") {
 
     setButtons("Save", "Delete");
+    isCancellable = false;
     destructiveButtonIndex = 1;
 
     contentView.addSubview(&thumbnailView3);

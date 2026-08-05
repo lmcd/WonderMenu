@@ -8,6 +8,7 @@
 ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<std::string>& paths)
     : Popover<FolderRowView, std::vector<std::string>>(baseScene) {
     title = "CHOOSE FOLDERS";
+    isCancellable = false;
 
     folderEntries.reserve(paths.size());
 

@@ -42,6 +42,8 @@ protected:
     // Row highlighted when the popover opens
     int initialSelectedRowIndex = 0;
 
+    bool isCancellable = true;
+
     /**
      * The value a successful selection resolves to
      */
@@ -157,7 +159,7 @@ public:
         if (aButtonWatcher.update(updateInfo.joypad.btn.a) == InputWatcher::BUTTON_UP) {
             hasMadeSelection = true;
         }
-        else if (btn.b) {
+        else if (btn.b && isCancellable) {
             hasCancelled = true;
         }
     }
