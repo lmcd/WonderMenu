@@ -81,8 +81,8 @@ Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
             // RDP never loads or samples the cropped-out texels. Rounded up so
             // the scaled result always covers the finalFrame (no seam); the fraction
             // of a pixel of overflow is removed by the scissor in render().
-            int sourceWidth  = std::min((int)ceilf(finalFrame.size.width  / scale), (int)spriteWidth);
-            int sourceHeight = std::min((int)ceilf(finalFrame.size.height / scale), (int)spriteHeight);
+            int sourceWidth  = std::min((int)roundf(finalFrame.size.width  / scale), (int)spriteWidth);
+            int sourceHeight = std::min((int)roundf(finalFrame.size.height / scale), (int)spriteHeight);
 
             params.s0      = ((int)spriteWidth  - sourceWidth)  / 2;
             params.t0      = ((int)spriteHeight - sourceHeight) / 2;
