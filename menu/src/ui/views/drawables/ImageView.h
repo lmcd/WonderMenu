@@ -36,9 +36,7 @@ public:
     ScaleMode scaleMode = SCALE_NONE;
 
     // Bump this whenever the sprite's pixels change without the pointer
-    // changing -- e.g. an owner that frees and reallocates a same-sized sprite
-    // usually gets the same address back, so the pointer compare below can't
-    // see the new content and buffers are left showing an older frame.
+    // changing.
     uint32_t spriteVersion = 0;
 
     void update(const RenderInfo& renderInfo) override;

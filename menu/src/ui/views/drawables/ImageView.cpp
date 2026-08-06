@@ -131,7 +131,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
     rdpq_mode_push();
 
     rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (0, 0, 0, PRIM)));
+        setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (TEX0, 0, PRIM, 0)));
         setBlender(WITH_FRAMEBUFFER);
     rdpq_mode_end();
 
