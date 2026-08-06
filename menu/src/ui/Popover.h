@@ -199,7 +199,7 @@ public:
         titleLabelView.textColor = titleColor;
         titleLabelView.backgroundColor = backgroundColor;
 
-        tableView.frame = rect.insetBy(Vec2(5, 0));
+        tableView.frame = rect.insetBy(Vec2(12, 0));
         tableView.frame.origin.y += tableY + 10;
 
         baseScene->updateViews(renderInfo);
