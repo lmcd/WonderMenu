@@ -8,6 +8,8 @@
 #include "ScrollbarView.h"
 
 ScrollbarView::ScrollbarView() {
+    frame.size.width = 8;
+
     knobView.isBlendedWithBackground = true;
 
     addSubview(&knobView);

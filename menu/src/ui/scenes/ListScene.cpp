@@ -371,12 +371,10 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
         }
     }
 
-    int scrollbarWidth = 8;
-
     scrollbarView.frame = Rect(
-        view.frame.size.width - scrollbarWidth,
+        view.frame.size.width - scrollbarView.frame.size.width,
         0,
-        scrollbarWidth,
+        scrollbarView.frame.size.width,
         view.frame.size.height
     );
     scrollbarView.contentHeight = contentHeight();
