@@ -78,7 +78,7 @@ bool INIParser::read(Entry& entry) {
         size_t length = strlen(line);
 
         while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r')) {
-            line[length] = '\0';
+            line[--length] = '\0';
         }
 
         if (length == 0) {
