@@ -14,7 +14,6 @@
 #include "general/Result.h"
 #include "ui/Scene.h"
 #include "ui/SceneRenderer.h"
-#include "ui/views/drawables/BorderView.h"
 #include "ui/views/drawables/LabelReferenceView.h"
 #include "ui/views/drawables/RectView.h"
 #include "ui/views/TableView.h"
@@ -28,10 +27,8 @@ template <typename RV, typename Value>
 class Popover : public Scene {
 private:
     bool hasCancelled = false;
-    bool hasMadeSelection = false;
 
     Transition transition;
-    BorderView borderView;
     InputWatcher aButtonWatcher;
 
 protected:
@@ -39,13 +36,24 @@ protected:
     int bottomPadding = 25;
     int tableY = 46;
 
-    // Row highlighted when the popover opens
+    /**
+     * Row highlighted when the popover opens.
+     */
     int initialSelectedRowIndex = 0;
 
+    /**
+     * Has the user actioned the popover and made a selection?
+     * This is the trigger that causes the `Popover` to dismiss.
+     */
+    bool hasMadeSelection = false;
+    
+    /**
+     * Can the `Popover` be cancelled by pressing the B button?
+     */
     bool isCancellable = true;
 
     /**
-     * The value a successful selection resolves to
+     * The value a successful selection resolves to.
      */
     virtual Value selectedValue() = 0;
 
@@ -67,11 +75,6 @@ public:
         rectView.radius = 30;
         rectView.isSmooth = true;
         rectView.isBlendedWithBackground = true;
-
-        borderView.color = Color::WHITE;
-        borderView.color.a *= 0.1;
-        borderView.radius = 30;
-        borderView.isSmooth = true;
     }
 
     std::string title = "";
@@ -92,22 +95,26 @@ public:
 
 private:
     /**
-     * Runs the modal loop: pushes the popover, spins until the user confirms
-     * or cancels, then pops it. Only present() calls this.
+     * Runs the modal loop.
+     * Presents the popover on-screen and spins until the user has made a
+     * selection or cancelled the popover with the B button.
      */
     ResultStatus runModal() {
-        baseScene->pushScene(this);
-
         transition.progress = 0.0;
         transition.speed = 0.1;
         transition.direction = Transition::FORWARDS;
 
         hasMadeSelection = false;
         hasCancelled = false;
+
         tableView.selectedRowIndex = initialSelectedRowIndex;
         tableView.clampScrollPosition();
 
         ResultStatus resultStatus;
+
+        baseScene->popoverTransitionProgress = 0.0f;
+        baseScene->view.opacity = 1.0f;
+        baseScene->pushScene(this);
 
         while (true) {
             // Render current scene
@@ -115,7 +122,7 @@ private:
 
             transition.advance();
 
-            baseScene->popoverProgress = transition.progress;
+            baseScene->popoverTransitionProgress = transition.progress;
 
             if (hasMadeSelection) {
                 resultStatus = ResultStatus::SUCCEEDED;
@@ -130,9 +137,11 @@ private:
             }
         }
 
-        baseScene->popoverProgress = 0.0f;
+        baseScene->popoverTransitionProgress = 0.0f;
         baseScene->view.opacity = 1.0f;
         baseScene->popScene();
+
+        debugf("ending\n");
 
         return resultStatus;
     }
@@ -140,7 +149,6 @@ private:
 public:
     void didBeginScene(SceneEntry) {
         contentView.addSubview(&rectView);
-        // contentView.addSubview(&borderView);
         contentView.addSubview(&titleLabelView);
         contentView.addSubview(&tableView);
 
@@ -154,7 +162,7 @@ public:
     void update(const UpdateInfo& updateInfo) override {
         joypad_buttons_t btn = updateInfo.btn;
 
-        if (tableView.handleInputs(updateInfo)) {}
+        tableView.handleInputs(updateInfo);
 
         if (aButtonWatcher.update(updateInfo.joypad.btn.a) == InputWatcher::BUTTON_UP) {
             hasMadeSelection = true;
@@ -170,14 +178,14 @@ public:
         Color backgroundColor = Color(17);
         Color titleColor = Color(252, 204, 007);
 
+        // Parent scene fades out
         float parentSceneOpacity = std::lerp(1.0f, 0.5f, transition.progress);
-        float alertSceneOpacity = std::lerp(0.0f, 1.0f, transition.progress);
+        // Popover fades in
+        float popoverSceneOpacity  = std::lerp(0.0f, 1.0f, transition.progress);
 
         baseScene->view.opacity = parentSceneOpacity;
-        contentView.opacity = alertSceneOpacity;
+        contentView.opacity = popoverSceneOpacity;
         contentView.isOpaque = (transition.progress == 1.0f);
-
-        tableView.backgroundColor = backgroundColor;
 
         int height = tableView.contentHeight() + tableY + bottomPadding;
 
@@ -193,6 +201,9 @@ public:
         Vec2 titlePosition = rect.origin;
         titlePosition.y += topPadding;
 
+        rectView.frame = rect;
+        rectView.fillColor = backgroundColor;
+
         titleLabelView.frame.origin = titlePosition;
         titleLabelView.maxWidth = size.width;
         titleLabelView.stringReference = title.c_str();
@@ -201,12 +212,8 @@ public:
 
         tableView.frame = rect.insetBy(Vec2(12, 0));
         tableView.frame.origin.y += tableY + 10;
+        tableView.backgroundColor = backgroundColor;
 
         baseScene->updateViews(renderInfo);
-
-        rectView.frame = rect;
-        rectView.fillColor = backgroundColor;
-
-        borderView.frame = rect;
     }
 };

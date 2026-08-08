@@ -10,7 +10,7 @@
 #include "ui/View.h"
 #include "ui/views/TableView.h"
 #include "ui/views/drawables/CheckboxView.h"
-#include "ui/views/drawables/LabelReferenceView.h"
+#include "ui/views/drawables/LabelView.h"
 
 struct FolderEntry {
     std::string path;
@@ -25,7 +25,7 @@ struct FolderRowView : public BaseRowView {
     const char* name() const override { return "FolderRowView"; }
 
     CheckboxView checkboxView;
-    LabelReferenceView<72> titleView;
+    LabelView<72> titleView;
 
     // Assigned by the scene every frame. Rows are a fixed pool that the table
     // recycles as it scrolls, so a row is never tied to one entry.

@@ -6,18 +6,18 @@
 #pragma once
 
 #include "ui/View.h"
+#include "ui/views/BaseView.h"
 #include "ui/views/drawables/BorderView.h"
 #include "ui/views/drawables/Imageview.h"
+#include "ui/views/drawables/MaskedImageView.h"
 #include "ui/views/drawables/RectView.h"
 
-struct ScreenshotThumbnailView : public View {
+struct ScreenshotThumbnailView : public MaskedImageView {
 private:
-    ImageView imageView1;
-    ImageView imageView2;
-    RectView roundedRectView;
     BorderView borderView;
+    BaseView contentsView;
 
-    surface_t lastSurface[BUFF_COUNT] = {};
+    void* lastFullSizeScreenshotBuffer = nullptr;
 
     static sprite_t* createScaledSprite(const surface_t* sourceSurface, int width);
     static void freeScaledSprite(sprite_t* sprite);
@@ -25,10 +25,10 @@ private:
 public:
     const char* name() const override { return "ScreenshotThumbnailView"; }
 
-    surface_t surface;
+    ImageView imageView1;
+    ImageView imageView2;
 
-    sprite_t* sprite160 = nullptr;
-    sprite_t* sprite80 = nullptr;
+    surface_t fullSizeScreenshotSurface;
 
     ScreenshotThumbnailView();
 

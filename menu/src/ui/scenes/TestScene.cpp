@@ -66,33 +66,17 @@ void TestScene::freeScaledSprite(sprite_t* sprite) {
 TestScene::TestScene()
     : Scene() {
 
-    // view.addSubview(&rectView);
-    // view.addSubview(&imageView);
-
     view.addSubview(&imageView3);
     view.addSubview(&imageView2);
     view.addSubview(&imageView1);
-
-    rectView.frame = Rect(30, 50, 76, 54);
 
     mario1Sprite = sprite_load("rom:/ui/mario1.RGBA16.sprite");
     mario2Sprite = sprite_load("rom:/ui/mario2.RGBA16.sprite");
     mario3Sprite = sprite_load("rom:/ui/mario3.RGBA16.sprite");
 
-    {
-        surface_t surface = sprite_get_pixels(mario1Sprite);
-        imageView1.surface = surface;
-    }
-
-    {
-        surface_t surface = sprite_get_pixels(mario2Sprite);
-        imageView2.surface = surface;
-    }
-
-    {
-        surface_t surface = sprite_get_pixels(mario3Sprite);
-        imageView3.surface = surface;
-    }
+    imageView1.fullSizeScreenshotSurface = sprite_get_pixels(mario1Sprite);
+    imageView2.fullSizeScreenshotSurface = sprite_get_pixels(mario2Sprite);
+    imageView3.fullSizeScreenshotSurface = sprite_get_pixels(mario3Sprite);
 }
 
 TestScene::~TestScene() {
@@ -100,40 +84,30 @@ TestScene::~TestScene() {
 }
 
 void TestScene::updateViews(const RenderInfo&) {
-    rectView.radius = 10;
-    rectView.fillColor = Color::RED;
-    rectView.isInverted = true;
-    rectView.isSmooth = true;
-    rectView.isHidden = false;
-    rectView.frame.origin.x += 1;
-    
-    // rectView.frame.size.height = 400;
-    // rectView.frame.origin.y = 500 - (500 * transitionProgress);
-
     Vec2 imagePosition = Vec2(100, 150);
-    
+    imagePosition.x += 90;
+
     Size imageSize = Size(76, 53);
     Size smallerImageSize = Size(57, 40);
 
-    imagePosition.x += 90;
-
-    imageView1.frame.origin = imagePosition;
-    imageView1.frame.size = imageSize;
-    imageView1.opacity = 1.0;
+    imageView1.frame = Rect(imagePosition, imageSize);
+    imageView1.radius = 10;
 
     imageView2.frame.origin = imagePosition;
     imageView2.frame.origin.x = imageView1.frame.minX();
-    imageView2.frame.origin.x -= 10;
+    imageView2.frame.origin.x -= 14;
     imageView2.frame.origin.y += 6;
     imageView2.frame.size = smallerImageSize;
-    imageView2.opacity = 0.5;
+    imageView2.opacity = 0.55;
+    imageView2.radius = 8;
 
     imageView3.frame.origin = imagePosition;
     imageView3.frame.origin.x = imageView1.frame.maxX() - smallerImageSize.width;
-    imageView3.frame.origin.x += 10;
+    imageView3.frame.origin.x += 14;
     imageView3.frame.origin.y += 6;
     imageView3.frame.size = smallerImageSize;
-    imageView3.opacity = 0.5;
+    imageView3.opacity = 0.55;
+    imageView3.radius = 8;
 }
 
 void TestScene::update(const UpdateInfo&) {

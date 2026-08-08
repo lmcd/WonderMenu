@@ -14,7 +14,9 @@ ChooseVersionPopover::ChooseVersionPopover(Scene* baseScene, GameGroup* gameGrou
 }
 
 Game* ChooseVersionPopover::selectedValue() {
-    return gameGroup->sortedGames()[tableView.selectedRowIndex];
+    int index = tableView.selectedRowIndex;
+
+    return gameGroup->sortedGames()[index];
 }
 
 void ChooseVersionPopover::updateViews(const RenderInfo& renderInfo) {

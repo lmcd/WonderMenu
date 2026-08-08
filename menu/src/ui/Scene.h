@@ -58,7 +58,7 @@ public:
      * Can be used to adjust/transition views int he scene as a popover is
      * presenting.
      */
-    float popoverProgress = 0.0f;
+    float popoverTransitionProgress = 0.0f;
 
     // TODO: this should be private
     SceneRenderer* renderer = nullptr;

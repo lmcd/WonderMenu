@@ -22,7 +22,7 @@ void BorderView::update(const RenderInfo& renderInfo) {
 void BorderView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex]);
+    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -111,7 +111,13 @@ void BorderView::render(const RenderInfo& renderInfo) {
         drawFilledRect(Rect(finalFrame.maxX() - 1, finalFrame.minY() + spriteRadius, 1, lineHeight));
     }
 
-    drawnBoundingBox[bufferIndex] = finalFrame;
+    Rect boundingBox = finalFrame;
+
+    if (hasScissor) {
+        boundingBox = boundingBox.intersection(scissorStack.back());
+    }
+
+    drawnBoundingBox[bufferIndex] = boundingBox;
 
     finishRender();
 }

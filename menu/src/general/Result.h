@@ -11,7 +11,8 @@ enum ResultStatus {
 };
 
 /**
- * Outcome of an operation that can either complete with a value or be cancelled.
+ * Outcome of an operation that can either complete with a value or be
+ * cancelled.
  */
 template <typename T>
 struct Result {

@@ -15,11 +15,12 @@
 #include "ui/scenes/ScreenshotsImportScene.h"
 #include "utils/fs.h"
 
-ScreenshotsImportScene::ScreenshotsImportScene(IntroScene* introScene, Game* lastLaunchedGame, int count)
+ScreenshotsImportScene::ScreenshotsImportScene(IntroScene* introScene, Game* lastLaunchedGame, int count, ScreenshotsSDRAMReader* reader)
     : Scene(),
     introScene(introScene),
     lastLaunchedGame(lastLaunchedGame),
-    count(count) {
+    count(count),
+    reader(reader) {
 
     ownedByRenderer = true;
     directoryPath = "sd:/screenshots/" + lastLaunchedGame->directoryName();
@@ -32,6 +33,8 @@ ScreenshotsImportScene::~ScreenshotsImportScene() {
     screenshotWriter.close();
     thumbnailWriter.close();
     closeScreenshotDir();
+
+    delete reader;
 }
 
 // A single path component, relative to screenshotDir -- f_open_in_dir() rejects
@@ -53,6 +56,8 @@ std::string ScreenshotsImportScene::filenameForScreenshot(int index, bool isThum
 }
 
 bool ScreenshotsImportScene::openScreenshotDir() {
+    directory_create(directoryPath.data());
+
     if (isScreenshotDirOpen()) {
         return true;
     }
@@ -118,7 +123,7 @@ int ScreenshotsImportScene::nextScreenshotIndex() {
 // When the main screenshot has been saved, we reuse it's space in cart SDRAM
 // to store the thumbnail, which we've already rendered
 void ScreenshotsImportScene::beginThumbnailWrite() {
-    sprite_t* thumbnailSprite = screenshotThumbnailView.sprite160;
+    sprite_t* thumbnailSprite = screenshotThumbnailView.imageView1.sprite;
 
     if (thumbnailSprite == nullptr || thumbnailWriter.hasSession()) {
         return;
@@ -149,9 +154,8 @@ void ScreenshotsImportScene::didBeginScene(SceneEntry) {
     view.addSubview(&screenshotThumbnailView);
     view.addSubview(&lineView);
     view.addSubview(&progressBarView);
-    view.addSubview(&labelView);
 
-    directory_create(directoryPath.data());
+    introScene->labelView.setString("Processing Screenshots");
 
     // Must follow nextScreenshotIndex(): that scan establishes the guarantee
     // FF_OPEN_NO_LOOKUP relies on, that nothing at or above screenshotIndexOffset
@@ -168,16 +172,9 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     progressBarView.maxValue = screenshotFrameInterval * count;
     progressBarView.progress += 1.0f;
 
-    labelView.frame.origin = Vec2(0, 458);
-    labelView.maxWidth = view.frame.size.width;
-    labelView.setString("Processing Screenshots");
-    labelView.textColor = Color(128);
-    labelView.align = ALIGN_CENTER;
-    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
-
-    Rect sceneRect = view.frame;
-
     Rect progressRect = progressBarView.progressRect();
+
+    // The rect inside the progress bar that excludes the rounded corners
     Rect insetRect = progressBarView.frame.insetBy(Vec2(4, 0));
 
     Vec2 imagePosition = Vec2(
@@ -185,9 +182,12 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
         progressBarView.frame.minY() - thumbnailSize.height - 10
     );
 
+    // Keep the line position within the bounds of `insetRect`
     int linePositionX = std::clamp(progressRect.maxX() - 1, insetRect.minX(), insetRect.maxX());
 
     screenshotThumbnailView.frame = Rect(imagePosition, thumbnailSize);
+    screenshotThumbnailView.radius = 10;
+    screenshotThumbnailView.isSmooth = true;
 
     lineView.frame = Rect(linePositionX, screenshotThumbnailView.frame.maxY(), 1, 10);
     lineView.fillColor = Color::WHITE;
@@ -238,55 +238,21 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    uint32_t baseReadOffset = ROM_ADDRESS + lastLaunchedGame->romFile.size + sizeof(ScreenshotsHeader);
-    uint32_t readOffset = baseReadOffset + bytesRead;
+    sprite_t* screenshotSprite = reader->nextSprite();
 
-    // Start of the whole record (sprite header + pixels + sector padding), which
-    // is what gets copied to the card verbatim.
-    uint32_t recordOffset = readOffset;
-
-    sprite_t screenshotHeader __attribute__((aligned(16)));
-
-    data_cache_hit_writeback_invalidate(&screenshotHeader, sizeof(screenshotHeader));
-    dma_read_raw_async(&screenshotHeader, readOffset, sizeof(screenshotHeader));
-    dma_wait();
-
-    readOffset += sizeof(sprite_t);
-
-    debugf("[ScreenshotsImportScene] Importing screenshot #%i (%i x %i) from 0x%08lX\n", currentScreenshotIndex, screenshotHeader.width, screenshotHeader.height, (unsigned long)readOffset);
-
-    int bytesToRead = screenshotHeader.width * screenshotHeader.height * 2;
-
-    // The header comes straight off the cart with no checksum, so a stale or
-    // corrupt one would DMA past the end of `buffer` and trash the heap.
-    if (bytesToRead <= 0 || bytesToRead > (int)sizeof(buffer)) {
-        debugf("[ScreenshotsImportScene] Screenshot #%i has bad dimensions (%i x %i)!\n",
-            currentScreenshotIndex, screenshotHeader.width, screenshotHeader.height);
-
+    // A stale or corrupt header on the cart is the only way this fails, and
+    // there's no way to find the following records without it.
+    if (screenshotSprite == nullptr) {
         popScene();
         return;
     }
 
-    data_cache_hit_writeback_invalidate(buffer, bytesToRead);
-    dma_read_raw_async(buffer, readOffset, bytesToRead);
-    dma_wait();
+    uint32_t recordOffset = reader->currentRecordOffset();
+    int recordSize = reader->currentRecordSize();
 
-    // The payload pads each record up to a whole 512-byte sector, so the next
-    // one starts at the rounded-up size rather than immediately after the pixels.
-    int recordSize = ((int)sizeof(sprite_t) + bytesToRead + 511) & ~511;
+    debugf("[ScreenshotsImportScene] Importing screenshot #%i (%i x %i) from 0x%08lX\n", currentScreenshotIndex, screenshotSprite->width, screenshotSprite->height, (unsigned long)recordOffset);
 
-    bytesRead += recordSize;
-
-    // Wrap the freshly-read pixels as a source surface to draw from.
-    surface_t screenshotSurface = surface_make(
-        buffer,
-        FMT_RGBA16,
-        screenshotHeader.width,
-        (screenshotHeader.height + 7) & ~7,
-        screenshotHeader.width * 2
-    );
-
-    screenshotThumbnailView.surface = screenshotSurface;
+    screenshotThumbnailView.fullSizeScreenshotSurface = reader->surfaceForSprite(screenshotSprite);
 
     screenshotWriter.begin(
         &screenshotDir,

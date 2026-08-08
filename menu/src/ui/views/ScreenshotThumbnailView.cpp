@@ -3,30 +3,29 @@
 * @license AGPLv3
 */
 
+#include <algorithm>
 #include <malloc.h>
 
 #include "ScreenshotThumbnailView.h"
 
 ScreenshotThumbnailView::ScreenshotThumbnailView() {
+    isSmooth = true;
+
     imageView1.scaleMode = ImageView::ASPECT_FILL;
     imageView1.opacity = 1.0;
 
     imageView2.scaleMode = ImageView::ASPECT_FILL;
     imageView2.opacity = 0.5;
 
-    roundedRectView.radius = 10;
-    roundedRectView.isInverted = true;
-    roundedRectView.isSmooth = true;
-    roundedRectView.isBlendedWithBackground = true;
-
-    borderView.radius = 10;
     borderView.isSmooth = true;
     borderView.color = Color::WHITE;
     borderView.color.a *= 0.3;
 
-    addSubview(&imageView1);
-    addSubview(&imageView1);
-    addSubview(&roundedRectView);
+    // `contentsView` is not added to the view hierachy. It's rendered
+    // off-screen.
+    contentsView.addSubview(&imageView1);
+    contentsView.addSubview(&imageView2);
+
     addSubview(&borderView);
 }
 
@@ -81,42 +80,44 @@ void ScreenshotThumbnailView::freeScaledSprite(sprite_t* sprite) {
 }
 
 void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
-    int bufferIndex = renderInfo.bufferIndex;
-    
-    if (surface.buffer != lastSurface[bufferIndex].buffer) {    
-        freeScaledSprite(sprite80);
-        freeScaledSprite(sprite160);
+    contentsView.frame.size = frame.size;
+    imageView1.frame.size = frame.size;
+    imageView2.frame.size = frame.size;
+    borderView.frame.size = frame.size;
 
-        sprite80  = createScaledSprite(&surface, 80);
-        sprite160 = createScaledSprite(&surface, 160);
+    borderView.radius = radius;
 
-        imageView1.sprite = sprite160;
-        imageView2.sprite = sprite80;
+    if (fullSizeScreenshotSurface.buffer != lastFullSizeScreenshotBuffer) {
+        // rdpq_detach() doesn't wait for the RDP, so last time's sprites and
+        // surface are still being read from, and they're about to be freed
+        rspq_wait();
 
-        lastSurface[bufferIndex] = surface;
+        freeScaledSprite(imageView1.sprite);
+        freeScaledSprite(imageView2.sprite);
+
+        if (imageSurface.buffer != nullptr) {
+            surface_free(&imageSurface);
+        }
+
+        imageView1.sprite = createScaledSprite(&fullSizeScreenshotSurface, 160);
+        imageView2.sprite = createScaledSprite(&fullSizeScreenshotSurface, 80);
+
+        imageView1.spriteVersion++;
+        imageView2.spriteVersion++;
+
+        // Composed here rather than drawn to the display, so this view can draw it
+        // with its corners masked off
+        imageSurface = contentsView.renderToSurface(renderInfo);
+        imageVersion++;
+
+        lastFullSizeScreenshotBuffer = fullSizeScreenshotSurface.buffer;
     }
 
-    imageView1.spriteVersion++;
-    imageView2.spriteVersion++;
-
-    imageView1.frame = Rect(Vec2::ZERO, frame.size);
-    imageView2.frame = Rect(Vec2::ZERO, frame.size);
-
-    roundedRectView.frame = Rect(Vec2::ZERO, frame.size);
-    roundedRectView.fillColor = backgroundColor;
-
-    borderView.frame = Rect(Vec2::ZERO, frame.size);
-
-    roundedRectView.setNeedsDisplay();
-    borderView.setNeedsDisplay();
+    MaskedImageView::update(renderInfo);
 }
 
 void ScreenshotThumbnailView::render(const RenderInfo& renderInfo) {
-    if (finalIsHidden) {
-        return;
-    }
+    MaskedImageView::render(renderInfo);
 
-    for (View* subview : subviews) {
-        subview->render(renderInfo);
-    }
+    borderView.render(renderInfo);
 }

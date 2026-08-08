@@ -19,9 +19,9 @@
 #include "Region.h"
 
 /**
- * File entry for a game ROM on the filesystem
- * Much of the metadata here is extracted from the first 64 bytes of the ROM file
- * Big/little endian format ROMs (e.g. .v64/.z64) are supported
+ * File entry for a game ROM on the filesystem.
+ * Much of the metadata here is extracted from the first 64 bytes of the file.
+ * Big/little endian ROMs formats (e.g. .v64/.z64) are supported.
  */
 struct ROMFile {
     ROMFile(const std::string& path) : path(path) {}

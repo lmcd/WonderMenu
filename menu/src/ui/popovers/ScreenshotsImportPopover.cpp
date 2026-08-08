@@ -3,73 +3,102 @@
 * @license AGPLv3
 */
 
+#include <cmath>
+
+#include "animation/TimingFunctions.h"
 #include "ScreenshotsImportPopover.h"
 
-// The title label is hidden in updateViews(), so there's no title to pass up.
-ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene)
-    : AlertPopover(baseScene, "") {
-
+ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene, ScreenshotsSDRAMReader* reader)
+    : AlertPopover(baseScene, ""),
+      reader(reader) {
     setButtons("Save", "Delete");
     isCancellable = false;
     destructiveButtonIndex = 1;
 
-    contentView.addSubview(&thumbnailView3);
-    contentView.addSubview(&thumbnailView2);
-    contentView.addSubview(&thumbnailView1);
+    thumbnailTransition.progress = 0.0f;
+    thumbnailTransition.speed = 1.0f / 20.0f;
+    thumbnailTransition.direction = Transition::FORWARDS;
 
-    mario1Sprite = sprite_load("rom:/ui/mario1.RGBA16.sprite");
-    mario2Sprite = sprite_load("rom:/ui/mario2.RGBA16.sprite");
-    mario3Sprite = sprite_load("rom:/ui/mario3.RGBA16.sprite");
+    messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
+    messageLabel.align = ALIGN_CENTER;
+    messageLabel.textColor = Color(140);
+    messageLabel.setString("25 $07screenshots found!\nWould you like to save them?");
+}
 
-    {
-        surface_t surface = sprite_get_pixels(mario1Sprite);
-        thumbnailView1.surface = surface;
-    }
+void ScreenshotsImportPopover::didBeginScene(SceneEntry entry) {
+    AlertPopover::didBeginScene(entry);
 
-    {
-        surface_t surface = sprite_get_pixels(mario2Sprite);
-        thumbnailView2.surface = surface;
-    }
+    leftContainerView.addSubview(&sideThumbnailView1);
+    rightContainerView.addSubview(&sideThumbnailView2);
 
-    {
-        surface_t surface = sprite_get_pixels(mario3Sprite);
-        thumbnailView3.surface = surface;
-    }
+    contentView.addSubview(&leftContainerView);
+    contentView.addSubview(&rightContainerView);
+    contentView.addSubview(&mainThumbnailView);
+    contentView.addSubview(&messageLabel);
 }
 
 void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
-    titleLabelView.isHidden = true;
+    if (reader != nullptr) {
+        if (renderInfo.sceneFrameNumber == 0) {
+            mainThumbnailView.fullSizeScreenshotSurface = reader->surfaceForSprite(reader->nextSprite());
+        }
+        else if (renderInfo.sceneFrameNumber == 1) {
+            sideThumbnailView1.fullSizeScreenshotSurface = reader->surfaceForSprite(reader->nextSprite());
+        }
+        else if (renderInfo.sceneFrameNumber == 2) {
+            sideThumbnailView2.fullSizeScreenshotSurface = reader->surfaceForSprite(reader->nextSprite());
+        }
+    }
 
     AlertPopover::updateViews(renderInfo);
-    
-    tableY = 100;
+
+    titleLabelView.isHidden = true;
+    tableY = 134;
     
     Size imageSize = Size(76, 53);
-    Size smallerImageSize = Size(57, 40);
+    Size smallerImageSize = imageSize * 0.75;
+
+    float sideThumbnailOpacity = 0.75f;
 
     Vec2 imagePosition = Vec2(
         rectView.frame.midX() - imageSize.midX(),
         rectView.frame.minY() + 30
     );
 
-    thumbnailView1.frame.origin = imagePosition;
-    thumbnailView1.frame.size = imageSize;
-    thumbnailView1.opacity = 1.0;
-    thumbnailView1.backgroundColor = rectView.fillColor;
+    if (renderInfo.sceneFrameNumber >= 22) {
+        thumbnailTransition.advance();
+    }
 
-    thumbnailView2.frame.origin = imagePosition;
-    thumbnailView2.frame.origin.x = thumbnailView1.frame.minX();
-    thumbnailView2.frame.origin.x -= 12;
-    thumbnailView2.frame.origin.y += 6;
-    thumbnailView2.frame.size = smallerImageSize;
-    thumbnailView2.opacity = 0.5;
-    thumbnailView2.backgroundColor = rectView.fillColor;
+    float slideProgress = TimingFunctions::easeInOutQuad(thumbnailTransition.progress);
 
-    thumbnailView3.frame.origin = imagePosition;
-    thumbnailView3.frame.origin.x = thumbnailView1.frame.maxX() - smallerImageSize.width;
-    thumbnailView3.frame.origin.x += 12;
-    thumbnailView3.frame.origin.y += 6;
-    thumbnailView3.frame.size = smallerImageSize;
-    thumbnailView3.opacity = 0.5;
-    thumbnailView3.backgroundColor = rectView.fillColor;
+    int leftSlideX  = std::lerp(+smallerImageSize.width, +45, slideProgress);
+    int rightSlideX = std::lerp(-smallerImageSize.width, -45, slideProgress);
+
+    mainThumbnailView.frame = Rect(imagePosition, imageSize);
+    mainThumbnailView.opacity = 1.0f;
+    mainThumbnailView.radius = 10;
+
+    leftContainerView.frame = Rect(imagePosition, smallerImageSize);
+    leftContainerView.frame.origin.x -= smallerImageSize.width;
+    leftContainerView.frame.origin.y += 7;
+    leftContainerView.scissorRect = leftContainerView.worldFrame();
+
+    rightContainerView.frame = Rect(imagePosition, smallerImageSize);
+    rightContainerView.frame.origin.x += imageSize.width;
+    rightContainerView.frame.origin.y += 7;
+    rightContainerView.scissorRect = rightContainerView.worldFrame();
+
+    sideThumbnailView1.frame = Rect(Vec2(leftSlideX, 0), smallerImageSize);
+    sideThumbnailView1.opacity = sideThumbnailOpacity;
+    sideThumbnailView1.radius = 8;
+
+    sideThumbnailView2.frame = Rect(Vec2(rightSlideX, 0), smallerImageSize);
+    sideThumbnailView2.opacity = sideThumbnailOpacity;
+    sideThumbnailView2.radius = 8;
+
+    messageLabel.frame.origin = Vec2(
+        rectView.frame.minX(),
+        mainThumbnailView.frame.maxY() + 26
+    );
+    messageLabel.maxWidth = rectView.frame.size.width;
 }

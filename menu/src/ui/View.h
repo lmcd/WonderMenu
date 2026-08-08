@@ -63,8 +63,11 @@ protected:
 
     bool isPendingFullRender = false;
     bool needsClear = false;
-    bool needsLayout = true;
     bool needsRender = true;
+
+    // TODO: Not yet used
+    bool needsLayout = true;
+
 
     /**
      * Recursively clear every subview in the subtree, visiting subviews in

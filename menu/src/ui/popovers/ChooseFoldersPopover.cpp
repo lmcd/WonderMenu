@@ -10,56 +10,54 @@ ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<s
     title = "CHOOSE FOLDERS";
     isCancellable = false;
 
+    sdCardSprite = sprite_load("rom:/ui/SD-128.RGBA16.sprite");
+
+    imageView.sprite = sdCardSprite;
+
+    messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
+    messageLabel.align = ALIGN_CENTER;
+    messageLabel.textColor = Color(140);
+    messageLabel.setString("%i $07ROM folders found!\nWhich would you like to use?", paths.size());
+
     folderEntries.reserve(paths.size());
 
     for (const std::string& path : paths) {
-        folderEntries.push_back(FolderEntry{ path, false });
+        folderEntries.push_back(FolderEntry{ path, true });
     }
+}
+
+void ChooseFoldersPopover::didBeginScene(SceneEntry entry) {
+    Base::didBeginScene(entry);
+
+    contentView.addSubview(&imageView);
+    contentView.addSubview(&messageLabel);
 }
 
 void ChooseFoldersPopover::toggleSelectedFolder() {
     int index = tableView.selectedRowIndex;
 
-    if (index < 0 || index >= (int)folderEntries.size()) {
-        return;
-    }
-
-    folderEntries[index].isSelected = !folderEntries[index].isSelected;
+    folderEntries[index].isSelected ^= true;
 }
 
-std::vector<std::string> ChooseFoldersPopover::selectedPaths() const {
-    std::vector<std::string> paths;
+std::vector<std::string> ChooseFoldersPopover::selectedValue() {
+    std::vector<std::string> selectedPaths;
 
     for (const FolderEntry& folder : folderEntries) {
         if (folder.isSelected) {
-            paths.push_back(folder.path);
+            selectedPaths.push_back(folder.path);
         }
     }
 
-    return paths;
-}
-
-int ChooseFoldersPopover::selectedCount() const {
-    int count = 0;
-
-    for (const FolderEntry& folder : folderEntries) {
-        if (folder.isSelected) {
-            count++;
-        }
-    }
-
-    return count;
+    return selectedPaths;
 }
 
 void ChooseFoldersPopover::update(const UpdateInfo& updateInfo) {
-    // A ticks the row rather than confirming, so Popover::update() is
-    // deliberately not called here -- its A handler would close the popover on
-    // the first tick.
-    if (tableView.handleInputs(updateInfo)) {
-        return;
-    }
+    tableView.handleInputs(updateInfo);
 
-    if (aButtonWatcher.update(updateInfo.joypad.btn.a) == InputWatcher::BUTTON_UP) {
+    if (updateInfo.btn.start) {
+        hasMadeSelection = true;
+    }
+    else if (aButtonWatcher.update(updateInfo.joypad.btn.a) == InputWatcher::BUTTON_DOWN) {
         toggleSelectedFolder();
     }
 }
@@ -67,7 +65,25 @@ void ChooseFoldersPopover::update(const UpdateInfo& updateInfo) {
 void ChooseFoldersPopover::updateViews(const RenderInfo& renderInfo) {
     tableView.rowCount = (int)folderEntries.size();
 
-    Popover<FolderRowView, std::vector<std::string>>::updateViews(renderInfo);
+    Base::updateViews(renderInfo);
+    titleLabelView.isHidden = true;
+    tableY = 134;
+
+    Size imageSize = Size(sdCardSprite->width, sdCardSprite->height);
+
+    imageView.frame = Rect(
+        Vec2(
+            rectView.frame.midX() - imageSize.midX(),
+            rectView.frame.minY() + 30
+        ),
+        imageSize
+    );
+
+    messageLabel.frame.origin = Vec2(
+        rectView.frame.minX(),
+        imageView.frame.maxY() + 26
+    );
+    messageLabel.maxWidth = rectView.frame.size.width;
 
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;

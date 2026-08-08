@@ -14,6 +14,7 @@
 #include "general/GameDatabase.h"
 #include "general/GameLibrary.h"
 #include "ui/Fonts.h"
+#include "ui/popovers/ChooseFoldersPopover.h"
 #include "ui/popovers/ScreenshotsImportPopover.h"
 #include "ui/scenes/ListScene.h"
 #include "ui/scenes/ListTransitionScene.h"
@@ -36,6 +37,7 @@ IntroScene::IntroScene(GameLibrary* gameLibrary)
 
     view.addSubview(&rectView);
     view.addSubview(&imageView);
+    view.addSubview(&labelView);
 }
 
 IntroScene::~IntroScene() {
@@ -47,12 +49,21 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 
     rectView.fillColor = Color::BLACK;
     rectView.frame = sceneRect;
+    rectView.usesMultipliedOpacity = false;
 
     float x = sceneRect.midX() - logoSprite->width  / 2.0f;
     float y = sceneRect.midY() - logoSprite->height / 2.0f;
 
     imageView.sprite = logoSprite;
     imageView.frame.origin = Vec2(x, y);
+
+    labelView.frame.origin = Vec2(0, 458);
+    labelView.maxWidth = sceneRect.size.width;
+    labelView.textColor = Color(128);
+    labelView.align = ALIGN_CENTER;
+    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
+    labelView.usesMultipliedOpacity = false;
+    labelView.opacity = popoverTransitionProgress;
 }
 
 void IntroScene::update(const UpdateInfo& updateInfo) {
@@ -79,6 +90,12 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
     if (updateInfo.frameNumber == 6) {
         seconds = measure([&] {
+            Fonts::loadAll();
+        });
+
+        debugf("[IntroScene] Loaded Fonts: %.3fs\n", seconds);
+
+        seconds = measure([&] {
             char databasePath[512];
             snprintf(databasePath, sizeof(databasePath), "%sWonderMenu.db", gameLibrary->path);
 
@@ -90,6 +107,12 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
     }
     
     if (updateInfo.frameNumber == 7) {
+        std::vector<std::string> folderPaths = gameLibrary->findROMDirectories();
+
+        labelView.setString("Press Start to Continue");
+        auto boo = presentPopover<ChooseFoldersPopover>(folderPaths);
+        labelView.setString("");
+
         seconds = measure([&] {
             gameLibrary->loadCache();
             gameLibrary->loadHistoryAndFavourites();
@@ -129,12 +152,6 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         totalSeconds += seconds;
 
         debugf("[IntroScene] Loaded Label Cluster Offsets: %.3fs\n", seconds);
-
-        seconds = measure([&] {
-            Fonts::loadAll();
-        });
-
-        debugf("[IntroScene] Loaded Fonts: %.3fs\n", seconds);
     }
 
     if (updateInfo.frameNumber == 9) {
@@ -164,8 +181,10 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
                 debugf("[IntroScene] %li Screenshots Found\n", count);
 
-                // ScreenshotsImportPopover* Popover = new ScreenshotsImportPopover();
-                // auto result = presentPopover<ScreenshotsImportPopover>()
+                // Handed to the import scene below, which owns it from there
+                ScreenshotsSDRAMReader* screenshotsReader = new ScreenshotsSDRAMReader(baseReadOffset + sizeof(ScreenshotsHeader));
+
+                auto result = presentPopover<ScreenshotsImportPopover>(screenshotsReader);
 
                 // Only the magic is validated, so clamp the count rather than
                 // trusting it to be sane.
@@ -174,7 +193,11 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                 // Dirty the magic so the same screenshots aren't imported again
                 io_write(baseReadOffset, 0);
 
-                ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(this, lastLaunchedGame, count);
+                // The popover read the first few screenshots to preview them,
+                // so reset before handing over to `ScreenshotsImportScene`
+                screenshotsReader->reset();
+
+                ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(this, lastLaunchedGame, count, screenshotsReader);
                 pushScene(screenshotsImportScene);
             }
         }

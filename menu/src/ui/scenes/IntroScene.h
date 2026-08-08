@@ -9,6 +9,7 @@
 
 #include "ui/Scene.h"
 #include "ui/views/drawables/ImageView.h"
+#include "ui/views/drawables/LabelView.h"
 #include "ui/views/drawables/RectView.h"
 
 class GameLibrary;
@@ -27,6 +28,8 @@ private:
 
 public:
     const char* name() { return "IntroScene"; }
+
+    LabelView<32> labelView;
 
     IntroScene(GameLibrary* gameLibrary);
     ~IntroScene();

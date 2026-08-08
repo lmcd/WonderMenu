@@ -358,7 +358,7 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
             rowView.backgroundColor = selectionBlendColor;
             selectionRectView.opacity = rowOpacity;
 
-            wobbler.speed = std::lerp(1.0f, 0.5f, popoverProgress);
+            wobbler.speed = std::lerp(1.0f, 0.5f, popoverTransitionProgress);
 
             cart3DView.frame.origin = rowView.cartPosition;
             cart3DView.scale = rowView.cartScale;
@@ -385,7 +385,7 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
     tableView.rowViews[0].titleView.setNeedsDisplay();
     tableView.rowViews[0].subtitleView.setNeedsDisplay();
 
-    tabControlView.isEnabled = (popoverProgress == 0.0f);
+    tabControlView.isEnabled = (popoverTransitionProgress == 0.0f);
     tabControlView.setNeedsDisplay();
 }
 
