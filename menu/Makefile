@@ -59,9 +59,15 @@ assets_ttf =  $(wildcard assets/fonts/*.ttf)
 assets_otf =  $(wildcard assets/fonts/*.otf)
 
 assets_n64 =  $(wildcard assets/sd/*.n64) \
-			  $(wildcard assets/sd/*.v64)
+			  $(wildcard assets/sd/*.v64) \
+			  $(wildcard assets/sd/*/*.n64) \
+			  $(wildcard assets/sd/*/*.v64)
 
-assets_bin =  $(wildcard assets/sd/*.db)
+assets_ini =  $(wildcard assets/sd/*.ini) \
+			  $(wildcard assets/sd/*/*.ini)
+
+assets_bin =  $(wildcard assets/sd/*.db) \
+			  $(wildcard assets/sd/*/*.db)
 
 assets_txt =  $(wildcard assets/*.txt)
 
@@ -72,6 +78,7 @@ assets_conv = $(patsubst assets/%,filesystem/%,$(assets_png:%.png=%.sprite)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_otf:%.otf=%.font64)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_gltf:%.glb=%.t3dm)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_n64)) \
+			  $(patsubst assets/%,filesystem/%,$(assets_ini)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_bin)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_txt)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_elf))
@@ -125,6 +132,11 @@ filesystem/sd/%.v64: assets/sd/%.v64
 	@echo "    [ROM] $@"
 	@dd if="$<" of="$@" bs=8192 count=1 2>/dev/null
 
+filesystem/%.ini: assets/%.ini
+	@mkdir -p $(dir $@)
+	@echo "    [INI] $@"
+	@cp "$<" "$@"
+
 filesystem/%.db: assets/%.db
 	@mkdir -p $(dir $@)
 	@echo "    [BIN] $@"
@@ -161,7 +173,7 @@ clean:
 
 release:
 	rm -rf filesystem/sd
-	$(MAKE) all assets_n64= assets_bin= BUILD_DIR=build/console EXTRA_DEFINES=-DRELEASE_BUILD PROJECT_NAME=$(PROJECT_NAME)-release
+	$(MAKE) all assets_n64= assets_ini= assets_bin= BUILD_DIR=build/console EXTRA_DEFINES=-DRELEASE_BUILD PROJECT_NAME=$(PROJECT_NAME)-release
 
 release-bundle:
 	rm -rf filesystem/*.n64 filesystem/*.v64
