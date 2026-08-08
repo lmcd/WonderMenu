@@ -40,6 +40,13 @@ private:
      */
     int sceneFrameNumber = 0;
 
+    /*
+     * `sceneFrameNumber` for each scene in `sceneStack`.
+     * Allows a scene's frame number to pick up from where it left off when
+     * returning.
+     */
+    std::vector<int> sceneFrameNumberStack;
+
     int horizontalOverscan = 7;
 
     // Destruct/free scenes that have been removed and are pending deletion

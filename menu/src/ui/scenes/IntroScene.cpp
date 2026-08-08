@@ -73,7 +73,7 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 void IntroScene::update(const UpdateInfo& updateInfo) {
     float seconds = 0;
 
-    if (updateInfo.frameNumber == 5) {
+    if (updateInfo.sceneFrameNumber == 2) {
         seconds = measure([&] {
             FILE* introFile = fopen("rom:/WonderMenu.txt", "rb");
 
@@ -92,7 +92,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Welcome Text: %.3fs\n", seconds);
     }
 
-    if (updateInfo.frameNumber == 6) {
+    if (updateInfo.sceneFrameNumber == 3) {
         seconds = measure([&] {
             Fonts::loadAll();
         });
@@ -110,7 +110,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Database: %.3fs\n", seconds);
     }
     
-    if (updateInfo.frameNumber == 7) {
+    if (updateInfo.sceneFrameNumber == 4) {
         // If no cache existed, present the user with a choice of folders to
         // load ROMs from
         if (!gameLibrary->loadCache()) {
@@ -122,17 +122,19 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
             gameLibrary->romDirectoryPaths = chosenFolders.value;
         }
+    }
 
+    if (updateInfo.sceneFrameNumber == 7) {
         seconds = measure([&] {
             gameLibrary->loadHistoryAndFavourites();
             gameLibrary->loadGames();
         });
         totalSeconds += seconds;
-        
+
         debugf("[IntroScene] Loaded Game Library: %.3fs\n", seconds);
     }
     
-    if (updateInfo.frameNumber == 8) {
+    if (updateInfo.sceneFrameNumber == 10) {
         seconds = measure([&] {
             GameDatabase& database = gameLibrary->database;
 
@@ -163,7 +165,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Label Cluster Offsets: %.3fs\n", seconds);
     }
 
-    if (updateInfo.frameNumber == 9) {
+    if (updateInfo.sceneFrameNumber == 12) {
         seconds = measure([&] {
             ELFFile payloadFile("payload.elf.stripped");
 
@@ -175,7 +177,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Payload: %.3fs\n", seconds);
     }
 
-    if (updateInfo.frameNumber == 10) {
+    if (updateInfo.sceneFrameNumber == 14) {
         Game* lastLaunchedGame = gameLibrary->lastLaunchedGame;
 
         if (lastLaunchedGame != nullptr) {
@@ -214,7 +216,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         }
     }
 
-    if (updateInfo.sceneFrameNumber >= 40) {
+    if (updateInfo.sceneFrameNumber >= 16) {
         ListScene* listScene;
 
         seconds = measure([&] {

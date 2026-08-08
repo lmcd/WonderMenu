@@ -15,6 +15,7 @@
 
 SceneRenderer::SceneRenderer(Scene* initialScene) : currentScene(initialScene), hasEnded(false), frameNumber(0) {
     sceneStack.reserve(5);
+    sceneFrameNumberStack.reserve(5);
 
     rootView.frame = sceneRect();
 
@@ -70,6 +71,7 @@ void SceneRenderer::pushScene(Scene* scene) {
         currentScene->view.removeFromSuperview();
 
         sceneStack.push_back(currentScene);
+        sceneFrameNumberStack.push_back(sceneFrameNumber);
     }
 
     currentScene = scene;
@@ -99,10 +101,12 @@ void SceneRenderer::popScene() {
         currentScene = sceneStack.back();
         sceneStack.pop_back();
 
+        // Resume the returned-to scene's own count rather than restarting it
+        sceneFrameNumber = sceneFrameNumberStack.back();
+        sceneFrameNumberStack.pop_back();
+
         rootView.addSubview(&currentScene->view);
         currentScene->didBeginScene(SCENE_POP);
-
-        sceneFrameNumber = 0;
     }
 }
 
