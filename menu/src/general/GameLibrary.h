@@ -91,14 +91,15 @@ public:
      */
     void loadGames();
 
+    /**
+     * Traverse the filesystem looking for directories that contain at least
+     * one file with a valid ROM file extension, starting in `path`
+     */
+    std::vector<std::string> findROMDirectories();
+
     void addToRecents(GameGroup gameGroup);
 
     void toggleFavourite(GameGroup gameGroup);
 
     void toggleRetailGroupings();
-
-    /**
-     * Get number of games in the list
-     */
-    int count() const { return allGames.size(); }
 };

@@ -308,6 +308,68 @@ void GameLibrary::toggleRetailGroupings() {
     });
 }
 
+std::vector<std::string> GameLibrary::findROMDirectories() {
+    std::vector<std::string> romDirectoryPaths;
+    std::vector<std::string> subdirectoryNames;
+
+    if (path == nullptr) {
+        return romDirectoryPaths;
+    }
+
+    dir_t entry;
+
+    if (dir_findfirst(path, &entry) != 0) {
+        debugf("[GameLibrary] No folders found in %s\n", path);
+        return romDirectoryPaths;
+    }
+
+    bool rootHasROMs = false;
+
+    do {
+        if (entry.d_type == DT_DIR) {
+            if (entry.d_name[0] != '.') {
+                subdirectoryNames.push_back(entry.d_name);
+            }
+        }
+        else if (!rootHasROMs && ROMFile::hasROMExtension(entry.d_name)) {
+            rootHasROMs = true;
+        }
+    } while (dir_findnext(path, &entry) == 0);
+
+    std::sort(subdirectoryNames.begin(), subdirectoryNames.end(), [](const std::string& a, const std::string& b) {
+        return strcasecmp(a.c_str(), b.c_str()) < 0;
+    });
+
+    if (rootHasROMs) {
+        romDirectoryPaths.push_back("");
+    }
+
+    for (const std::string& subdirectoryName : subdirectoryNames) {
+        char subdirectoryPath[512];
+        snprintf(subdirectoryPath, sizeof(subdirectoryPath), "%s%s/", path, subdirectoryName.c_str());
+
+        if (dir_findfirst(subdirectoryPath, &entry) != 0) {
+            continue;
+        }
+
+        bool hasROMs = false;
+
+        do {
+            if (!hasROMs && entry.d_type != DT_DIR && ROMFile::hasROMExtension(entry.d_name)) {
+                hasROMs = true;
+            }
+        } while (dir_findnext(subdirectoryPath, &entry) == 0);
+
+        if (hasROMs) {
+            romDirectoryPaths.push_back(subdirectoryName);
+        }
+    }
+
+    debugf("[GameLibrary] Found %i ROM folders in %s\n", romDirectoryPaths.size(), path);
+
+    return romDirectoryPaths;
+}
+
 void GameLibrary::loadGames() {
     retailGroups.clear();
 
