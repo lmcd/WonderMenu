@@ -80,6 +80,8 @@ int main()
     Scene* mainScene;
 
     if (true) {
+        // `IntroScene` loads everything required to run the menu into place.
+        // Not the best place to load everything, but it works for now.
         mainScene = new IntroScene(&gameLibrary);
     }
     else {
@@ -91,6 +93,9 @@ int main()
 
     // Main render loop
     sceneRenderer.begin();
+
+    // WonderMenu is now finished, and we begin to handover to the selected
+    // game.
 
     t3d_destroy();
 
