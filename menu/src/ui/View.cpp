@@ -172,7 +172,13 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
             finalBlendColor2 = subview->backgroundColor;
         }
 
-        subview->finalOpacity      = finalOpacity * subview->opacity;
+        if (subview->usesMultipliedOpacity) {
+            subview->finalOpacity = finalOpacity * subview->opacity;
+        }
+        else {
+            subview->finalOpacity = subview->opacity;
+        }
+        
         subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
         subview->finalFrame.origin = finalPosition + subview->frame.origin;
         subview->finalFrame.size   = subview->frame.size;

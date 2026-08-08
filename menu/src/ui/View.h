@@ -99,6 +99,10 @@ public:
      */
     View* superview = nullptr;
 
+    /**
+     * Should view opacity be multiplied as we descend through the tree?
+     */
+    bool usesMultipliedOpacity = true;
     float opacity = 1.0f;
     bool isHidden = false;
     Rect frame = {};
