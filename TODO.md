@@ -16,6 +16,7 @@
 - [ ] Move corner sprites to `View`?
 - [ ] Allow half points for corner sprites (like 7.5, needed for screenshots)
 - [ ] There's currently some overlap in functionality in various places. `ImageView`, `MaskedImageView`, `RectView`, `BorderView`. Should these all these migrate to a more versatile version of `View` (like `CALayer` for example in the Apple ecosystem), or stay seperate?
+- [ ] Cleanup `IntroScene` and come up with a way of encapsulating all the tasks into individual jobs
 
 ## Views
 - [x] `ScrollbarView` should be simplified with a `RectView`
