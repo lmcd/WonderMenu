@@ -5,6 +5,7 @@ payload
 design-resources
 release-builds
 menu/WonderMenu.z64
+menu/WonderMenu-release.z64
 menu/assets/sd/*.v64
 menu/assets/sd/*/*.v64
 menu/assets/sd/*.n64
