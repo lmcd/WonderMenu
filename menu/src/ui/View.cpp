@@ -201,6 +201,52 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
     }
 }
 
+surface_t View::renderToSurface(const RenderInfo& renderInfo) {
+    // The view is rendered detached from its superview and the rest of the
+    // view hierachy, so reset all final render values.
+    finalOpacity  = 1.0f;
+    finalIsHidden = isHidden;
+    finalFrame    = Rect(Vec2::ZERO, frame.size);
+    finalIsBlendedWithMemory = !isOpaque;
+
+    Color blendColor = (backgroundColor.a == 255) ? backgroundColor : Color::BLACK;
+
+    finalBlendColor = blendColor;
+
+    update(renderInfo);
+
+    updateSubtree(
+        renderInfo,
+        finalOpacity,
+        finalIsHidden,
+        finalFrame.origin,
+        blendColor,
+        finalIsBlendedWithMemory
+    );
+
+    int width  = finalFrame.size.width;
+    int height = finalFrame.size.height;
+
+    if (width <= 0 || height <= 0) {
+        return (surface_t){};
+    }
+
+    surface_t surface = surface_alloc(FMT_RGBA16, width, height);
+
+    if (surface.buffer == nullptr) {
+        return (surface_t){};
+    }
+
+    rdpq_attach(&surface, NULL);
+
+    clearRecursive(renderInfo);
+    render(renderInfo);
+
+    rdpq_detach();
+
+    return surface;
+}
+
 void View::clearSubtree(const RenderInfo& renderInfo, bool force) {
     for (auto it = subviews.rbegin(); it != subviews.rend(); ++it) {
         View* subview = *it;
