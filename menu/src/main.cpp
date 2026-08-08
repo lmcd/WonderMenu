@@ -102,7 +102,8 @@ int main()
         gameLibrary.writeCacheHeader();
     }
     
-    flashcart_deinit();
+    // This must be disabled to keep the cart SDRAM writable by the payload.
+    // flashcart_deinit();
 
     gameLaunchSession.launch();
 
