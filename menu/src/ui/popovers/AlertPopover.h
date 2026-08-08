@@ -26,7 +26,6 @@ public:
     const char* name() { return "AlertPopover"; }
 
     std::vector<std::string> buttons;
-
     int destructiveButtonIndex = -1;
 
     AlertPopover(Scene* baseScene, const std::string& title);

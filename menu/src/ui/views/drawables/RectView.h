@@ -10,12 +10,26 @@
 #include "ui/View.h"
 
 struct RectView : public Drawable {
-private:
+public:
     static constexpr int MAXIMUM_RADIUS = 40;
 
+private:
     inline static sprite_t* cornerSprites[MAXIMUM_RADIUS] = {};
     inline static sprite_t* smoothCornerSprites[MAXIMUM_RADIUS] = {};
 
+    Color lastFillColor[BUFF_COUNT] = {};
+    Rect lastFrame[BUFF_COUNT] = {};
+    int lastRadius[BUFF_COUNT] = {};
+
+    Rect rectsToClear[4] = {};
+	bool needsPartialClear = false;
+
+    void renderRect(const RenderInfo& renderInfo, Rect currentRect);
+
+public:
+    const char* name() const override { return "RectView"; }
+
+    // Shared with the other views that round their corners with these sprites
     static sprite_t* spriteForRadius(int radius, bool isSmooth) {
         if (radius < 0 || radius >= MAXIMUM_RADIUS) {
             return nullptr;
@@ -38,18 +52,6 @@ private:
 
         return cache[radius];
     }
-
-    Color lastFillColor[BUFF_COUNT] = {};
-    Rect lastFrame[BUFF_COUNT] = {};
-    int lastRadius[BUFF_COUNT] = {};
-
-    Rect rectsToClear[4] = {};
-	bool needsPartialClear = false;
-
-    void renderRect(const RenderInfo& renderInfo, Rect currentRect);
-
-public:
-    const char* name() const override { return "RectView"; }
 
     Color fillColor = Color::WHITE;
     int radius = 0;
