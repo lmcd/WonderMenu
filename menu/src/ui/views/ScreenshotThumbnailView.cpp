@@ -88,8 +88,8 @@ void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
     borderView.radius = radius;
 
     if (fullSizeScreenshotSurface.buffer != lastFullSizeScreenshotBuffer) {
-        // rdpq_detach() doesn't wait for the RDP, so last time's sprites and
-        // surface are still being read from, and they're about to be freed
+        // The previous frame's render is still reading the composed surface, and
+        // it's about to be freed along with last time's sprites
         rspq_wait();
 
         freeScaledSprite(imageView1.sprite);
@@ -109,6 +109,11 @@ void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
         // with its corners masked off
         imageSurface = contentsView.renderToSurface(renderInfo);
         imageVersion++;
+
+        // Everything above only queued the work: the RDP is still reading the
+        // full size screenshot, which the caller is free to overwrite the moment
+        // this returns
+        rspq_wait();
 
         lastFullSizeScreenshotBuffer = fullSizeScreenshotSurface.buffer;
     }

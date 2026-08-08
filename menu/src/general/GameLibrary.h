@@ -6,6 +6,7 @@
 #pragma once
 
 #include <dir.h>
+#include <algorithm>
 #include <cstring>
 #include <strings.h>
 #include <vector>
@@ -18,13 +19,27 @@
 #include "INIParser.h"
 #include "M64File.h"
 
+/**
+ * Each `ROMFile` and corresponding database entry has an associated memory
+ * cost, so we have to draw the line somewhere.
+ */
 #define MAX_NUMBER_OF_FILES 1000
 
+#define MAX_NUMBER_OF_DIRECTORIES 255
+#define MAX_DIRECTORY_LENGTH 128
+
 struct __attribute__((packed)) CacheHeader {
-    // The 2 character game ID (e.g. BK)
+    /**
+     * The two-character unique ID of the last selected game.
+     * TODO: just read this from `PayloadData`?
+     */
     char lastUniqueID[2];
     RegionCode lastRegionCode;
-    uint8_t empty1;
+
+    /**
+     * The number of ROM directories the user has chosen to load ROMs from.
+     */
+    uint8_t directoryCount;
     uint32_t empty2;
 };
 
@@ -52,10 +67,23 @@ private:
     // lastLaunchedGame, so it must never hold garbage.
     CacheHeader temporaryCacheHeader = {};
 
+    uint8_t directoryCount() const {
+        return (uint8_t)std::min(romDirectoryPaths.size(), (size_t)MAX_NUMBER_OF_DIRECTORIES);
+    }
+
 public:
     GameDatabase& database;
+
+    /**
+     * Typically the root path of the filesystem.
+     * rom:/sd/ on emulator
+     * sd:/ on console
+     */
     const char* path;
 
+    /**
+     * Should games be grouped by their unqiue game ID.
+     */
     bool groupRetailGames = true;
 
     Game* lastLaunchedGame = nullptr;
@@ -71,9 +99,14 @@ public:
     std::vector<std::string> recentsPaths;
     std::vector<std::string> favouritesPaths;
 
+    /**
+     * A list of paths the user has chosen to load ROMs from.
+     */
+    std::vector<std::string> romDirectoryPaths;
+
     GameLibrary(GameDatabase& database, const char* path = nullptr);
 
-    void loadCache();
+    bool loadCache();
     bool writeCache();
     bool writeCacheHeader();
 
@@ -87,7 +120,7 @@ public:
     bool saveHistoryAndFavourites();
 
     /**
-     * Reload game list from filesystem path
+     * Reload game list from the directories in `romDirectoryPaths`
      */
     void loadGames();
 

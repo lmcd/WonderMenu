@@ -155,8 +155,6 @@ void ScreenshotsImportScene::didBeginScene(SceneEntry) {
     view.addSubview(&lineView);
     view.addSubview(&progressBarView);
 
-    introScene->labelView.setString("Processing Screenshots");
-
     // Must follow nextScreenshotIndex(): that scan establishes the guarantee
     // FF_OPEN_NO_LOOKUP relies on, that nothing at or above screenshotIndexOffset
     // is already in the directory.

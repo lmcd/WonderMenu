@@ -141,8 +141,6 @@ private:
         baseScene->view.opacity = 1.0f;
         baseScene->popScene();
 
-        debugf("ending\n");
-
         return resultStatus;
     }
 

@@ -24,10 +24,12 @@ GameLibrary::GameLibrary(GameDatabase& database, const char* path) :
     recentGroups.reserve(64);
 }
 
-void GameLibrary::loadCache() {
+bool GameLibrary::loadCache() {
+    romDirectoryPaths.clear();
+
     #ifndef RELEASE_BUILD
     readFromCache = false;
-    return;
+    return false;
     #endif
 
     char cachePath[512];
@@ -38,14 +40,15 @@ void GameLibrary::loadCache() {
     if (!cacheFile) {
         debugf("[GameLibrary] Failed to open cache file: %s\n", cachePath);
         readFromCache = false;
-        return;
+        return false;
     }
 
     struct stat st;
     if (fstat(fileno(cacheFile), &st)) {
         debugf("[GameLibrary] Failed to stat cache file: %s\n", cachePath);
         readFromCache = false;
-        return;
+        fclose(cacheFile);
+        return false;
     }
 
     debugf("[GameLibrary] Found cache file. Size: %li\n", st.st_size);
@@ -54,23 +57,58 @@ void GameLibrary::loadCache() {
         debugf("[GameLibrary] Failed to read cache header\n");
         readFromCache = false;
         fclose(cacheFile);
-        return;
+        return false;
+    }
+
+    int directoryCount = temporaryCacheHeader.directoryCount;
+
+    if (directoryCount > 0) {
+        std::vector<char> directoryBuffer(directoryCount * MAX_DIRECTORY_LENGTH);
+
+        if (fread(directoryBuffer.data(), 1, directoryBuffer.size(), cacheFile) != directoryBuffer.size()) {
+            debugf("[GameLibrary] Failed to read %i cache directories\n", directoryCount);
+
+            readFromCache = false;
+            fclose(cacheFile);
+            return false;
+        }
+
+        for (int i = 0; i < directoryCount; i++) {
+            char* directoryPath = directoryBuffer.data() + (i * MAX_DIRECTORY_LENGTH);
+            directoryPath[MAX_DIRECTORY_LENGTH - 1] = '\0';
+
+            romDirectoryPaths.push_back(directoryPath);
+        }
+    }
+
+    debugf("[GameLibrary] Read %i ROM directories from cache\n", directoryCount);
+
+    size_t entriesOffset = sizeof(CacheHeader) + (directoryCount * MAX_DIRECTORY_LENGTH);
+
+    if ((size_t)st.st_size < entriesOffset) {
+        debugf("[GameLibrary] Cache file is shorter than its header claims\n");
+
+        romDirectoryPaths.clear();
+        readFromCache = false;
+        fclose(cacheFile);
+        return false;
     }
 
     // Don't read past the bounds of the cache array
-    size_t bytesToRead = std::min((size_t)st.st_size, sizeof(cache));
-    bytesToRead -= sizeof(CacheHeader);
+    size_t bytesToRead = std::min((size_t)st.st_size - entriesOffset, sizeof(cache));
 
     size_t bytesRead = fread(cache, 1, bytesToRead, cacheFile);
     if (bytesRead != bytesToRead) {
         debugf("[GameLibrary] Failed to read cache file (read %zu of %zu bytes)\n", bytesRead, bytesToRead);
         fclose(cacheFile);
-        return;
+        return false;
     }
 
     fclose(cacheFile);
 
     readFromCache = true;
+
+    return !romDirectoryPaths.empty();
 }
 
 bool GameLibrary::writeCache() {
@@ -88,10 +126,23 @@ bool GameLibrary::writeCache() {
     // Reserve the header slot with a blank (zeroed) header; the real values are
     // filled in later by writeCacheHeader(). The entries follow it.
     CacheHeader header = {};
+    header.directoryCount = directoryCount();
+
     if (fwrite(&header, 1, sizeof(CacheHeader), cacheFile) != sizeof(CacheHeader)) {
         debugf("[GameLibrary] Failed to write blank cache header\n");
         fclose(cacheFile);
         return false;
+    }
+
+    for (int i = 0; i < header.directoryCount; i++) {
+        char directoryPath[MAX_DIRECTORY_LENGTH] = {};
+        snprintf(directoryPath, sizeof(directoryPath), "%s", romDirectoryPaths[i].c_str());
+
+        if (fwrite(directoryPath, 1, sizeof(directoryPath), cacheFile) != sizeof(directoryPath)) {
+            debugf("[GameLibrary] Failed to write cache directory %i\n", i);
+            fclose(cacheFile);
+            return false;
+        }
     }
 
     size_t entriesToWrite = std::min((size_t)cachedFileCount, (size_t)MAX_NUMBER_OF_FILES);
@@ -124,6 +175,7 @@ bool GameLibrary::writeCacheHeader() {
     header.lastUniqueID[0] = romFile.uniqueID[0];
     header.lastUniqueID[1] = romFile.uniqueID[1];
     header.lastRegionCode = romFile.regionCode;
+    header.directoryCount = directoryCount();
 
     char cachePath[512];
     snprintf(cachePath, sizeof(cachePath), "sd:/cache.bin");
@@ -376,151 +428,169 @@ void GameLibrary::loadGames() {
     entryIndexMap.reset();
 
     dir_t entry;
-    // Find the first file in the directory
-    int result = dir_findfirst(path, &entry);
-
-    debugf("[GameLibrary] Reading ROM files in %s\n", path);
-
-    // If directory is empty or doesn't exist, return
-    if (result != 0) {
-        debugf("[GameLibrary] No ROM files found\n");
-        return;
-    }
 
     int fileIndex = -1;
     int entryIndex = 0;
 
     std::vector<Game*> speedrunGames;
 
-    // Process the first entry and continue with the rest
-    do {
-        // Skip directories
-        if (entry.d_type == DT_DIR) {
-            continue;
-        }
-        
-        const char* filename = entry.d_name;
+    // Each directory is relative to `path` and carries no trailing slash (the
+    // root itself is an empty string)
+    for (const std::string& directoryPath : romDirectoryPaths) {
+        char scanPath[512];
 
-        // Skip files without a valid extension (e.g. .z64)
-        if (!ROMFile::hasROMExtension(filename)) {
-            continue;
-        }
-
-        // Build full path
-        char fullPath[512];
-        snprintf(fullPath, sizeof(fullPath), "%s%s", path, filename);
-
-        ROMFile* romFile = new ROMFile(fullPath);
-
-        GameDatabase::Entry* databaseEntry = nullptr;
-
-        uint32_t hash = GameDatabase::djb2((const unsigned char*)filename, strlen(filename));
-        uint32_t fileSize = entry.d_size;
-
-        // Set the ROM size here so it is populated on the cache-hit path too;
-        // loadHeader() (cache-miss only) would otherwise be the sole place it is
-        // set, leaving romFile->size uninitialised for cached games.
-        romFile->size = fileSize;
-
-        fileIndex++;
-
-        CacheResult cacheResult = cache[fileIndex];
-
-        cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
-
-        if (readFromCache) {
-            if (cacheResult.hash != hash || cacheResult.fileSize != fileSize) {
-                readFromCache = false;
-
-                debugf("[GameLibrary] Hash mismatch for file: %s\n", filename);
-                debugf("[GameLibrary] Abandoning cache.\n");
-            }
-        }
-
-        if (readFromCache) {
-            if (cacheResult.entryIndex != -1) {
-                databaseEntry = database.readEntryAtIndex(cacheResult.entryIndex);
-            }
-
-            romFile->version = cacheResult.version;
-            romFile->crc1 = cacheResult.crc1;
-
-            cache[fileIndex].entryIndex = cacheResult.entryIndex;
-            cache[fileIndex].version = cacheResult.version;
-            cache[fileIndex].crc1 = cacheResult.crc1;
+        if (directoryPath.empty()) {
+            snprintf(scanPath, sizeof(scanPath), "%s", path);
         }
         else {
-            if (romFile->loadHeader()) {
-                databaseEntry = database.entryForROMFile(romFile);
+            snprintf(scanPath, sizeof(scanPath), "%s%s/", path, directoryPath.c_str());
+        }
 
-                cache[fileIndex].entryIndex = (databaseEntry == nullptr) ? -1 : databaseEntry->entryIndex;
-                cache[fileIndex].version = romFile->version;
-                cache[fileIndex].crc1 = romFile->crc1;
-            } else {
-                debugf("[GameLibrary] Failed to load ROM file: %s\n", filename);
+        debugf("[GameLibrary] Reading ROM files in %s\n", scanPath);
 
-                // Failed to load, clean up
-                delete romFile;
+        // Skip directories that are empty or don't exist
+        if (dir_findfirst(scanPath, &entry) != 0) {
+            debugf("[GameLibrary] No ROM files found in %s\n", scanPath);
+            continue;
+        }
 
-                cache[fileIndex].entryIndex = -1;
-                cache[fileIndex].version = 0;
-                cache[fileIndex].crc1 = 0;
-
+        // Process the first entry and continue with the rest
+        do {
+            // Skip directories
+            if (entry.d_type == DT_DIR) {
                 continue;
             }
-        }
 
-        if (databaseEntry != nullptr) {
-            romFile->uniqueID[0] = databaseEntry->uniqueID[0];
-            romFile->uniqueID[1] = databaseEntry->uniqueID[1];
-            romFile->regionCode = databaseEntry->regionCode;
-        }
+            const char* filename = entry.d_name;
 
-        Game& lastGame = allGames.emplace_back(*romFile, databaseEntry);
-
-        if (databaseEntry != nullptr) {
-            if (databaseEntry->supportsSpeedruns) {
-                speedrunGames.push_back(&lastGame);
+            // Skip files without a valid extension (e.g. .z64)
+            if (!ROMFile::hasROMExtension(filename)) {
+                continue;
             }
-        }
 
-        char* uniqueID = romFile->uniqueID;
+            // The cache is a fixed-size array, so stop rather than run past it
+            if (fileIndex + 1 >= MAX_NUMBER_OF_FILES) {
+                debugf("[GameLibrary] Reached the %i file limit\n", MAX_NUMBER_OF_FILES);
+                break;
+            }
 
-        int foundRetailEntryIndex = entryIndexMap[uniqueID];
+            // Build full path. Sized so scanPath (up to 511) + d_name (up to
+            // 255) can't truncate, keeping -Werror=format-truncation happy.
+            char fullPath[768];
+            snprintf(fullPath, sizeof(fullPath), "%s%s", scanPath, filename);
 
-        if (romFile->hasHomebrewGameCode()) {
-            foundRetailEntryIndex = -1;
-        }
+            ROMFile* romFile = new ROMFile(fullPath);
 
-        if (foundRetailEntryIndex == -1) {
-            if (romFile->hasHomebrewGameCode() || databaseEntry == nullptr) {
-                // Version field  for homebrew roms can't be trusted, so keep it a 1
-                lastGame.romFile.version = 1;
+            GameDatabase::Entry* databaseEntry = nullptr;
 
-                homebrewGroups.emplace_back(lastGame);
+            uint32_t hash = GameDatabase::djb2((const unsigned char*)filename, strlen(filename));
+            uint32_t fileSize = entry.d_size;
+
+            // Set the ROM size here so it is populated on the cache-hit path too;
+            // loadHeader() (cache-miss only) would otherwise be the sole place it is
+            // set, leaving romFile->size uninitialised for cached games.
+            romFile->size = fileSize;
+
+            fileIndex++;
+
+            CacheResult cacheResult = cache[fileIndex];
+
+            cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
+
+            if (readFromCache) {
+                if (cacheResult.hash != hash || cacheResult.fileSize != fileSize) {
+                    readFromCache = false;
+
+                    debugf("[GameLibrary] Hash mismatch for file: %s\n", filename);
+                    debugf("[GameLibrary] Abandoning cache.\n");
+                }
+            }
+
+            if (readFromCache) {
+                if (cacheResult.entryIndex != -1) {
+                    databaseEntry = database.readEntryAtIndex(cacheResult.entryIndex);
+                }
+
+                romFile->version = cacheResult.version;
+                romFile->crc1 = cacheResult.crc1;
+
+                cache[fileIndex].entryIndex = cacheResult.entryIndex;
+                cache[fileIndex].version = cacheResult.version;
+                cache[fileIndex].crc1 = cacheResult.crc1;
             }
             else {
-                entryIndexMap[uniqueID] = entryIndex;
+                if (romFile->loadHeader()) {
+                    databaseEntry = database.entryForROMFile(romFile);
 
-                retailGroups.emplace_back(lastGame);
-                entryIndex++;
+                    cache[fileIndex].entryIndex = (databaseEntry == nullptr) ? -1 : databaseEntry->entryIndex;
+                    cache[fileIndex].version = romFile->version;
+                    cache[fileIndex].crc1 = romFile->crc1;
+                } else {
+                    debugf("[GameLibrary] Failed to load ROM file: %s\n", filename);
+
+                    // Failed to load, clean up
+                    delete romFile;
+
+                    cache[fileIndex].entryIndex = -1;
+                    cache[fileIndex].version = 0;
+                    cache[fileIndex].crc1 = 0;
+
+                    continue;
+                }
             }
-        }
-        else {
-            GameGroup& gameGroup = retailGroups.at(foundRetailEntryIndex);
-            gameGroup.addGame(lastGame);
-        }
 
-        if (std::find(recentsPaths.begin(), recentsPaths.end(), fullPath) != recentsPaths.end()) {
-            recentGroups.emplace_back(lastGame);
-        }
+            if (databaseEntry != nullptr) {
+                romFile->uniqueID[0] = databaseEntry->uniqueID[0];
+                romFile->uniqueID[1] = databaseEntry->uniqueID[1];
+                romFile->regionCode = databaseEntry->regionCode;
+            }
 
-        if (std::find(favouritesPaths.begin(), favouritesPaths.end(), fullPath) != favouritesPaths.end()) {
-            lastGame.isFavourite = true;
+            Game& lastGame = allGames.emplace_back(*romFile, databaseEntry);
 
-            favouriteGroups.emplace_back(lastGame);
-        }
-    } while (dir_findnext(path, &entry) == 0);
+            if (databaseEntry != nullptr) {
+                if (databaseEntry->supportsSpeedruns) {
+                    speedrunGames.push_back(&lastGame);
+                }
+            }
+
+            char* uniqueID = romFile->uniqueID;
+
+            int foundRetailEntryIndex = entryIndexMap[uniqueID];
+
+            if (romFile->hasHomebrewGameCode()) {
+                foundRetailEntryIndex = -1;
+            }
+
+            if (foundRetailEntryIndex == -1) {
+                if (romFile->hasHomebrewGameCode() || databaseEntry == nullptr) {
+                    // Version field  for homebrew roms can't be trusted, so keep it a 1
+                    lastGame.romFile.version = 1;
+
+                    homebrewGroups.emplace_back(lastGame);
+                }
+                else {
+                    entryIndexMap[uniqueID] = entryIndex;
+
+                    retailGroups.emplace_back(lastGame);
+                    entryIndex++;
+                }
+            }
+            else {
+                GameGroup& gameGroup = retailGroups.at(foundRetailEntryIndex);
+                gameGroup.addGame(lastGame);
+            }
+
+            if (std::find(recentsPaths.begin(), recentsPaths.end(), fullPath) != recentsPaths.end()) {
+                recentGroups.emplace_back(lastGame);
+            }
+
+            if (std::find(favouritesPaths.begin(), favouritesPaths.end(), fullPath) != favouritesPaths.end()) {
+                lastGame.isFavourite = true;
+
+                favouriteGroups.emplace_back(lastGame);
+            }
+        } while (dir_findnext(scanPath, &entry) == 0);
+    }
 
     // fileIndex is the last 0-based index; the count is one more than that
     cachedFileCount = fileIndex + 1;
@@ -574,7 +644,7 @@ void GameLibrary::loadGames() {
 
     debugf("[GameLibrary] Reading M64 files in %s\n", m64sPath);
 
-    result = dir_findfirst(m64sPath, &entry);
+    int result = dir_findfirst(m64sPath, &entry);
 
     // Only proceed if folder exists
     if (result == 0) {

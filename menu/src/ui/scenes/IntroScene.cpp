@@ -44,6 +44,10 @@ IntroScene::~IntroScene() {
     sprite_free(logoSprite);
 }
 
+void IntroScene::didBeginScene(SceneEntry) {
+    labelView.setString("");
+}
+
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
     Rect sceneRect = view.frame;
 
@@ -107,14 +111,19 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
     }
     
     if (updateInfo.frameNumber == 7) {
-        std::vector<std::string> folderPaths = gameLibrary->findROMDirectories();
+        // If no cache existed, present the user with a choice of folders to
+        // load ROMs from
+        if (!gameLibrary->loadCache()) {
+            std::vector<std::string> folderPaths = gameLibrary->findROMDirectories();
 
-        labelView.setString("Press Start to Continue");
-        auto boo = presentPopover<ChooseFoldersPopover>(folderPaths);
-        labelView.setString("");
+            labelView.setString("Press Start to Continue");
+            auto chosenFolders = presentPopover<ChooseFoldersPopover>(folderPaths);
+            labelView.setString("");
+
+            gameLibrary->romDirectoryPaths = chosenFolders.value;
+        }
 
         seconds = measure([&] {
-            gameLibrary->loadCache();
             gameLibrary->loadHistoryAndFavourites();
             gameLibrary->loadGames();
         });
@@ -196,6 +205,8 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                 // The popover read the first few screenshots to preview them,
                 // so reset before handing over to `ScreenshotsImportScene`
                 screenshotsReader->reset();
+
+                labelView.setString("Processing Screenshots");
 
                 ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(this, lastLaunchedGame, count, screenshotsReader);
                 pushScene(screenshotsImportScene);
