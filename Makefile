@@ -16,14 +16,29 @@ export N64_INST
 PAYLOAD_ELF      = payload/build/payload.elf.stripped
 MENU_PAYLOAD_ELF = menu/assets/payload.elf.stripped
 
+# The payload is built from a sibling checkout that isn't always present. When
+# it's missing, build the menu against whatever payload.elf.stripped is already
+# in menu/assets/ rather than failing on a directory we can't enter.
+HAVE_PAYLOAD := $(wildcard payload/Makefile)
+
+ifeq ($(HAVE_PAYLOAD),)
+MENU_PAYLOAD_DEP =
+else
+MENU_PAYLOAD_DEP = $(MENU_PAYLOAD_ELF)
+endif
+
 all: menu
 .PHONY: all
 
 # --- payload ---------------------------------------------------------------
 
 payload:
+ifeq ($(HAVE_PAYLOAD),)
+	@echo "==> payload (skipped -- payload/ not found)"
+else
 	@echo "==> payload"
 	$(MAKE) -C payload
+endif
 .PHONY: payload
 
 # Phony prerequisite, so the payload's own Makefile always gets a chance to
@@ -38,7 +53,7 @@ $(MENU_PAYLOAD_ELF): $(PAYLOAD_ELF)
 
 # --- menu ------------------------------------------------------------------
 
-menu: $(MENU_PAYLOAD_ELF)
+menu: $(MENU_PAYLOAD_DEP)
 	@echo "==> menu"
 	$(MAKE) -C menu
 .PHONY: menu
@@ -46,7 +61,7 @@ menu: $(MENU_PAYLOAD_ELF)
 # Pass-throughs to menu/, but gated on a current payload asset first, so a
 # release ROM can never embed a stale payload.elf.stripped. `deploy` picks
 # this up transitively via its `release` prerequisite.
-release release-bundle sc64: $(MENU_PAYLOAD_ELF)
+release release-bundle sc64: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu $@
 .PHONY: release release-bundle sc64
 
@@ -80,6 +95,8 @@ launch-emu: all
 # --- housekeeping ----------------------------------------------------------
 
 clean:
+ifneq ($(HAVE_PAYLOAD),)
 	$(MAKE) -C payload clean
+endif
 	$(MAKE) -C menu clean
 .PHONY: clean
