@@ -82,11 +82,13 @@ void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
     leftContainerView.frame.origin.x -= smallerImageSize.width;
     leftContainerView.frame.origin.y += 7;
     leftContainerView.scissorRect = leftContainerView.worldFrame();
+    leftContainerView.backgroundColor = rectView.fillColor;
 
     rightContainerView.frame = Rect(imagePosition, smallerImageSize);
     rightContainerView.frame.origin.x += imageSize.width;
     rightContainerView.frame.origin.y += 7;
     rightContainerView.scissorRect = rightContainerView.worldFrame();
+    rightContainerView.backgroundColor = rectView.fillColor;
 
     sideThumbnailView1.frame = Rect(Vec2(leftSlideX, 0), smallerImageSize);
     sideThumbnailView1.opacity = sideThumbnailOpacity;
@@ -101,4 +103,5 @@ void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
         mainThumbnailView.frame.maxY() + 26
     );
     messageLabel.maxWidth = rectView.frame.size.width;
+    messageLabel.backgroundColor = rectView.fillColor;
 }
