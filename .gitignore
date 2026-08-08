@@ -6,8 +6,11 @@ design-resources
 release-builds
 menu/WonderMenu.z64
 menu/assets/sd/*.v64
+menu/assets/sd/*/*.v64
 menu/assets/sd/*.n64
+menu/assets/sd/*/*.n64
 menu/assets/sd/*.z64
+menu/assets/sd/*/*.z64
 menu/filesystem
 menu/build
 
