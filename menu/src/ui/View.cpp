@@ -168,25 +168,27 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
     for (View* subview : subviews) {
         Color finalBlendColor2 = finalBlendColor;
 
-        if (subview->backgroundColor.a == 255) {
-            finalBlendColor2 = subview->backgroundColor;
-        }
-
         if (subview->usesMultipliedOpacity) {
             subview->finalOpacity = finalOpacity * subview->opacity;
         }
         else {
             subview->finalOpacity = subview->opacity;
         }
+
+        if (subview->backgroundColor.a == 255) {
+            finalBlendColor2 = subview->backgroundColor;
+
+            finalBlendColor2.rgb *= subview->finalOpacity;
+            subview->finalBlendColor   = finalBlendColor2;
+        }
+        else {
+            subview->finalBlendColor = finalBlendColor2;
+        }
         
         subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
         subview->finalFrame.origin = finalPosition + subview->frame.origin;
         subview->finalFrame.size   = subview->frame.size;
         subview->finalIsBlendedWithMemory = finalIsBlendedWithMemory ? true : !subview->isOpaque;
-
-        Color blendedColor = finalBlendColor2;
-        blendedColor.rgb *= subview->finalOpacity;
-        subview->finalBlendColor   = blendedColor;
 
         subview->update(renderInfo);
 
@@ -432,6 +434,7 @@ void Drawable::update(const RenderInfo& renderInfo) {
 
     if (finalOpacity != lastFinalOpacity[bufferIndex]) {
         needsRender = true;
+        needsClear = true;
         lastFinalOpacity[bufferIndex] = finalOpacity;
     }
 
