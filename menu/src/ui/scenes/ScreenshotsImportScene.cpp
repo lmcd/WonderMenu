@@ -135,8 +135,8 @@ void ScreenshotsImportScene::beginThumbnailWrite() {
 
     uint32_t thumbnailRecordSize = (thumbnailSize + 511u) & ~511u;
 
-    data_cache_hit_writeback(thumbnailSprite, sizeof(sprite_t));
-    dma_write_raw_async(thumbnailSprite, screenshotRecordOffset, thumbnailSize);
+    data_cache_hit_writeback(thumbnailSprite, thumbnailRecordSize);
+    dma_write_raw_async(thumbnailSprite, screenshotRecordOffset, thumbnailRecordSize);
     dma_wait();
 
     thumbnailWriter.begin(
@@ -246,24 +246,19 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    uint32_t recordOffset = reader->currentRecordOffset();
-    int recordSize = reader->currentRecordSize();
-
-    debugf("[ScreenshotsImportScene] Importing screenshot #%i (%i x %i) from 0x%08lX\n", currentScreenshotIndex, screenshotSprite->width, screenshotSprite->height, (unsigned long)recordOffset);
-
-    screenshotThumbnailView.fullSizeScreenshotSurface = reader->surfaceForSprite(screenshotSprite);
+    screenshotThumbnailView.setFullSizeScreenshotSurface(reader->surfaceForSprite(screenshotSprite));
 
     screenshotWriter.begin(
         &screenshotDir,
         filenameForScreenshot(currentScreenshotIndex, false),
-        (const void*)(uintptr_t)recordOffset,
-        recordSize,
+        (const void*)(uintptr_t)reader->recordOffset,
+        reader->recordSize,
         KiB(40)
     );
 
     // Held for beginThumbnailWrite(), which reuses this record once the
     // screenshot above has finished streaming out.
-    screenshotRecordOffset = recordOffset;
+    screenshotRecordOffset = reader->recordOffset;
     writingScreenshotIndex = currentScreenshotIndex;
 
     currentScreenshotIndex++;

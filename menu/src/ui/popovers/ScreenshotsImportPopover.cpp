@@ -22,7 +22,7 @@ ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene, Screenshots
     messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
     messageLabel.align = ALIGN_CENTER;
     messageLabel.textColor = Color(140);
-    messageLabel.setString("25 $07screenshots found!\nWould you like to save them?");
+    messageLabel.setString("%i $07screenshots found!\nWould you like to save them?", reader->count);
 }
 
 void ScreenshotsImportPopover::didBeginScene(SceneEntry entry) {
@@ -40,14 +40,18 @@ void ScreenshotsImportPopover::didBeginScene(SceneEntry entry) {
 void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
     if (reader != nullptr) {
         if (renderInfo.sceneFrameNumber == 0) {
-            mainThumbnailView.fullSizeScreenshotSurface = reader->surfaceForSprite(reader->nextSprite());
+            mainThumbnailView.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
         }
         else if (renderInfo.sceneFrameNumber == 1) {
-            sideThumbnailView1.fullSizeScreenshotSurface = reader->surfaceForSprite(reader->nextSprite());
+            sideThumbnailView1.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
         }
         else if (renderInfo.sceneFrameNumber == 2) {
-            sideThumbnailView2.fullSizeScreenshotSurface = reader->surfaceForSprite(reader->nextSprite());
+            sideThumbnailView2.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
         }
+    }
+
+    if (renderInfo.sceneFrameNumber >= 22) {
+        thumbnailTransition.advance();
     }
 
     AlertPopover::updateViews(renderInfo);
@@ -64,10 +68,6 @@ void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
         rectView.frame.midX() - imageSize.midX(),
         rectView.frame.minY() + 30
     );
-
-    if (renderInfo.sceneFrameNumber >= 22) {
-        thumbnailTransition.advance();
-    }
 
     float slideProgress = TimingFunctions::easeInOutQuad(thumbnailTransition.progress);
 

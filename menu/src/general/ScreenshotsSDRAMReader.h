@@ -15,18 +15,26 @@ private:
     static constexpr int MAXIMUM_PIXEL_BYTES = 440 * 326 * 2;
 
     uint32_t baseAddress = 0;
-    uint32_t readOffset = 0;
-    uint32_t recordOffset = 0;
-
-    int index = 0;
-    int recordSize = 0;
-
     uint8_t* buffer = nullptr;
-    int bufferSize = 0;
+
+    uint32_t readOffset = 0;
+
+    /**
+     * This index of the screenshot currenty being processed/in the buffer.
+     */
+    int currentIndex = -1;
 
 public:
-    ScreenshotsSDRAMReader(uint32_t baseAddress);
+    ScreenshotsSDRAMReader(uint32_t baseAddress, int count);
     ~ScreenshotsSDRAMReader();
+
+    /**
+     * The number of screenshots available to read.
+     */
+    int count = 0;
+
+    uint32_t recordOffset = 0;
+    int recordSize = 0;
 
     /**
      * Advance to and read the next sprite from SDRAM.
@@ -36,8 +44,4 @@ public:
     surface_t surfaceForSprite(sprite_t* sprite) const;
 
     void reset();
-
-    int currentIndex() const { return index; }
-    int currentRecordSize() const { return recordSize; }
-    uint32_t currentRecordOffset() const { return recordOffset; }
 };

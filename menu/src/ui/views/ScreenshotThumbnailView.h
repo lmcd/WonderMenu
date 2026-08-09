@@ -17,7 +17,8 @@ private:
     BorderView borderView;
     BaseView contentsView;
 
-    void* lastFullSizeScreenshotBuffer = nullptr;
+    surface_t fullSizeScreenshotSurface = {};
+    bool needsScaledSpriteRebuild = false;
 
     static sprite_t* createScaledSprite(const surface_t* sourceSurface, int width);
     static void freeScaledSprite(sprite_t* sprite);
@@ -28,9 +29,9 @@ public:
     ImageView imageView1;
     ImageView imageView2;
 
-    surface_t fullSizeScreenshotSurface;
-
     ScreenshotThumbnailView();
+
+    void setFullSizeScreenshotSurface(const surface_t& surface);
 
     void update(const RenderInfo& renderInfo) override;
     void render(const RenderInfo& renderInfo) override;

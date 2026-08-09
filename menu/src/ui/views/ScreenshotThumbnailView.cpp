@@ -8,6 +8,8 @@
 
 #include "ScreenshotThumbnailView.h"
 
+static constexpr size_t SPRITE_HEADER_OFFSET = (64 - (sizeof(sprite_t) % 64)) % 64;
+
 ScreenshotThumbnailView::ScreenshotThumbnailView() {
     isSmooth = true;
 
@@ -28,8 +30,6 @@ ScreenshotThumbnailView::ScreenshotThumbnailView() {
 
     addSubview(&borderView);
 }
-
-static constexpr size_t SPRITE_HEADER_OFFSET = (64 - (sizeof(sprite_t) % 64)) % 64;
 
 sprite_t* ScreenshotThumbnailView::createScaledSprite(const surface_t* sourceSurface, int width) {
     if (sourceSurface == nullptr) {
@@ -79,6 +79,11 @@ void ScreenshotThumbnailView::freeScaledSprite(sprite_t* sprite) {
     }
 }
 
+void ScreenshotThumbnailView::setFullSizeScreenshotSurface(const surface_t& surface) {
+    fullSizeScreenshotSurface = surface;
+    needsScaledSpriteRebuild = true;
+}
+
 void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
     contentsView.frame.size = frame.size;
     imageView1.frame.size = frame.size;
@@ -87,7 +92,7 @@ void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
 
     borderView.radius = radius;
 
-    if (fullSizeScreenshotSurface.buffer != lastFullSizeScreenshotBuffer) {
+    if (needsScaledSpriteRebuild) {
         // The previous frame's render is still reading the composed surface, and
         // it's about to be freed along with last time's sprites
         rspq_wait();
@@ -115,7 +120,7 @@ void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
         // this returns
         rspq_wait();
 
-        lastFullSizeScreenshotBuffer = fullSizeScreenshotSurface.buffer;
+        needsScaledSpriteRebuild = false;
     }
 
     MaskedImageView::update(renderInfo);

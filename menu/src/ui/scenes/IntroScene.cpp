@@ -49,20 +49,18 @@ void IntroScene::didBeginScene(SceneEntry) {
 }
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
-    Rect sceneRect = view.frame;
-
     rectView.fillColor = Color::BLACK;
-    rectView.frame = sceneRect;
+    rectView.frame = view.frame;
     rectView.usesMultipliedOpacity = false;
 
-    float x = sceneRect.midX() - logoSprite->width  / 2.0f;
-    float y = sceneRect.midY() - logoSprite->height / 2.0f;
+    float x = view.frame.midX() - logoSprite->width  / 2.0f;
+    float y = view.frame.midY() - logoSprite->height / 2.0f;
 
     imageView.sprite = logoSprite;
     imageView.frame.origin = Vec2(x, y);
 
     labelView.frame.origin = Vec2(0, 458);
-    labelView.maxWidth = sceneRect.size.width;
+    labelView.maxWidth = view.frame.size.width;
     labelView.textColor = Color(128);
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
@@ -192,14 +190,14 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
                 debugf("[IntroScene] %li Screenshots Found\n", count);
 
-                // Handed to the import scene below, which owns it from there
-                ScreenshotsSDRAMReader* screenshotsReader = new ScreenshotsSDRAMReader(baseReadOffset + sizeof(ScreenshotsHeader));
-
-                auto result = presentPopover<ScreenshotsImportPopover>(screenshotsReader);
-
                 // Only the magic is validated, so clamp the count rather than
                 // trusting it to be sane.
                 count = std::min(count, (uint32_t)MAX_SCREENSHOT_IMPORT_COUNT);
+
+                // Handed to the import scene below, which owns it from there
+                ScreenshotsSDRAMReader* screenshotsReader = new ScreenshotsSDRAMReader(baseReadOffset + sizeof(ScreenshotsHeader), count);
+
+                auto result = presentPopover<ScreenshotsImportPopover>(screenshotsReader);
 
                 // Dirty the magic so the same screenshots aren't imported again
                 io_write(baseReadOffset, 0);

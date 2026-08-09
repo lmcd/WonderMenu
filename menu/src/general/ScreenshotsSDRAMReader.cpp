@@ -7,11 +7,14 @@
 
 #include "ScreenshotsSDRAMReader.h"
 
-ScreenshotsSDRAMReader::ScreenshotsSDRAMReader(uint32_t baseAddress)
+ScreenshotsSDRAMReader::ScreenshotsSDRAMReader(uint32_t baseAddress, int count)
     : baseAddress(baseAddress),
-      readOffset(baseAddress) {
+      readOffset(baseAddress),
+      count(count) {
 
-    bufferSize = (int)sizeof(sprite_t) + MAXIMUM_PIXEL_BYTES;
+    int bufferSize = sizeof(sprite_t) + MAXIMUM_PIXEL_BYTES;
+
+    // Allocate the buffer
     buffer = (uint8_t*)memalign(16, bufferSize);
 }
 
@@ -25,7 +28,7 @@ ScreenshotsSDRAMReader::~ScreenshotsSDRAMReader() {
 void ScreenshotsSDRAMReader::reset() {
     readOffset = baseAddress;
     recordOffset = baseAddress;
-    index = 0;
+    currentIndex = -1;
     recordSize = 0;
 }
 
@@ -34,31 +37,37 @@ sprite_t* ScreenshotsSDRAMReader::nextSprite() {
         return nullptr;
     }
 
-    sprite_t* sprite = (sprite_t*)buffer;
+    currentIndex++;
 
-    data_cache_hit_writeback_invalidate(sprite, sizeof(sprite_t));
-    dma_read_raw_async(sprite, readOffset, sizeof(sprite_t));
+    uint8_t* spriteHeaderBuffer = buffer;
+    uint8_t* imageDataBuffer = spriteHeaderBuffer + sizeof(sprite_t);
+
+    // Read the sprite header/metadata (width, height, etc)
+    data_cache_hit_writeback_invalidate(spriteHeaderBuffer, sizeof(sprite_t));
+    dma_read_raw_async(spriteHeaderBuffer, readOffset, sizeof(sprite_t));
     dma_wait();
 
-    int pixelBytes = sprite->width * sprite->height * 2;
+    // Cast read metadata to a sprite so we can access its attributes
+    sprite_t* sprite = (sprite_t*)spriteHeaderBuffer;
 
-    if (pixelBytes <= 0 || pixelBytes > MAXIMUM_PIXEL_BYTES) {
-        debugf("[ScreenshotsSDRAMReader] Screenshot #%i has bad dimensions (%i x %i)\n", index, sprite->width, sprite->height);
+    // Number of bytes the image data occupies
+    int imageBytes = sprite->width * sprite->height * 2;
+
+    if (imageBytes <= 0 || imageBytes > MAXIMUM_PIXEL_BYTES) {
+        debugf("[ScreenshotsSDRAMReader] Screenshot #%i has bad dimensions (%i x %i)\n", currentIndex, sprite->width, sprite->height);
 
         return nullptr;
     }
 
-    uint8_t* pixels = buffer + sizeof(sprite_t);
-
-    data_cache_hit_writeback_invalidate(pixels, pixelBytes);
-    dma_read_raw_async(pixels, readOffset + sizeof(sprite_t), pixelBytes);
+    // Read the actual image data
+    data_cache_hit_writeback_invalidate(imageDataBuffer, imageBytes);
+    dma_read_raw_async(imageDataBuffer, readOffset + sizeof(sprite_t), imageBytes);
     dma_wait();
 
     recordOffset = readOffset;
-    recordSize = ((int)sizeof(sprite_t) + pixelBytes + 511) & ~511;
+    recordSize = (sizeof(sprite_t) + imageBytes + 511) & ~511;
 
     readOffset += recordSize;
-    index++;
 
     return sprite;
 }
