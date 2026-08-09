@@ -10,6 +10,7 @@
 #include "animation/Animation.h"
 #include "general/InputRepeater.h"
 #include "ui/View.h"
+#include "ui/views/BaseView.h"
 #include "ui/views/drawables/LabelView.h"
 
 static constexpr int MAX_TAB_SEGMENTS = 6;
@@ -37,6 +38,8 @@ private:
 	Animation<float>* rLabelAnimation = nullptr;
 
 	surface_t lrSheet;
+
+	BaseView labelsView;
 
 	LabelView<MAX_TAB_LABEL_CHARS> labelViews[MAX_TAB_SEGMENTS];
 

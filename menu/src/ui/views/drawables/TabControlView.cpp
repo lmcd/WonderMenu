@@ -25,8 +25,10 @@ TabControlView::TabControlView() {
         labelView.align = ALIGN_LEFT;
         labelView.maxWidth = 200;
 
-        addSubview(&labelView);
+        labelsView.addSubview(&labelView);
     }
+
+    addSubview(&labelsView);
 }
 
 void TabControlView::freeLabelsBlock() {
@@ -141,6 +143,10 @@ bool TabControlView::handleInputs(const UpdateInfo&) {
 }
 
 void TabControlView::update(const RenderInfo& renderInfo) {
+    labelsView.frame = Rect(Vec2::ZERO, frame.size);
+    Color barColor = Color(17);
+    labelsView.backgroundColor = barColor;
+
     Drawable::update(renderInfo);
 
     int bufferIndex = renderInfo.bufferIndex;
