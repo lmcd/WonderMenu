@@ -20,7 +20,7 @@ struct __attribute__((packed)) CheatGroup {
 
 struct __attribute__((packed)) CheatWildcardOption {
     char title[50];
-    uint8_t value;
+    uint16_t value;
 };
 
 struct __attribute__((packed)) Cheat {
@@ -55,6 +55,7 @@ struct CheatDatabase {
     //   CheatGroup[groupCount]  { char title[50], u16 cheatStartIndex, u16 cheatCount, u16 groupStartIndex, u16 groupCount }
     //   Cheat[cheatCount]       { char title[50], u16 codesStartIndex, u16 codesCount }
     //   CheatCode[codeCount]    { u32 address, u16 value }
+    //   CheatWildcardOption[wildcardOptionsCount] { char title[50], u16 value }
     std::vector<uint8_t> serialize() const;
 
     size_t byteOffset = 0;

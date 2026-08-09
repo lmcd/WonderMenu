@@ -4,6 +4,7 @@
  */
 #include "CheatDatabase.h"
 #include <cinttypes>
+#include <cstdlib>
 #include <cstring>
 
 #ifdef N64
@@ -24,9 +25,6 @@ static void setTitle(char* dest, size_t destSize, const std::string& src) {
     dest[destSize - 1] = '\0';
 }
 
-static void writeU8(std::vector<uint8_t>& out, uint8_t v) {
-    out.push_back(v);
-}
 
 static void writeU16BE(std::vector<uint8_t>& out, uint16_t v) {
     out.push_back((v >> 8) & 0xFF);
@@ -106,35 +104,57 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
     size_t currentWildcardOptionIndex = 0;
     size_t currentCodeIndex = 0;
 
-    bool expecting1ByteWildcard = false;
-    bool expecting2ByteWildcard = false;
+    bool expectingWildcardOptions = false;
+    // True for a "????" (2 byte) wildcard, false for a "??" (1 byte) one.
+    bool wildcardIsTwoBytes = false;
+    // The wildcard code's value with the question marks zeroed, e.g. 0xAB00 for
+    // "AB??". Option values are substituted into this.
+    uint16_t wildcardBaseValue = 0;
 
     while (std::getline(stream, line)) {
         if (line.empty()) {
-            expecting1ByteWildcard = false;
-            expecting2ByteWildcard = false;
+            expectingWildcardOptions = false;
             continue;
         }
-        
+
         if (line.rfind("Note=", 0) == 0) {
             continue;
         }
 
-        if (expecting1ByteWildcard) {
-            // Wildcard option line, e.g. "04 Big Boo's Haunt":
-            // first two chars are a hex byte, then a space, then the name.
-            uint8_t optionValue;
-            if (sscanf(line.c_str(), "%2" SCNx8, &optionValue) == 1) {
-                std::string optionName = line.substr(3);
+        if (expectingWildcardOptions) {
+            // Wildcard option line, e.g. "04 Big Boo's Haunt" (1 byte) or
+            // "0104 Big Boo's Haunt" (2 bytes): a hex value, a space, then the
+            // name. Code lines always lead with an 8 digit address, so a token
+            // of 4 hex digits or fewer is what tells the two apart.
+            size_t valueEnd = line.find(' ');
 
-                // PRINTF("Wildcard option: 0x%02X %s\n", optionValue, optionName.c_str());
+            bool isOptionLine =
+                valueEnd != std::string::npos
+             && valueEnd >= 1
+             && valueEnd <= 4
+             && line.find_first_not_of("0123456789abcdefABCDEF") == valueEnd;
+
+            if (isOptionLine) {
+                uint16_t optionValue = (uint16_t)strtoul(line.substr(0, valueEnd).c_str(), nullptr, 16);
+
+                std::string optionName = line.substr(valueEnd + 1);
 
                 CheatWildcardOption option;
                 setTitle(option.title, sizeof(option.title), optionName);
-                
+
+                // Substitute the option into the code's value: a 2 byte
+                // wildcard replaces it outright, a 1 byte one only its low byte.
+                option.value = wildcardIsTwoBytes
+                    ? optionValue
+                    : (uint16_t)((wildcardBaseValue & 0xFF00) | (optionValue & 0x00FF));
+
+                // PRINTF("Wildcard option: 0x%04X %s\n", option.value, optionName.c_str());
+
                 wildcardOptions.push_back(option);
                 cheatPool[currentCheatIndex].wildcardCount++;
                 currentWildcardOptionIndex++;
+
+                continue;
             }
         }
 
@@ -186,6 +206,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
                 pushGroup(groupSegments[i]);
 
             // Add cheat to the innermost group
+            expectingWildcardOptions = false;
             currentCheatIndex = cheatPool.size();
             cheatPool.push_back({cheatTitle, (uint16_t)codes.size(), 0});
             nodes[currentParent()].items.push_back({false, currentCheatIndex});
@@ -196,24 +217,34 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             uint32_t address;
             uint16_t value;
 
-            // Wildcard values (e.g. "A032DDF9 30??") have their trailing
-            // "??" replaced with zeros -> "A032DDF9 3000"
-            if (line.ends_with("????")) {
-                continue;
-            }
+            // Wildcard values (e.g. "A032DDF9 30??" or "A032DDF9 ????") have
+            // their question marks replaced with zeros -> "A032DDF9 3000".
+            // The option lines that follow supply the real value.
+            bool isOneByteWildcard = line.ends_with("??");
+            bool isTwoByteWildcard = line.ends_with("????");
 
-            if (line.ends_with("??")) {
-                line[line.size() - 2] = '0';
-                line[line.size() - 1] = '0';
+            bool isWildcardCode = isTwoByteWildcard || isOneByteWildcard;
 
-                debugf("Found wildcard\n");
-                expecting1ByteWildcard = true;
-                
+            if (isWildcardCode) {
+                size_t markCount = isTwoByteWildcard ? 4 : 2;
+
+                // Replace question makrs with zeroes.
+                line.replace(line.size() - markCount, markCount, markCount, '0');
+
+                // We're now expecting the actual options on subsequent lines.
+                expectingWildcardOptions = true;
+                wildcardIsTwoBytes = isTwoByteWildcard;
+
                 cheatPool[currentCheatIndex].codeWithWildcardIndex = cheatPool[currentCheatIndex].codesCount;
                 cheatPool[currentCheatIndex].wildcardStartIndex = currentWildcardOptionIndex;
             }
-            
+
+            // Read `address` and `code` from the line
             if (sscanf(line.c_str(), "%8" SCNx32 " %4" SCNx16, &address, &value) == 2) {
+                if (isWildcardCode) {
+                    wildcardBaseValue = value;
+                }
+
                 codes.push_back({address, value});
                 cheatPool[currentCheatIndex].codesCount++;
             }
@@ -311,7 +342,7 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
 
     for (const auto& wildcardOption : wildcardOptions) {
         out.insert(out.end(), wildcardOption.title, wildcardOption.title + sizeof(wildcardOption.title));
-        writeU8(out, wildcardOption.value);
+        writeU16BE(out, wildcardOption.value);
     }
 
     return out;

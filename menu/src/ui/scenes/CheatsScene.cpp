@@ -183,7 +183,8 @@ void CheatsScene::updateViews(const RenderInfo&) {
             rowView->titleView.stringReference = cheat.title;
 
             if (row.multipleChoiceIndex != -1 && isCheatEnabled) {
-                const CheatWildcardOption option = cheatsDatabase->wildcardOptions[row.multipleChoiceIndex];
+                const CheatWildcardOption option =
+                    cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + row.multipleChoiceIndex];
 
                 rowView->setSubtitle("%s", option.title);
             }
@@ -315,6 +316,7 @@ void CheatsScene::finishCheatSelection(const RowInfo& row) {
         parentIndex = parent.parentRowIndex;
     }
 
+    // TODO: this should be called when exiting the scene
     enableSelectedCheats();
 }
 
@@ -326,12 +328,26 @@ void CheatsScene::enableSelectedCheats() {
 
         uint16_t codesEnd = cheat.codesStartIndex + cheat.codesCount;
 
+        // For multiple choice cheats, the wildcard code's value comes from the
+        // chosen option (the code itself only holds the wildcard zeroed out).
+        int16_t multipleChoiceIndex = multipleChoiceIndexForCheat(cheatIndex);
+        uint16_t wildcardCodeIndex = cheat.codesStartIndex + cheat.codeWithWildcardIndex;
+
         for (uint16_t codeIndex = cheat.codesStartIndex; codeIndex < codesEnd; codeIndex++) {
             const CheatCode& code = cheatsDatabase->codes[codeIndex];
 
-            debugf("[CheatsScene] Added cheat to session\n");
+            uint16_t value = code.value;
 
-            gameLaunchSession.userCheatCodes.push_back({code.address, code.value});
+            if (multipleChoiceIndex != -1 && codeIndex == wildcardCodeIndex) {
+                const CheatWildcardOption& option =
+                    cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + multipleChoiceIndex];
+
+                value = option.value;
+            }
+
+            debugf("[CheatsScene] Added cheat code: %08lX %04X\n", (unsigned long)code.address, value);
+
+            gameLaunchSession.userCheatCodes.push_back({code.address, value});
         }
     }
 }
