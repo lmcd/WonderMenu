@@ -171,6 +171,7 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     progressBarView.progress += 1.0f;
 
     Rect progressRect = progressBarView.progressRect();
+    progressRect.origin.x = progressBarView.frame.origin.x;
 
     // The rect inside the progress bar that excludes the rounded corners
     Rect insetRect = progressBarView.frame.insetBy(Vec2(4, 0));
