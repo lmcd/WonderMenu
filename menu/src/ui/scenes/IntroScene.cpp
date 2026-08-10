@@ -149,7 +149,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
             // to right is faster
             std::sort(entries.begin(), entries.end(),
                 [](const GameDatabase::Entry* a, const GameDatabase::Entry* b) {
-                    return a->labelTileOffset < b->labelTileOffset;
+                    return a->smallLabelTileIndex < b->smallLabelTileIndex;
                 }
             );
 

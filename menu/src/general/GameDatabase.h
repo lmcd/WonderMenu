@@ -110,9 +110,8 @@ public:
 
         SaveType saveType;
 
-        // TODO: rename to index?
-        uint16_t labelTileOffset = 0;
-        uint16_t highResLabelTileOffset = 0;
+        uint16_t smallLabelTileIndex = 0;
+        uint16_t largeLabelTileIndex = 0;
         uint32_t cheatByteOffset;  // byte offset into cheat data section, 0xFFFFFFFF = no cheats
 
         uint8_t supportsSpeedruns = 0;

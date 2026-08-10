@@ -229,7 +229,7 @@ void GameDatabase::warmLabelClusterOffset(Entry* entry) {
     #endif
 
     #ifdef N64
-    uint16_t tileIndex = entry->labelTileOffset;
+    uint16_t tileIndex = entry->smallLabelTileIndex;
     int tileOffset = getLabelTileOffset(tileIndex);
 
     if (USE_DMA) {
@@ -249,18 +249,18 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
     }
 
     if (!entry) {
-        placeholderEntry.labelTileOffset = 0;
-        placeholderEntry.highResLabelTileOffset = 4;
+        placeholderEntry.smallLabelTileIndex = 0;
+        placeholderEntry.largeLabelTileIndex = 4;
 
         entry = &placeholderEntry;
     }
     else {
-        if (highRes && entry->highResLabelTileOffset == 0) {
+        if (highRes && entry->largeLabelTileIndex == 0) {
             return false;
         }
     }
 
-    uint16_t tileIndex = highRes ? entry->highResLabelTileOffset : entry->labelTileOffset;
+    uint16_t tileIndex = highRes ? entry->largeLabelTileIndex : entry->smallLabelTileIndex;
     
     tileIndex += chunkOffset;
 
