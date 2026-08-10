@@ -50,7 +50,7 @@ void IntroScene::didBeginScene(SceneEntry) {
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
     rectView.fillColor = Color::BLACK;
-    rectView.frame = view.frame;
+    rectView.frame = renderInfo.screenRect;
     rectView.usesMultipliedOpacity = false;
 
     float x = view.frame.midX() - logoSprite->width  / 2.0f;
