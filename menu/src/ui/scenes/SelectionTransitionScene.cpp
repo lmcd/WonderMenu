@@ -131,6 +131,9 @@ void SelectionTransitionScene::update(const UpdateInfo& updateInfo) {
     bool passed50Percent = (transition.progress > 0.50f);
 
     if (transition.direction == Transition::FORWARDS) {
+        // The f_open in this call can be awfully slow (>500ms, >500 disk_reads)
+        gameLaunchScene->beginROMLoadSession();
+
         if (passed70Percent) {
             gameLaunchScene->loadNextROMChunk();
         }

@@ -59,6 +59,12 @@ public:
     GameLaunchScene(Game* game, CartRenderer* cartRenderer, GameDatabase* database);
 
     Vec3f rotationForFrame(int frameNumber);
+
+    /**
+     * Open the ROM load session, if it isn't open already.
+     */
+    void beginROMLoadSession();
+
     void loadNextROMChunk();
     void showGameInfo();
 

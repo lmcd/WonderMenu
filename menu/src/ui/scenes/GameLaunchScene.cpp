@@ -181,14 +181,20 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
     }
 }
 
-void GameLaunchScene::loadNextROMChunk() {
-    if (session.initial_chunk == 0) {
-        std::string romFilePath = game->romFile.path;
-
-        int initialChunk = 10; //200
-
-        session = sc64_begin_load_rom_session(romFilePath.data(), initialChunk);
+void GameLaunchScene::beginROMLoadSession() {
+    if (session.initial_chunk != 0) {
+        return;
     }
+
+    std::string romFilePath = game->romFile.path;
+
+    int initialChunk = 10; //200
+
+    session = sc64_begin_load_rom_session(romFilePath.data(), initialChunk);
+}
+
+void GameLaunchScene::loadNextROMChunk() {
+    beginROMLoadSession();
 
     bool loadBeginningChunks = (transitionSpeed > 0);
 
