@@ -197,9 +197,6 @@ public:
             advanceX = maxWidth;
         }
 
-        int width = (int)(layout->bbox.x1 - layout->bbox.x0);
-        int height = (int)(layout->bbox.y1 - layout->bbox.y0);
-
         int textX = finalFrame.origin.x;
         int textY = finalFrame.origin.y + layout->bbox.y0;
 
@@ -213,11 +210,11 @@ public:
         Rect boundingBox = Rect(
             textX,
             textY,
-            width,
-            height
+            (int)(layout->bbox.x1 - layout->bbox.x0),
+            (int)(layout->bbox.y1 - layout->bbox.y0)
         );
-        boundingBox = boundingBox;
-
+        boundingBox = boundingBox.insetBy(Vec2(-1, 0));
+        
         if (hasScissor) {
             boundingBox = boundingBox.intersection(scissorStack.back());
         }
