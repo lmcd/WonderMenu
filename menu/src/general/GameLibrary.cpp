@@ -557,12 +557,14 @@ void GameLibrary::loadGames() {
 
             int foundRetailEntryIndex = entryIndexMap[uniqueID];
 
-            if (romFile->hasHomebrewGameCode()) {
+            bool hasHomebrewGameCode = romFile->hasHomebrewGameCode();
+
+            if (hasHomebrewGameCode) {
                 foundRetailEntryIndex = -1;
             }
 
             if (foundRetailEntryIndex == -1) {
-                if (romFile->hasHomebrewGameCode() || databaseEntry == nullptr) {
+                if (hasHomebrewGameCode || databaseEntry == nullptr) {
                     // Version field  for homebrew roms can't be trusted, so keep it a 1
                     lastGame.romFile.version = 1;
 
