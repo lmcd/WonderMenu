@@ -25,12 +25,14 @@ struct GameLaunchSession {
     std::vector<CheatCode> speedrunCheatCodes;
     std::vector<CheatCode> userCheatCodes;
 
+    // `PayloadData` lives in the first 64 bytes of the expansion pak.
     volatile PayloadData* payloadData = (PayloadData*)0xA0400000;
+
     volatile SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     volatile ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
     volatile GameInfo* gameInfo = &payloadData->gameInfo;
 
-    void writeCheatListToBootParams() {
+    uint32_t* makeCheatList() {
         uint32_t tempCheatItems[MAX_CHEAT_CODE_ARRAYLIST_SIZE];
         size_t itemCount = 0;
 
@@ -58,27 +60,30 @@ struct GameLaunchSession {
 
 cheatLimitReached:
         if (itemCount > 0) {
-            // Ensure the last two entries are zero
+            // Ensure the last two entries are zero.
             tempCheatItems[itemCount++] = 0;
             tempCheatItems[itemCount++] = 0;
 
-            // Allocate memory for the cheats array
+            // Allocate memory for the cheats array.
             uint32_t* cheats = (uint32_t*)malloc(itemCount * sizeof(uint32_t));
 
             if (cheats) {
                 memcpy(cheats, tempCheatItems, itemCount * sizeof(uint32_t));
 
                 debugf("Cheats enabled, %u cheats found\n", itemCount / 2);
-                boot_params.cheat_list = cheats;
+
+                return cheats;
             }
             else {
                 debugf("Failed to allocate memory for cheat list\n");
-                boot_params.cheat_list = NULL;
+
+                return nullptr;
             }
         }
         else {
             debugf("Cheats enabled, but no cheats found\n");
-            boot_params.cheat_list = NULL;
+
+            return nullptr;
         }
     }
 
@@ -103,6 +108,8 @@ cheatLimitReached:
         screenshotSettings->writeOffset  = 0;
 
         if (m64File != nullptr) {
+            // TODO: None of these values should be hardcoded here.
+
             speedrunCheatCodes.clear();
             speedrunCheatCodes.push_back({0xBD400248, 0x0000});
 
@@ -124,15 +131,14 @@ cheatLimitReached:
             }
         }
 
-        writeCheatListToBootParams();
-
+        boot_params.cheat_list = makeCheatList();
         boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
         boot_params.tv_type = BOOT_TV_TYPE_PASSTHROUGH;
         boot_params.detect_cic_seed = true;
 
-        // Boot into the selected game
+        // Boot into the selected game.
         // At this point, the game has already been loaded elsewhere from the
-        // SD card and is already sitting in cart SDRAM
+        // SD card and is already sitting in cart SDRAM.
         boot(&boot_params);
     }
 };
