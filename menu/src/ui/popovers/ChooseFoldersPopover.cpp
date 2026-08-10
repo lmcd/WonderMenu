@@ -84,6 +84,7 @@ void ChooseFoldersPopover::updateViews(const RenderInfo& renderInfo) {
         imageView.frame.maxY() + 26
     );
     messageLabel.maxWidth = rectView.frame.size.width;
+    messageLabel.backgroundColor = rectView.fillColor;
 
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;
