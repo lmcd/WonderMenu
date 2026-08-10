@@ -495,8 +495,6 @@ void GameLibrary::loadGames() {
 
             CacheResult cacheResult = cache[fileIndex];
 
-            cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
-
             if (readFromCache) {
                 if (cacheResult.hash != hash || cacheResult.fileSize != fileSize) {
                     readFromCache = false;
@@ -519,6 +517,8 @@ void GameLibrary::loadGames() {
                 cache[fileIndex].crc1 = cacheResult.crc1;
             }
             else {
+                cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
+                
                 if (romFile->loadHeader()) {
                     databaseEntry = database.entryForROMFile(romFile);
 
