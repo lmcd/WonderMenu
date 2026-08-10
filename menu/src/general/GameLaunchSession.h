@@ -28,6 +28,7 @@ struct GameLaunchSession {
     volatile PayloadData* payloadData = (PayloadData*)0xA0400000;
     volatile SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     volatile ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
+    volatile GameInfo* gameInfo = &payloadData->gameInfo;
 
     void writeCheatListToBootParams() {
         uint32_t tempCheatItems[MAX_CHEAT_CODE_ARRAYLIST_SIZE];
@@ -87,14 +88,19 @@ cheatLimitReached:
         // cache invalidation. osInfo layout matches the cheat engine's O_OSINFO.
         payloadData->memSize = __boot_memsize;
         payloadData->osInfo  = ((__boot_tvtype      & 0xff) << 16)
-                             | ((sys_reset_type()   & 0xff) << 8)
-                             | ((__boot_consoletype & 0xff));
-        payloadData->romSize = game->romFile.size;
+                             | ((sys_reset_type()   & 0xff) <<  8)
+                             | ((__boot_consoletype & 0xff) <<  0);
+        
+        gameInfo->romSize     = game->romFile.size;
+        gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
+        gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
+        gameInfo->region      = (uint8_t)game->romFile.regionCode;
+        gameInfo->version     = game->romFile.version;
 
-        screenshotSettings->nextNumber = 0;
-		screenshotSettings->showOverlay = true;
+        screenshotSettings->nextNumber   = 0;
+		screenshotSettings->showOverlay  = true;
         screenshotSettings->overlayDelay = 32;
-        screenshotSettings->writeOffset = 0;
+        screenshotSettings->writeOffset  = 0;
 
         if (m64File != nullptr) {
             speedrunCheatCodes.clear();

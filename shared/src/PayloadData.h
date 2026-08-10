@@ -18,6 +18,18 @@
 // guarded by the magic word above.
 #define MAX_SCREENSHOT_IMPORT_COUNT 64
 
+// Size: 8
+struct __attribute__((packed)) GameInfo {
+    // Size: 4
+    uint32_t romSize;
+    // Size: 2
+    char uniqueID[2];
+    // Size: 1
+    u_int8_t region;
+    // Size: 1
+    u_int8_t version;
+};
+
 struct __attribute__((packed)) ScreenshotsHeader {
     // Size: 4
     int magic = 0;
@@ -76,10 +88,10 @@ struct __attribute__((packed)) PayloadData {
     ScreenshotSettings screenshotSettings;
     // Size: 12
     SpeedrunSettings speedrunSettings;
-    // Size: 4
-    uint32_t romSize;
-	// Size: 20
-	uint8_t reserved[20] = {0};
+    // Size: 8
+    GameInfo gameInfo;
+	// Size: 16
+	uint8_t reserved[16] = {0};
 };
 
 static_assert(sizeof(PayloadData) == 64, "PayloadData must be 64 bytes");
