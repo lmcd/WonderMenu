@@ -148,23 +148,22 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
     if (transitionProgress == 1.0f) {
         currentInstance = this;
 
+        std::string romFilePath = game->romFile.path;
+
+        // TODO: much of this should be moved to `GameLaunchSession`
+
         if (gameLaunchSession.m64File != nullptr) {
             gameLaunchSession.m64File->stageInputsTable(0x80600000);
 
             debugf("[GameLaunchSecene] Staged inputs table\n");
         }
-        
-        debugf("[GameLaunchSecene] Set save type\n");
+        else {
+            // Save file isn't loaded if speedrun is active
 
-        std::string romFilePath = game->romFile.path;
+            std::string saveFilename = std::filesystem::path(romFilePath).filename().replace_extension(".sav").string();
+            std::string saveFilePath = "sd:/saves/" + saveFilename;
 
-        std::string saveFilename = std::filesystem::path(romFilePath).filename().replace_extension(".sav").string();
-        std::string saveFilePath = "sd:/saves/" + saveFilename;
-
-        struct stat saveFileStat;
-        bool saveFileExists = (stat(saveFilePath.c_str(), &saveFileStat) == 0);
-
-        debugf("[GameLaunchSecene] Save file %s: %s\n", saveFilePath.c_str(), saveFileExists ? "exists" : "missing");
+            debugf("[GameLaunchSecene] Save file %s\n", saveFilePath.c_str());
 
         if (saveFileExists) {
             flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->saveType;
