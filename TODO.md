@@ -33,6 +33,7 @@
 - [ ] At boot, temporarily DMA all database entries into RAM for faster access. Free this memory after boot, and fallback to the current method for subsequent database lookups. Currently, for a full library of 900+ games, there are 900 DMA operations taking place.
 - [ ] The cache filename hashing is a bad way of detecting changes. We should be able to do this on filesystem metadata alone.
 - [ ] Explore storing actual DB entries in cache.db, instead of indexes to DB entries.
+- [ ] On an initial boot, each ROM file is opened to read its header. the cost of f_open on a file in a large directory can be very expensive (>500ms). This can cause an initial boot to take multiple minutes. Explore using `f_open_obj` which has the potential to remove a HUGE chunk of this load time when processing hundreds of ROMs.
 
 ## Models
 
