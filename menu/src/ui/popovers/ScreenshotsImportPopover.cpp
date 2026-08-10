@@ -42,11 +42,13 @@ void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
         if (renderInfo.sceneFrameNumber == 0) {
             mainThumbnailView.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
         }
-        else if (renderInfo.sceneFrameNumber == 1) {
-            sideThumbnailView1.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
-        }
-        else if (renderInfo.sceneFrameNumber == 2) {
-            sideThumbnailView2.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
+        else if (reader->count >= 3) {
+            if (renderInfo.sceneFrameNumber == 1) {
+                sideThumbnailView1.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
+            }
+            else if (renderInfo.sceneFrameNumber == 2) {
+                sideThumbnailView2.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
+            }
         }
     }
 
