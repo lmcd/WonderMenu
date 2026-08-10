@@ -66,6 +66,9 @@ void TestScene::freeScaledSprite(sprite_t* sprite) {
 TestScene::TestScene()
     : Scene() {
 
+    imageView2.opacity = 0;
+
+    view.addSubview(&rectView);
     view.addSubview(&imageView3);
     view.addSubview(&imageView2);
     view.addSubview(&imageView1);
@@ -74,9 +77,9 @@ TestScene::TestScene()
     mario2Sprite = sprite_load("rom:/ui/mario2.RGBA16.sprite");
     mario3Sprite = sprite_load("rom:/ui/mario3.RGBA16.sprite");
 
-    imageView1.fullSizeScreenshotSurface = sprite_get_pixels(mario1Sprite);
-    imageView2.fullSizeScreenshotSurface = sprite_get_pixels(mario2Sprite);
-    imageView3.fullSizeScreenshotSurface = sprite_get_pixels(mario3Sprite);
+    imageView1.setFullSizeScreenshotSurface(sprite_get_pixels(mario1Sprite));
+    imageView2.setFullSizeScreenshotSurface(sprite_get_pixels(mario2Sprite));
+    imageView3.setFullSizeScreenshotSurface(sprite_get_pixels(mario3Sprite));
 }
 
 TestScene::~TestScene() {
@@ -84,6 +87,9 @@ TestScene::~TestScene() {
 }
 
 void TestScene::updateViews(const RenderInfo&) {
+    rectView.fillColor = Color::RED;
+    rectView.frame = view.frame;
+
     Vec2 imagePosition = Vec2(100, 150);
     imagePosition.x += 90;
 
@@ -93,12 +99,15 @@ void TestScene::updateViews(const RenderInfo&) {
     imageView1.frame = Rect(imagePosition, imageSize);
     imageView1.radius = 10;
 
+    view.backgroundColor = Color::RED;
     imageView2.frame.origin = imagePosition;
     imageView2.frame.origin.x = imageView1.frame.minX();
     imageView2.frame.origin.x -= 14;
     imageView2.frame.origin.y += 6;
     imageView2.frame.size = smallerImageSize;
-    imageView2.opacity = 0.55;
+    // imageView2.opacity = 0.55;
+    imageView2.opacity += 0.01;
+    imageView2.opacity = std::clamp(imageView2.opacity, 0.0f, 0.55f);
     imageView2.radius = 8;
 
     imageView3.frame.origin = imagePosition;

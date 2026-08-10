@@ -23,6 +23,8 @@ private:
     ScreenshotThumbnailView imageView2;
     ScreenshotThumbnailView imageView3;
 
+    RectView rectView;
+
     static sprite_t* createScaledSprite(const surface_t* source, int width);
     static void freeScaledSprite(sprite_t* sprite);
 
