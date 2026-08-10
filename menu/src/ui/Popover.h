@@ -112,6 +112,7 @@ private:
 
         ResultStatus resultStatus;
 
+        baseScene->hasActivePopover = true;
         baseScene->popoverTransitionProgress = 0.0f;
         baseScene->view.opacity = 1.0f;
         baseScene->pushScene(this);
@@ -137,6 +138,7 @@ private:
             }
         }
 
+        baseScene->hasActivePopover = false;
         baseScene->popoverTransitionProgress = 0.0f;
         baseScene->view.opacity = 1.0f;
         baseScene->popScene();

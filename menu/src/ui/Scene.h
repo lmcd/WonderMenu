@@ -60,6 +60,11 @@ public:
      */
     float popoverTransitionProgress = 0.0f;
 
+    /**
+     * Is a `Popover` currently active on top of this scene?
+     */
+    bool hasActivePopover = false;
+
     // TODO: this should be private
     SceneRenderer* renderer = nullptr;
 

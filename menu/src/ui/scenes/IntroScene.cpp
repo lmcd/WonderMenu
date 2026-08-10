@@ -65,7 +65,7 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
     labelView.usesMultipliedOpacity = false;
-    labelView.opacity = popoverTransitionProgress;
+    labelView.opacity = hasActivePopover ? popoverTransitionProgress : 1.0f;
 }
 
 void IntroScene::update(const UpdateInfo& updateInfo) {
