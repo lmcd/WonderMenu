@@ -350,6 +350,8 @@ sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, unsigned in
     FIL fil;
     UINT br;
 
+    int32_t t0 = get_ticks();
+
     if (f_open(&fil, strip_fs_prefix(rom_path), FA_READ) != FR_OK) {
         return (sc64_load_rom_session_t) {};
     }
@@ -371,15 +373,11 @@ sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, unsigned in
 
     unsigned int offset = chunk_size * initial_chunk;
 
-    debugf("Seeking to offset %i\n", offset);
-
-    int32_t t0 = get_ticks();
-
     f_lseek(&fil, offset);
 
 	uint32_t t1 = get_ticks();
 
-	debugf("ROM opened: %.2fs\n", (float)TICKS_TO_MS(t1 - t0) / 1000.0f);
+	debugf("[SC64] ROM opened: %.2fs\n", (float)TICKS_TO_MS(t1 - t0) / 1000.0f);
 
     // debugf("[SC64] Starting load session: %i\n", (int)f_tell(&fil)    );
 

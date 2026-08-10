@@ -28,6 +28,12 @@
 - [ ] Proper view rect invalidation - current implementation is a hack that attempts to clear what's behind a view with a flat colour. This should instead sample whatever view is underneath. I had a go at this before, but was too expensive. This can be made cheaper when layout passes are implemented.
 - [ ] Add `ScrollView` that manages scrollbars automatically
 
+## Performance
+
+- [ ] At boot, temporarily DMA all database entries into RAM for faster access. Free this memory after boot, and fallback to the current method for subsequent database lookups. Currently, for a full library of 900+ games, there are 900 DMA operations taking place.
+- [ ] The cache filename hashing is a bad way of detecting changes. We should be able to do this on filesystem metadata alone.
+- [ ] Explore storing actual DB entries in cache.db, instead of indexes to DB entries.
+
 ## Models
 
 - [ ] Add 64DD cartridge model
