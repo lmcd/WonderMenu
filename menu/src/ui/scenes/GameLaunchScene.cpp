@@ -20,18 +20,10 @@
 #include "ui/scenes/GameInfoTransitionScene.h"
 #include "ui/SceneRenderer.h"
 
-// Static pointer to the current instance for callback access
-static GameLaunchScene* currentInstance = nullptr;
+SceneRenderer* GameLaunchScene::currentRenderer = nullptr;
 
-static void romLoadProgressHandler(float progress) {
-    rdpq_attach(display_get(), NULL);
-    rdpq_mode_zbuf(false, false);
-
-    t3d_screen_clear_color(Color::BLACK);
-
-    // currentInstance->renderProgressBar(progress);
-
-    rdpq_detach_show();
+void GameLaunchScene::romLoadProgressHandler(float progress) {
+    currentRenderer->advance();
 }
 
 GameLaunchScene::GameLaunchScene(Game* game, CartRenderer* cartRenderer, GameDatabase* database)
@@ -122,6 +114,10 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 }
 
 void GameLaunchScene::update(const UpdateInfo& updateInfo) {
+    if (isFinalisingROMLoad) {
+        return;
+    }
+
     joypad_buttons_t btn = updateInfo.btn;
 
     if (btn.a) {
@@ -146,7 +142,7 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
     transitionProgress = std::clamp(transitionProgress, 0.0f, 1.0f);
 
     if (transitionProgress == 1.0f) {
-        currentInstance = this;
+        currentRenderer = renderer;
 
         std::string romFilePath = game->romFile.path;
 
@@ -165,15 +161,15 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
 
             debugf("[GameLaunchSecene] Save file %s\n", saveFilePath.c_str());
 
-        if (saveFileExists) {
             flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->saveType;
 
             flashcart_load_save(saveFilePath.data(), saveType);
         }
 
+        isFinalisingROMLoad = true;
         sc64_finish_load_rom_session(&session, romLoadProgressHandler);
 
-        currentInstance = nullptr;
+        currentRenderer = nullptr;
 
         renderer->end();
 

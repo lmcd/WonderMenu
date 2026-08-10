@@ -31,7 +31,18 @@ private:
     bool preferHighRes = true;
     bool preferFlatModel = false;
 
+    bool isFinalisingROMLoad = false;
+
     sc64_load_rom_session_t session;
+
+    /**
+     * During the final load of the ROM, we exit the class and live inside
+     * `romLoadProgressHandler`. We need a reference back to the renderer so we
+     * can continue to draw the progress bar.
+     */
+    static SceneRenderer* currentRenderer;
+
+    static void romLoadProgressHandler(float progress);
 
 public:
     const char* name() { return "GameLaunchScene"; }
