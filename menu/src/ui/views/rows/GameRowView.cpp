@@ -40,22 +40,19 @@ void GameRowView::update(const RenderInfo&) {
     cart2DView.frame.origin = cartPosition - frame.origin;
     cart2DView.scale = cartScale;
 
-    int xPosition = 112;
-    int yPosition;
-    int16_t maxLabelWidth = (frame.size.width - xPosition) - 82;
-    
-    yPosition = 31;
+    Vec2 labelPosition = Vec2(112, 31);
 
-    titleView.frame.origin = Vec2(xPosition, yPosition);
+    int16_t maxLabelWidth = (frame.size.width - labelPosition.x) - 82;
+
+    titleView.frame.origin = labelPosition;
     titleView.maxWidth = maxLabelWidth;
 
-    yPosition = 51;
+    labelPosition.y += 20;
 
-    subtitleView.frame.origin = Vec2(xPosition, yPosition);
+    subtitleView.frame.origin = labelPosition;
     subtitleView.maxWidth = maxLabelWidth;
 
     int countWidth = 50;
-
     int flagWidth = 20;
     int starWidth = 20;
     int accessorySpacing = 12;
@@ -63,20 +60,13 @@ void GameRowView::update(const RenderInfo&) {
     int flagX  = frame.size.width - flagWidth - 15;
     int starX  = flagX - starWidth  - accessorySpacing;
 
-    Vec2 versionPosition = subtitleView.frame.origin;
-    versionPosition.x = starView.frame.minX() - countWidth - accessorySpacing;
+    Vec2 versionLabelPosition = labelPosition;
+    versionLabelPosition.x = starView.frame.minX() - countWidth - accessorySpacing;
 
-    starView.frame.origin = Vec2(
-        starX,
-        35
-    );
+    starView.frame.origin = Vec2(starX, 35);
+    flagView.frame.origin = Vec2(flagX, 35);
 
-    flagView.frame.origin = Vec2(
-        flagX,
-        35
-    );
-
-    versionNumberView.frame.origin = versionPosition;
+    versionNumberView.frame.origin = versionLabelPosition;
     versionNumberView.maxWidth = countWidth;
 
     numberView.frame.origin = flagView.frame.origin;
