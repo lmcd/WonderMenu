@@ -97,8 +97,7 @@ struct TableView : public View {
     static constexpr int TABLE_Y_PADDING    = 8;
     static constexpr int DEFAULT_ROW_HEIGHT = 34;
     static constexpr int ROW_SPACING        = 2;
-    static constexpr int ROWS_VISIBLE       = 11;
-    static constexpr int MAX_ROW_VIEWS      = 20;
+    static constexpr int MAXIMUM_LOADED_ROW_VIEWS = 20;
 
     static constexpr Color DEFAULT_SELECTION_COLOR = Color{35};
     static constexpr Color DEFAULT_HIGHLIGHT_COLOR = Color{50};
@@ -120,8 +119,15 @@ struct TableView : public View {
     
     RectView backgroundRectView;
     SelectedRowView selectedRowView;
-    RV rowViews[MAX_ROW_VIEWS];
+    RV rowViews[MAXIMUM_LOADED_ROW_VIEWS];
 
+    /**
+     * Used to determine the fitting size of the table on-screen.
+     */
+    int maximumDrawableRows = 11;
+    /**
+     * The number of data items currently associated with this table.
+     */
     int rowCount = 5;
     int selectedRowIndex = 0;
 
@@ -213,9 +219,7 @@ struct TableView : public View {
 
         Color selectionColor = isADown ? DEFAULT_HIGHLIGHT_COLOR : DEFAULT_SELECTION_COLOR;
 
-        Rect _tableRect = tableRect();
-
-        backgroundRectView.frame = _tableRect;
+        backgroundRectView.frame = contentRect();
         backgroundRectView.fillColor = DEFAULT_BACKGROUND_COLOR;
         backgroundRectView.isHidden = !drawsBackground;
 
@@ -344,12 +348,12 @@ struct TableView : public View {
 
     int visibleRowCount() {
         // Never report more rows than the fixed rowViews pool can back -- during a
-        // group expand/collapse ROWS_VISIBLE + expandRowCount can exceed the pool
+        // group expand/collapse maximumDrawableRows + expandRowCount can exceed the pool
         // (e.g. collapsing a large/nested group), and both the update and render
         // loops index rowViews[i] up to this count. Overrunning the array reads a
         // garbage View and faults on its vtable.
-        int count = std::min(rowCount - scrollPosition, ROWS_VISIBLE + expandRowCount);
-        return std::min(count, MAX_ROW_VIEWS);
+        int count = std::min(rowCount - scrollPosition, maximumDrawableRows + expandRowCount);
+        return std::min(count, MAXIMUM_LOADED_ROW_VIEWS);
     }
 
     bool rowIsInExpandingGroup(int rowIndex) {
@@ -364,7 +368,7 @@ struct TableView : public View {
     }
 
     int rawYForRow(int rowIndex) {
-        Rect _tableRect = tableRect();
+        Rect _tableRect = contentRect();
 
         return _tableRect.minY() + TABLE_Y_PADDING + (rowIndex * paddedRowHeight());
     }
@@ -386,7 +390,7 @@ struct TableView : public View {
     }
 
     Rect rectForRow(int rowIndex) {
-        Rect _tableRect = tableRect();
+        Rect _tableRect = contentRect();
 
         int rowY = rawYForRow(rowIndex);
 
@@ -406,25 +410,28 @@ struct TableView : public View {
         );
     }
 
-    Rect tableRect() {
+    int heightForRowCount() {
         int visibleCount = visibleRowCount();
 
-        int xInset = 1 + 3;
-        int barWidth = frame.size.width - (xInset * 2);
-
-        Rect rect(
-            xInset,
-            -TABLE_Y_PADDING,
-            barWidth,
-            (visibleCount * paddedRowHeight()) + (TABLE_Y_PADDING * 2) - ROW_SPACING
-        );
+        int height = (visibleCount * paddedRowHeight()) + (TABLE_Y_PADDING * 2) - ROW_SPACING;
 
         if (expandRowCount > 0) {
-            rect.size.height -= (expandRowCount * paddedRowHeight());
-            rect.size.height += heightForExpandingGroup();
+            height -= (expandRowCount * paddedRowHeight());
+            height += heightForExpandingGroup();
         }
 
-        return rect;
+        return height;
+    }
+
+    Rect contentRect() {
+        int xInset = 1 + 3;
+
+        return Rect(
+            xInset,
+            -TABLE_Y_PADDING,
+            frame.size.width - (xInset * 2),
+            heightForRowCount()
+        );
     }
 
     void clampScrollPosition() {
@@ -433,8 +440,8 @@ struct TableView : public View {
         if (selectedRowIndex < scrollPosition) {
             scrollPosition = selectedRowIndex;
         }
-        else if (selectedRowIndex >= scrollPosition + ROWS_VISIBLE) {
-            scrollPosition = selectedRowIndex - ROWS_VISIBLE + 1;
+        else if (selectedRowIndex >= scrollPosition + maximumDrawableRows) {
+            scrollPosition = selectedRowIndex - maximumDrawableRows + 1;
         }
     }
 

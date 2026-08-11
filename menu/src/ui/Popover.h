@@ -16,6 +16,7 @@
 #include "ui/SceneRenderer.h"
 #include "ui/views/drawables/LabelReferenceView.h"
 #include "ui/views/drawables/RectView.h"
+#include "ui/views/ScrollbarView.h"
 #include "ui/views/TableView.h"
 
 /**
@@ -33,7 +34,7 @@ private:
 
 protected:
     int topPadding = 35;
-    int bottomPadding = 25;
+    int bottomPadding = 16;
     int tableY = 46;
 
     /**
@@ -68,6 +69,7 @@ public:
         tableView.drawsBackground = false;
         tableView.selectionInset = Vec2::ZERO;
         tableView.selectedRowView.isRounded = true;
+        tableView.maximumDrawableRows = 7;
 
         titleLabelView.align = ALIGN_CENTER;
         titleLabelView.fontID = Fonts::UNBOUNDED_BLACK_14;
@@ -82,6 +84,7 @@ public:
     RectView rectView;
     BaseView contentView;
     TableView<RV> tableView;
+    ScrollbarView scrollbarView;
     LabelReferenceView<32> titleLabelView;
     Scene* baseScene;
 
@@ -151,6 +154,7 @@ public:
         contentView.addSubview(&rectView);
         contentView.addSubview(&titleLabelView);
         contentView.addSubview(&tableView);
+        contentView.addSubview(&scrollbarView);
 
         view.addSubview(&baseScene->view);
         view.addSubview(&contentView);
@@ -187,7 +191,7 @@ public:
         contentView.opacity = popoverSceneOpacity;
         contentView.isOpaque = (transition.progress == 1.0f);
 
-        int height = tableView.contentHeight() + tableY + bottomPadding;
+        int height = tableView.heightForRowCount() + tableY + bottomPadding;
 
         Size size(260, height);
         Rect rect(
@@ -214,6 +218,19 @@ public:
         tableView.frame.origin.y += tableY + 10;
         tableView.backgroundColor = backgroundColor;
 
+        Rect scrollbarFrame = Rect(
+            rect.maxX() - scrollbarView.frame.size.width - 2,
+            rect.minY(),
+            scrollbarView.frame.size.width,
+            rect.size.height
+        );
+        scrollbarFrame = scrollbarFrame.insetBy(Vec2(0, 35));
+
+        scrollbarView.frame = scrollbarFrame;
+        scrollbarView.contentHeight = tableView.contentHeight();
+        scrollbarView.scrollPosition = tableView.scrollPosition * tableView.paddedRowHeight();
+        scrollbarView.backgroundColor = backgroundColor;
+        
         baseScene->updateViews(renderInfo);
     }
 };
