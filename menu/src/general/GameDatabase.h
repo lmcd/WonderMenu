@@ -96,11 +96,6 @@ public:
         char developer[50];
 
         // An alphanumeric character that specifies the kind of media the game is stored on.
-        // N  Game Pak
-        // D  64DD Disk
-        // C  Expandable Game: Game Pak Part
-        // E  Expandable Game: 64DD Disk Part
-        // Z  Aleck64 Game Pak
         CategoryCode categoryCode;
 
         // The 2 character game ID (e.g. BK)
