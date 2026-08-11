@@ -434,6 +434,11 @@ void GameLibrary::loadGames() {
 
     std::vector<Game*> speedrunGames;
 
+    // Move database entires from cart space into memory for quicker retrieval.
+    // NOTE: this suprisingly only saves about 22ms of load time for a library
+    // of 900 games. Hmmm...
+    // database.loadEntriesIntoMemory();
+
     // Each directory is relative to `path` and carries no trailing slash (the
     // root itself is an empty string)
     for (const std::string& directoryPath : romDirectoryPaths) {
@@ -593,6 +598,8 @@ void GameLibrary::loadGames() {
             }
         } while (dir_findnext(scanPath, &entry) == 0);
     }
+
+    // database.releaseEntriesFromMemory();
 
     // fileIndex is the last 0-based index; the count is one more than that
     cachedFileCount = fileIndex + 1;

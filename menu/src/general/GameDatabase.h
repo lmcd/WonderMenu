@@ -152,6 +152,18 @@ private:
     FIL fil;
     #endif
 
+    /**
+     * Number of `Entry` records in the database, read from the header.
+     */
+    uint16_t entryCount = 0;
+
+    /**
+     * The whole entries block held in RDRAM, `entryCount` records of
+     * `DB_ENTRY_SIZE` bytes each. Null until `loadEntriesIntoMemory()` is
+     * called, which is what `readEntryAtIndex` keys its fast path off.
+     */
+    unsigned char* entriesData = nullptr;
+
     long entriesStartOffset;
     long labelsStartOffset;
     long cheatsStartOffset;
@@ -167,6 +179,20 @@ public:
     int getLabelTileOffset(int tileIndex);
 
     Entry* readEntryAtIndex(uint16_t index);
+
+    /**
+     * On `load()`, entries are moved from the SD card into cartridge SDRAM.
+     * This method moves the entries again from cart space in main memory.
+     * This provides a fast path for database seeking on boot.
+     */
+    bool loadEntriesIntoMemory();
+
+    /**
+     * Release memory temporarily occupied by database entries during boot.
+     */
+    void releaseEntriesFromMemory();
+
+    bool hasEntriesInMemory() const { return entriesData != nullptr; }
 
     /**
      * Read only the region code for the entry at the given index.

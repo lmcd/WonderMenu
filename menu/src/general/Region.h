@@ -27,11 +27,11 @@ enum class SaveType : uint8_t {
 };
 
 enum class CategoryCode : uint8_t {
-    CATEGORY_GAMEPAK         = 'N',
-    CATEGORY_64DD_DISK       = 'D',
-    CATEGORY_GAME_PAK_PART   = 'C',
-    CATEGORY_64DD_DISK_PART  = 'E',
-    CATEGORY_ALECK64_GAMEPAK = 'z'
+    CATEGORY_GAMEPAK         = 'N', // Game Pak
+    CATEGORY_64DD_DISK       = 'D', // 64DD Disk
+    CATEGORY_GAME_PAK_PART   = 'C', // Expandable Game: Game Pak Part
+    CATEGORY_64DD_DISK_PART  = 'E', // Expandable Game: 64DD Disk Part
+    CATEGORY_ALECK64_GAMEPAK = 'z'  // Aleck64 Game Pak
 };
 
 enum class RegionCode : uint8_t {

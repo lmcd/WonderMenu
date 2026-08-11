@@ -4,6 +4,10 @@
 */
 
 #include <chrono>
+#include <cstdlib>
+#ifdef N64
+#include <malloc.h>
+#endif
 
 #include "GameDatabase.h"
 #include "utils/fs.h"
@@ -73,6 +77,8 @@ GameDatabase::GameDatabase() : databaseFile(nullptr) {
 }
 
 GameDatabase::~GameDatabase() {
+    releaseEntriesFromMemory();
+
     if (databaseFile) {
         fclose(databaseFile);
         databaseFile = nullptr;
@@ -83,18 +89,88 @@ int GameDatabase::getLabelTileOffset(int tileIndex) {
     return labelsStartOffset + (tileIndex * DB_LABEL_TILE_SIZE) + (DB_LABEL_PADDING_PER_CHUNK * (tileIndex / DB_LABEL_TILES_PER_CHUNK));
 }
 
+bool GameDatabase::loadEntriesIntoMemory() {
+    if (entriesData != nullptr) {
+        return true;
+    }
+
+    if (!databaseFile || entryCount == 0) {
+        return false;
+    }
+
+    size_t size = (size_t)entryCount * DB_ENTRY_SIZE;
+
+    // PI DMA moves whole 8 byte words, so round the destination up rather than
+    // let it write past the end of the block. The overread lands in the padding
+    // before the labels section, which is still inside the staged chunk.
+    size_t allocationSize = (size + 7) & ~(size_t)7;
+
+    // Aligned for the DMA below; plain malloc everywhere else, where the
+    // alignment buys nothing
+    #ifdef N64
+    unsigned char* data = (unsigned char*)memalign(16, allocationSize);
+    #else
+    unsigned char* data = (unsigned char*)malloc(allocationSize);
+    #endif
+
+    if (data == nullptr) {
+        debugf("[GameDatabase] Failed to allocate %u bytes for entries\n", (unsigned)allocationSize);
+        return false;
+    }
+
+    if (USE_DMA) {
+        #ifdef N64
+        // `load()` already staged this region in cart SDRAM, so it's one
+        // transfer straight out of there
+        data_cache_hit_writeback_invalidate(data, allocationSize);
+        dma_read_raw_async(data, ROM_ADDRESS_HEADER + entriesStartOffset, allocationSize);
+        dma_wait();
+        #endif
+    }
+    else {
+        if (fseek(databaseFile, entriesStartOffset, SEEK_SET) != 0 ||
+            fread(data, size, 1, databaseFile) != 1) {
+            debugf("[GameDatabase] Failed to read entries block\n");
+            free(data);
+            return false;
+        }
+    }
+
+    entriesData = data;
+
+    debugf("[GameDatabase] Cached %u entries in memory (%u bytes)\n", (unsigned)entryCount, (unsigned)allocationSize);
+
+    return true;
+}
+
+void GameDatabase::releaseEntriesFromMemory() {
+    if (entriesData == nullptr) {
+        return;
+    }
+
+    free(entriesData);
+    entriesData = nullptr;
+}
+
 GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
     if (!databaseFile) {
         return nullptr;
     }
 
+    if (index >= entryCount) {
+        return nullptr;
+    }
+
+    Entry* entry = new Entry();
+
     size_t size = DB_ENTRY_SIZE;
     uint32_t offset = entriesStartOffset + (size * index);
 
-    Entry* entry = new Entry();
-    entry->entryIndex = index;
-
-    if (USE_DMA) {
+    // Fast path: the whole block is resident, so no DMA or filesystem read
+    if (entriesData != nullptr) {
+        memcpy(entry, entriesData + ((size_t)index * size), size);
+    }
+    else if (USE_DMA) {
         #ifdef N64
         data_cache_hit_writeback_invalidate(entry, size);
         dma_read_raw_async(entry, ROM_ADDRESS_HEADER + offset, size);
@@ -112,6 +188,8 @@ GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
             return nullptr;
         }
     }
+
+    entry->entryIndex = index;
 
     return entry;
 }
@@ -386,6 +464,7 @@ bool GameDatabase::load(const char* filename) {
 
         UINT bytesRead = 0;
 
+        // TODO: Determine the actual size of this
         size_t chunk = KiB(106);
         f_read(&fil, (void *) (ROM_ADDRESS_HEADER), chunk, &bytesRead);
 
@@ -421,7 +500,7 @@ bool GameDatabase::load(const char* filename) {
 
     // READ ENTRY COUNT
     // 2 bytes
-    uint16_t entryCount = 0;
+    entryCount = 0;
 
     memcpy(&entryCount, &headerBuffer[cursor], 2);
     cursor += sizeof(entryCount);
@@ -482,6 +561,8 @@ bool GameDatabase::load(const char* filename) {
 #endif
 
 void GameDatabase::close() {
+    releaseEntriesFromMemory();
+
     fclose(databaseFile);
     databaseFile = NULL;
 }
