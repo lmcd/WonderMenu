@@ -88,50 +88,56 @@ cheatLimitReached:
     }
 
     void launch() {
-        // Boot params the resident payload needs. Written through the uncached
-        // PayloadData pointer so they land in RDRAM and survive the game boot's
-        // cache invalidation. osInfo layout matches the cheat engine's O_OSINFO.
-        payloadData->memSize = __boot_memsize;
-        payloadData->osInfo  = ((__boot_tvtype      & 0xff) << 16)
-                             | ((sys_reset_type()   & 0xff) <<  8)
-                             | ((__boot_consoletype & 0xff) <<  0);
-        
-        gameInfo->romSize     = game->romFile.size;
-        gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
-        gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
-        gameInfo->region      = (uint8_t)game->romFile.regionCode;
-        gameInfo->version     = game->romFile.version;
+        uint32_t* cheatList = nullptr;
 
-        screenshotSettings->nextNumber   = 0;
-		screenshotSettings->showOverlay  = true;
-        screenshotSettings->overlayDelay = 32;
-        screenshotSettings->writeOffset  = 0;
+        if (is_memory_expanded()) {
+            // Boot params the resident payload needs. Written through the uncached
+            // PayloadData pointer so they land in RDRAM and survive the game boot's
+            // cache invalidation. osInfo layout matches the cheat engine's O_OSINFO.
+            payloadData->memSize = __boot_memsize;
+            payloadData->osInfo  = ((__boot_tvtype      & 0xff) << 16)
+                                 | ((sys_reset_type()   & 0xff) <<  8)
+                                 | ((__boot_consoletype & 0xff) <<  0);
+            
+            gameInfo->romSize     = game->romFile.size;
+            gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
+            gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
+            gameInfo->region      = (uint8_t)game->romFile.regionCode;
+            gameInfo->version     = game->romFile.version;
 
-        if (m64File != nullptr) {
-            // TODO: None of these values should be hardcoded here.
+            screenshotSettings->nextNumber   = 0;
+            screenshotSettings->showOverlay  = true;
+            screenshotSettings->overlayDelay = 32;
+            screenshotSettings->writeOffset  = 0;
 
-            speedrunCheatCodes.clear();
-            speedrunCheatCodes.push_back({0xBD400248, 0x0000});
+            if (m64File != nullptr) {
+                // TODO: None of these values should be hardcoded here.
 
-            // SM64
-            if (game->romFile.crc1 == 0x635A2BFF) {
-                // 0x80367050: __osContPifRam
-                speedrunSettings->controllerInputAddress = 0x80367054;
-                // 0x8032d5d4: gGlobalTimer
-                speedrunSettings->currentFrameAddress = 0x8032D5D4;
-                speedrunSettings->frameDelayOffset = -1;
+                speedrunCheatCodes.clear();
+                speedrunCheatCodes.push_back({0xBD400248, 0x0000});
+
+                // SM64
+                if (game->romFile.crc1 == 0x635A2BFF) {
+                    // 0x80367050: __osContPifRam
+                    speedrunSettings->controllerInputAddress = 0x80367054;
+                    // 0x8032d5d4: gGlobalTimer
+                    speedrunSettings->currentFrameAddress = 0x8032D5D4;
+                    speedrunSettings->frameDelayOffset = -1;
+                }
+                // MK64
+                else if (game->romFile.crc1 == 0x3E5055B6) {
+                    // 0x80196500: __osContPifRam
+                    speedrunSettings->controllerInputAddress = 0x80196504;
+                    // 0x800dc54c: gGlobalTimer
+                    speedrunSettings->currentFrameAddress = 0x800dc54c;
+                    speedrunSettings->frameDelayOffset = -2;
+                }
             }
-            // MK64
-            else if (game->romFile.crc1 == 0x3E5055B6) {
-                // 0x80196500: __osContPifRam
-                speedrunSettings->controllerInputAddress = 0x80196504;
-                // 0x800dc54c: gGlobalTimer
-                speedrunSettings->currentFrameAddress = 0x800dc54c;
-                speedrunSettings->frameDelayOffset = -2;
-            }
+
+            cheatList = makeCheatList();
         }
 
-        boot_params.cheat_list = makeCheatList();
+        boot_params.cheat_list = cheatList;
         boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
         boot_params.tv_type = BOOT_TV_TYPE_PASSTHROUGH;
         boot_params.detect_cic_seed = true;
