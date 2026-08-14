@@ -256,9 +256,9 @@ void View::clearSubtree(const RenderInfo& renderInfo, bool force) {
         subview->clearSubtree(renderInfo, force);
 
         if (force) {
-            subview->lastFinalIsHidden[0] = true;
-            subview->lastFinalIsHidden[1] = true;
-            subview->lastFinalIsHidden[2] = true;
+            for (int i = 0; i < BUFF_COUNT; i++) {
+                subview->lastFinalIsHidden[i] = true;
+            }
 			
             subview->clear(renderInfo);
         }

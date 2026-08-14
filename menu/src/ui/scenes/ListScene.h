@@ -61,7 +61,8 @@ private:
     GameDatabase* database;
     GameLibrary* gameLibrary;
 
-    InputRepeater slowScrollRepeater;
+    InputRepeater slowScrollRepeater1;
+    InputRepeater slowScrollRepeater2;
     InputRepeater fastScrollRepeater;
 
     LabelView<64> labelView;
@@ -69,7 +70,11 @@ private:
     uint8_t numberOfRows;
     uint8_t numberOfOffEdgeRows;
 
-    float cartScale;
+    /**
+     * The scale of the cartridges in the games list, relative to the full size
+     * of the cartridge model's geometry.
+     */
+    float cartScale = 0.005286;
     Size cartSize;
     uint8_t rowHeight;
     uint8_t cartMiddleX;
@@ -85,12 +90,15 @@ private:
     // The current scroll position in pixels
     int scrollPosition = 0;
 
+    /**
+     * Remember the scroll position for each tab.
+     */
     int tabScrollPositions[4] = {};
 
     std::vector<GameGroup>* gameGroups;
 
     /**
-     * Manages the cartridge wobble animation.
+     * Generates the rotational values for the cartridge wobble animation.
      */
     Wobbler wobbler;
 
@@ -136,7 +144,7 @@ private:
     int getMaxScrollPosition();
     Vec2 cartPositionForSelectedRow();
 
-    void loadVisibleCarts();
+    void preloadVisibleCartLabels();
 
     void setupViews();
 

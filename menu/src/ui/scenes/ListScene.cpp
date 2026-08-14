@@ -23,19 +23,19 @@ ListScene::ListScene(CartRenderer* cartRenderer, GameLibrary* gameLibrary, GameD
 
     numberOfRows = 0;
 
-    slowScrollRepeater.type = InputRepeater::JOYSTICK_UP_DOWN;
-    fastScrollRepeater.type = InputRepeater::C_UP_DOWN;
+    slowScrollRepeater1.type = InputRepeater::JOYSTICK_UP_DOWN;
+    slowScrollRepeater2.type = InputRepeater::DPAD_UP_DOWN;
+    fastScrollRepeater.type  = InputRepeater::C_UP_DOWN;
 
     gameGroups = &gameLibrary->retailGroups;
-
-    view.addSubview(&selectionRectView);
-    view.addSubview(&tableView);
-    view.addSubview(&labelView);
 
     for (int i = 0; i < MAX_VISIBLE_LIST_ITEMS; i++) {
         tableView.rowViews[i].cart2DView.cartRenderer = cartRenderer;
     }
 
+    view.addSubview(&selectionRectView);
+    view.addSubview(&tableView);
+    view.addSubview(&labelView);
     view.addSubview(&cart3DView);
     view.addSubview(&tabControlView);
     view.addSubview(&scrollbarView);
@@ -103,7 +103,7 @@ Vec2 ListScene::cartPositionForSelectedRow() {
     return cartPositionForEntry(selectedRow, scrollPosition);
 }
 
-void ListScene::loadVisibleCarts() {
+void ListScene::preloadVisibleCartLabels() {
     Range range = getRange();
 
     cartRenderer->freeAllLabels();
@@ -128,11 +128,10 @@ void ListScene::didBeginScene(SceneEntry) {
 
     numberOfRows = numberOfDisplayableRows;
     numberOfOffEdgeRows = std::ceil((float)(numberOfDisplayableRows - 1) / 2);
-    cartScale = 0.005286;
     cartSize = cartRenderer->sizeForScale(cartScale);
     cartMiddleX = cartSize.midX() + 27;
 
-    loadVisibleCarts();
+    preloadVisibleCartLabels();
     setupViews();
 
     cart3DView.isHidden = false;
@@ -144,8 +143,9 @@ void ListScene::update(const UpdateInfo& updateInfo) {
     joypad_inputs_t joypad = updateInfo.joypad;
     joypad_buttons_t btn = updateInfo.btn;
 
-    int slowScrollAmount = -slowScrollRepeater.update(joypad);
-    int fastScrollAmount = -fastScrollRepeater.update(joypad);
+    int slowScrollAmount1 = -slowScrollRepeater1.update(joypad);
+    int slowScrollAmount2 = -slowScrollRepeater2.update(joypad);
+    int fastScrollAmount  = -fastScrollRepeater.update(joypad);
 
     Range range = getRange(0);
     Range prerenderRange = getRange(-7);
@@ -184,16 +184,11 @@ void ListScene::update(const UpdateInfo& updateInfo) {
     // │ ▭                │  Purgable Range (+5 more)
     // └ - - - - - - - - -┘
 
-    if (didChangeScrollOffset) {
-        // cartRenderer->finishPreload();
-        // debugf("Visible Range %i %i\n", range.startIndex, range.endIndex);
-        // debugf("Prerender Range %i %i\n", prerenderRange.startIndex, prerenderRange.endIndex);
-    }
-
     for (int i : prerenderRange) {
         if (range.contains(i)) {
             continue;
         }
+
         assertf(totalLoadedTileCount <= maxTileLoadPerFrame, "Loaded too many tiles (%i). Max tiles per frame: %i", totalLoadedTileCount, maxTileLoadPerFrame);
 
         if (totalLoadedTileCount == maxTileLoadPerFrame) {
@@ -234,18 +229,17 @@ void ListScene::update(const UpdateInfo& updateInfo) {
         setCurrentTab((Tab)tabControlView.selectedSegment);
     }
     else if (fastScrollRepeater.isEngaged) {
-        if (fastScrollAmount != 0) {
-            moveSelectionBy(fastScrollAmount * pageMoveAmount());
-        }
+        moveSelectionBy(fastScrollAmount * pageMoveAmount());
     }
-    else if (slowScrollRepeater.isEngaged) {
-        if (slowScrollAmount != 0) {
-            moveSelectionBy(slowScrollAmount);
-        }
+    else if (slowScrollRepeater1.isEngaged) {
+        moveSelectionBy(slowScrollAmount1);
     }
-    else if (btn.d_up) {
-        toggleRetailGroupings();
+    else if (slowScrollRepeater2.isEngaged) {
+        moveSelectionBy(slowScrollAmount2);
     }
+    // else if (btn.d_up) {
+    //     toggleRetailGroupings();
+    // }
     else if (btn.z) {
         toggleFavourite();
     }
@@ -424,7 +418,7 @@ void ListScene::setCurrentTab(Tab _currentTab) {
     // so it has to be re-clamped once gameGroups points at the new list.
     scrollPosition = std::clamp(scrollPosition, 0, std::max(0, getMaxScrollPosition()));
 
-    loadVisibleCarts();
+    preloadVisibleCartLabels();
 }
 
 void ListScene::performSelection() {
@@ -484,7 +478,7 @@ void ListScene::toggleRetailGroupings() {
     }
 
     setScrollPosition(newRow * rowHeight);
-    loadVisibleCarts();
+    preloadVisibleCartLabels();
 }
 
 void ListScene::toggleFavourite() {
@@ -500,5 +494,9 @@ void ListScene::toggleFavourite() {
 }
 
 void ListScene::moveSelectionBy(int offset) {
+    // if (offset == 0) {
+    //     return;
+    // }
+
     setScrollPosition(scrollPosition + (rowHeight * offset));
 }

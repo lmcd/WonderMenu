@@ -25,6 +25,23 @@ class GameDatabase;
  */
 class GameLaunchScene : public Scene {
 private:
+    /**
+     * During the final load of the ROM, we exit the class and live inside
+     * `romLoadProgressHandler`. We need a reference back to the renderer so we
+     * can continue to draw the progress bar.
+     */
+    static SceneRenderer* currentRenderer;
+
+    static void romLoadProgressHandler(float progress);
+
+    ProgressBarView progressBarView;
+
+    /**
+     * The scale of the cartridge, relative to the full size of the cartridge
+     * model's geometry.
+     */
+    float cartScale = 0.02f;
+
     float transitionProgress = 0.0;
     float transitionSpeed = 0.0;
 
@@ -35,25 +52,13 @@ private:
 
     sc64_load_rom_session_t session;
 
-    /**
-     * During the final load of the ROM, we exit the class and live inside
-     * `romLoadProgressHandler`. We need a reference back to the renderer so we
-     * can continue to draw the progress bar.
-     */
-    static SceneRenderer* currentRenderer;
-
-    static void romLoadProgressHandler(float progress);
-
 public:
     const char* name() { return "GameLaunchScene"; }
-
-    static constexpr float ZOOMED_CART_SCALE = 0.02f;
 
     Game* game;
     CartRenderer* cartRenderer;
     GameDatabase* database;
     
-    ProgressBarView progressBarView;
     Cart3DView cart3DView;
     
     GameLaunchScene(Game* game, CartRenderer* cartRenderer, GameDatabase* database);

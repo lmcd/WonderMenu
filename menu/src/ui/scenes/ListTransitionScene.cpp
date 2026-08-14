@@ -36,7 +36,6 @@ void ListTransitionScene::didBeginScene(SceneEntry entry) {
         listScene->tableView.rowViews[i].opacity = 0.0f;
     }
 
-    // view.addSubview(&introScene->view);
     view.addSubview(&listScene->view);
 }
 

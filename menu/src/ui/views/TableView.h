@@ -114,7 +114,8 @@ struct TableView : public View {
     int rowCount = 5;
     int selectedRowIndex = 0;
 
-    InputRepeater slowScrollRepeater;
+    InputRepeater slowScrollRepeater1;
+    InputRepeater slowScrollRepeater2;
     InputRepeater fastScrollRepeater;
     InputWatcher aButtonWatcher;
 
@@ -125,8 +126,9 @@ struct TableView : public View {
     TableView& operator=(const TableView&) = delete;
 
     TableView() {
-        slowScrollRepeater.type = InputRepeater::JOYSTICK_UP_DOWN;
-        fastScrollRepeater.type = InputRepeater::C_UP_DOWN;
+        slowScrollRepeater1.type = InputRepeater::JOYSTICK_UP_DOWN;
+        slowScrollRepeater2.type = InputRepeater::DPAD_UP_DOWN;
+        fastScrollRepeater.type  = InputRepeater::C_UP_DOWN;
 
         expandTransition.progress = 0.0f;
         expandTransition.speed = 0.1f;
@@ -165,21 +167,20 @@ struct TableView : public View {
     bool handleInputs(const UpdateInfo& updateInfo) {
         joypad_inputs_t joypad = updateInfo.joypad;
 
-        int slowScrollAmount = slowScrollRepeater.update(joypad);
-        int fastScrollAmount = fastScrollRepeater.update(joypad);
+        int slowScrollAmount1 = slowScrollRepeater1.update(joypad);
+        int slowScrollAmount2 = slowScrollRepeater2.update(joypad);
+        int fastScrollAmount  = fastScrollRepeater.update(joypad);
 
         if (fastScrollRepeater.isEngaged) {
-            if (fastScrollAmount != 0) {
-                moveSelectionBy(fastScrollAmount * 4);
-            }
-
+            moveSelectionBy(fastScrollAmount * 4);
             return true;
         }
-        else if (slowScrollRepeater.isEngaged) {
-            if (slowScrollAmount != 0) {
-                moveSelectionBy(slowScrollAmount);
-            }
-
+        else if (slowScrollRepeater1.isEngaged) {
+            moveSelectionBy(slowScrollAmount1);
+            return true;
+        }
+        else if (slowScrollRepeater2.isEngaged) {
+            moveSelectionBy(slowScrollAmount2);
             return true;
         }
 
@@ -208,9 +209,8 @@ struct TableView : public View {
 
         int selectedSlot = selectedRowIndex - scrollPosition;
 
-        Rect rowRect = rectForRow(selectedSlot);
-
-		Rect selectionRect = rowRect.insetBy(selectionInset);
+        Rect selectedRowRect = rectForRow(selectedSlot);
+		Rect selectionRect = selectedRowRect.insetBy(selectionInset);
 
         selectedRowView.frame = selectionRect;
         selectedRowView.inset = selectionInset;
@@ -429,6 +429,10 @@ struct TableView : public View {
     }
 
     void moveSelectionBy(int offset) {
+        if (offset == 0) {
+            return;
+        }
+
         int moveAmount = -offset;
 
         selectedRowIndex += moveAmount;

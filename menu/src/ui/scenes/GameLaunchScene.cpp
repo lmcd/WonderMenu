@@ -58,7 +58,7 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 
     float value = TimingFunctions::easeInOutQuad(transitionProgress);
 
-    Size cartSize = cartRenderer->sizeForScale(ZOOMED_CART_SCALE);
+    Size cartSize = cartRenderer->sizeForScale(cartScale);
 
     Vec2 screenPosition = view.frame.size.mid();
 
@@ -106,7 +106,7 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
         flags |= CART_RENDER_SLIM;
     }
 
-    cart3DView.scale = ZOOMED_CART_SCALE;
+    cart3DView.scale = cartScale;
     cart3DView.rotation = rotation;
     cart3DView.frame.origin = screenPosition;
     cart3DView.game = game;
