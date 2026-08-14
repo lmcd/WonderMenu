@@ -17,23 +17,6 @@
 #include "ui/views/drawables/BottomShadowView.h"
 #include "ui/views/drawables/RectView.h"
 
-// TODO: not yet used
-template <typename Derived>
-class BaseRowView2 {
-public:
-    static void callFoo() {
-        Derived::fool();
-    }
-};
-
-// TODO: not yet used
-class GameRow2 : public BaseRowView2<GameRow2> {
-public:
-    static void foo() {
-        // ...
-    }
-};
-
 struct BaseRowView : public View {
     static constexpr int FONT_ID = 3;
 
