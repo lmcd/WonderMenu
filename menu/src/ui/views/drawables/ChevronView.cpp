@@ -5,6 +5,10 @@
 
 #include "ChevronView.h"
 
+ChevronView::ChevronView() {
+    frame.size = Size(16, 16);
+}
+
 void ChevronView::uploadSprite() {
     if (sprite == nullptr) {
         sprite = sprite_load("rom:/ui/TableChevrons.IA16.sprite");
@@ -19,12 +23,6 @@ void ChevronView::update(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    if (finalFrame != lastFinalFrame[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastFinalFrame[bufferIndex] = finalFrame;
-    }
-    
     if (expandProgress != lastExpandProgress[bufferIndex]) {
         needsRender = true;
         lastExpandProgress[bufferIndex] = expandProgress;
@@ -69,13 +67,12 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
     setPrimitiveColor(currentFillColor);
     setBlendColor(finalBlendColor);
 
-    Size size(16, 16);
-    Rect rect(finalFrame.origin, size);
+    Rect rect = finalFrame;
     Vec2 blitOrigin = finalFrame.origin;
 
     rdpq_blitparms_t p = {
-        .width  = size.width,
-        .height = size.height
+        .width  = finalFrame.size.width,
+        .height = finalFrame.size.height
     };
 
     float degrees00 = 0.0f;

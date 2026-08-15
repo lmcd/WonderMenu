@@ -5,6 +5,10 @@
 
 #include "NumberView.h"
 
+NumberView::NumberView() {
+    frame.size = Size(20, 20);
+}
+
 void NumberView::uploadSprite() {
     if (sprite == nullptr) {
         sprite = sprite_load("rom:/ui/CircleNumbers.IA16.sprite");
@@ -47,12 +51,9 @@ void NumberView::renderIcon(const RenderInfo& renderInfo) {
     Color color = fillColor;
     color.a *= finalOpacity;
 
-    Size size(20, 20);
-    Rect rect(finalFrame.origin, size);
-
-    Rect numberRect = rect;
+    Rect numberRect = finalFrame;
     numberRect.size.width = 8;
-    numberRect.origin.x += (size.width - numberRect.size.width) / 2;
+    numberRect.origin.x += (finalFrame.size.width - numberRect.size.width) / 2;
 
     Color foregroundColor = Color::WHITE;
     foregroundColor.a *= finalOpacity;
@@ -67,25 +68,20 @@ void NumberView::renderIcon(const RenderInfo& renderInfo) {
     setPrimitiveColor(color);
     setBlendColor(finalBlendColor);
 
-    int s0 = 0;
+    drawTexturedRect(TILE0, finalFrame);
 
-    drawTexturedRect(TILE0, rect, s0);
-
-    rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
-        setBlender(WITH_FRAMEBUFFER);
-    rdpq_mode_end();
-
+    setBlender(WITH_FRAMEBUFFER);
+    
     setPrimitiveColor(foregroundColor);
 
-    s0 += size.width;
+    int s0 = 20;
     s0 += 8 * (number - 1);
 
     drawTexturedRect(TILE0, numberRect, s0);
 
     rdpq_mode_pop();
 
-    drawnBoundingBox[bufferIndex] = rect;
+    drawnBoundingBox[bufferIndex] = finalFrame;
 }
 
 void NumberView::render(const RenderInfo& renderInfo) {

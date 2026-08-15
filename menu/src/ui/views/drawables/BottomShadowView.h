@@ -16,8 +16,6 @@ private:
 
     void uploadSprite();
 
-	Rect lastRect[BUFF_COUNT] = {};
-
     Rect rectsToClear[4] = {};
 	bool needsPartialClear = false;
 

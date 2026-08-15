@@ -5,6 +5,10 @@
 
 #include "CheckboxView.h"
 
+CheckboxView::CheckboxView() {
+    frame.size = Size(16, 16);
+}
+
 void CheckboxView::uploadSprite() {
     if (sprite == nullptr) {
         sprite = sprite_load("rom:/ui/TableCheckbox.IA16.sprite");
@@ -19,12 +23,6 @@ void CheckboxView::update(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    if (finalFrame != lastFinalFrame[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastFinalFrame[bufferIndex] = finalFrame;
-    }
-    
     if (isOn != lastIsOn[bufferIndex]) {
         needsRender = true;
         lastIsOn[bufferIndex] = isOn;
@@ -71,13 +69,12 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
 
     int s0 = isRadio ? 32 : 0;
 
-    Size size(16, 16);
-    Rect rect(finalFrame.origin, size);
+    Rect rect = finalFrame;
 
     drawTexturedRect(TILE0, rect, s0);
 
     if (isOn) {
-        s0 += size.width;
+        s0 += finalFrame.size.width;
 
         Color checkColor = DEFAULT_CHECK_COLOR;
         checkColor.rgb *= finalOpacity;

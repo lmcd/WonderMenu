@@ -18,7 +18,6 @@ private:
     inline static sprite_t* smoothCornerSprites[MAXIMUM_RADIUS] = {};
 
     Color lastFillColor[BUFF_COUNT] = {};
-    Rect lastFrame[BUFF_COUNT] = {};
     int lastRadius[BUFF_COUNT] = {};
 
     Rect rectsToClear[4] = {};

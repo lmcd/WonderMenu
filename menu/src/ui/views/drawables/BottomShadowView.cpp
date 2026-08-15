@@ -99,10 +99,10 @@ void BottomShadowView::update(const RenderInfo& renderInfo) {
         }
     }
 
-    if (finalFrame != lastRect[bufferIndex]) {
+    if (finalFrame != lastFinalFrame[bufferIndex]) {
         needsClear = true;
         setNeedsDisplay();
-        lastRect[bufferIndex] = finalFrame;
+        lastFinalFrame[bufferIndex] = finalFrame;
     }
     else if (needsRender) {
         needsClear = true;

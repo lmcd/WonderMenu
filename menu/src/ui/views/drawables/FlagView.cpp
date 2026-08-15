@@ -5,6 +5,10 @@
 
 #include "FlagView.h"
 
+FlagView::FlagView() {
+    frame.size = Size(FLAG_SIZE, FLAG_SIZE);
+}
+
 void FlagView::uploadSprite(int spriteIndex) {
     if (sprites[0] == nullptr) {
         // Not enough space in TMEM to occupy all flags, so they're split
@@ -52,11 +56,8 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    Size size(20, 20);
-    Rect rect(finalFrame.origin, size);
-
-    Rect spriteRect = Rect(Vec2::ZERO, size);
-    Rect drawRect = rect;
+    Rect spriteRect = Rect(Vec2::ZERO, Size(FLAG_SIZE, FLAG_SIZE));
+    Rect drawRect = finalFrame;
     
 	bool shouldFlip = false;
 
@@ -130,7 +131,7 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
 	drawTexturedRect(TILE0, drawRect, spriteRect);
 
 	if (shouldFlip) {
-		drawRect.origin.x += (size.width / 2);
+		drawRect.origin.x += (finalFrame.size.width / 2);
 
         // Special case for `ALL`
         // The only game I've seen with this is 1080° Snowboarding, and the
@@ -146,7 +147,7 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
 
     rdpq_mode_pop();
 
-    drawnBoundingBox[bufferIndex] = rect;
+    drawnBoundingBox[bufferIndex] = finalFrame;
 }
 
 void FlagView::update(const RenderInfo& renderInfo) {

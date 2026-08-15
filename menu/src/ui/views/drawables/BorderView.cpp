@@ -9,14 +9,6 @@
 
 void BorderView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
-
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (finalFrame != lastFrame[bufferIndex]) {
-        needsRender = true;
-        needsClear = true;
-        lastFrame[bufferIndex] = finalFrame;
-    }
 }
 
 void BorderView::clear(const RenderInfo& renderInfo) {

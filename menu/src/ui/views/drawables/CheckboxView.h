@@ -42,6 +42,8 @@ public:
     Color checkColor = DEFAULT_CHECK_COLOR;
     bool isRadio = false;
 
+    CheckboxView();
+
     void update(const RenderInfo& renderInfo) override;
     void clear(const RenderInfo& renderInfo);
     void render(const RenderInfo& renderInfo) override;

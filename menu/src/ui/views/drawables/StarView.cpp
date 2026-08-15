@@ -5,6 +5,10 @@
 
 #include "StarView.h"
 
+StarView::StarView() {
+    frame.size = Size(20, 20);
+}
+
 void StarView::uploadSprite() {
     if (sprite == nullptr) {
         sprite = sprite_load("rom:/ui/Star16.IA16.sprite");
@@ -47,11 +51,7 @@ void StarView::renderIcon(const RenderInfo& renderInfo) {
     Color color = isOn ? onColor : offColor;
     color.rgb *= finalOpacity;
 
-    Size size(20, 20);
-    Rect rect(finalFrame.origin, size);
-
-    int offset = isOn ? 0 : 1;
-    int s0 = (offset * size.width);
+    int s0 = isOn ? 0 : 20;
 
     rdpq_mode_push();
 
@@ -63,11 +63,11 @@ void StarView::renderIcon(const RenderInfo& renderInfo) {
     setPrimitiveColor(color);
     setBlendColor(finalBlendColor);
 
-    drawTexturedRect(TILE0, rect, s0);
+    drawTexturedRect(TILE0, finalFrame, s0);
 
     rdpq_mode_pop();
 
-    drawnBoundingBox[bufferIndex] = rect;
+    drawnBoundingBox[bufferIndex] = finalFrame;
 }
 
 void StarView::render(const RenderInfo& renderInfo) {

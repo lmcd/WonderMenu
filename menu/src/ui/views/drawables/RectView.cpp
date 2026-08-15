@@ -187,7 +187,7 @@ void RectView::update(const RenderInfo& renderInfo) {
         lastFillColor[bufferIndex] = fillColor;
     }
     
-    if (finalFrame != lastFrame[bufferIndex]) {
+    if (finalFrame != lastFinalFrame[bufferIndex]) {
         needsClear = true;
 
         if (isInverted || isBlendedWithBackground) {
@@ -196,7 +196,7 @@ void RectView::update(const RenderInfo& renderInfo) {
         else {
             needsPartialClear = true;
             
-            Rect _lastFrame = lastFrame[bufferIndex];
+            Rect _lastFrame = lastFinalFrame[bufferIndex];
 
             if (finalFrame.size.width != _lastFrame.size.width) {
                 _lastFrame.size.width = std::min(finalFrame.size.width, _lastFrame.size.width) - radius;
@@ -210,7 +210,7 @@ void RectView::update(const RenderInfo& renderInfo) {
             // given up as well as the leading ones.
             if (finalFrame.origin.x != _lastFrame.origin.x) {
                 int originX = std::max(finalFrame.origin.x, _lastFrame.origin.x) + radius;
-                int maxX = std::min(finalFrame.maxX(), lastFrame[bufferIndex].maxX()) - radius;
+                int maxX = std::min(finalFrame.maxX(), lastFinalFrame[bufferIndex].maxX()) - radius;
 
                 _lastFrame.origin.x = originX;
                 _lastFrame.size.width = std::max(0, maxX - originX);
@@ -218,13 +218,13 @@ void RectView::update(const RenderInfo& renderInfo) {
 
             if (finalFrame.origin.y != _lastFrame.origin.y) {
                 int originY = std::max(finalFrame.origin.y, _lastFrame.origin.y) + radius;
-                int maxY = std::min(finalFrame.maxY(), lastFrame[bufferIndex].maxY()) - radius;
+                int maxY = std::min(finalFrame.maxY(), lastFinalFrame[bufferIndex].maxY()) - radius;
 
                 _lastFrame.origin.y = originY;
                 _lastFrame.size.height = std::max(0, maxY - originY);
             }
 
-            lastFrame[bufferIndex].subtract(finalFrame, rectsToClear);
+            lastFinalFrame[bufferIndex].subtract(finalFrame, rectsToClear);
 
             Rect rectsToRender[4];
             int count = finalFrame.subtract(_lastFrame, rectsToRender);
@@ -236,7 +236,7 @@ void RectView::update(const RenderInfo& renderInfo) {
             }
         }
 
-        lastFrame[bufferIndex] = finalFrame;
+        lastFinalFrame[bufferIndex] = finalFrame;
     }
     else if (needsRender && isBlendedWithBackground) {
         needsClear = true;

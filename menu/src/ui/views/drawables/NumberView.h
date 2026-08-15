@@ -38,6 +38,8 @@ public:
     int number = 0;
     Color fillColor = Color::WHITE;
 
+    NumberView();
+
     void update(const RenderInfo& renderInfo) override;
     void clear(const RenderInfo& renderInfo);
     void render(const RenderInfo& renderInfo) override;

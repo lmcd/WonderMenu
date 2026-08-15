@@ -15,6 +15,9 @@ struct FlagView : public Drawable {
 private:
     static void uploadSprite(int spriteIndex);
 
+    // Size of one flag cell in the sprite sheets
+    static constexpr int FLAG_SIZE = 20;
+
     inline static sprite_t* sprites[2] = {};
 	inline static sprite_t* maskSprite = nullptr;
 
@@ -38,6 +41,8 @@ public:
     }
 
     RegionCode regionCode = RegionCode::UNKNOWN;
+
+    FlagView();
 
     void update(const RenderInfo& renderInfo) override;
     void clear(const RenderInfo& renderInfo);

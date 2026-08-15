@@ -38,6 +38,8 @@ public:
     float expandProgress = 0.0f;
     Color fillColor = DEFAULT_FILL_COLOR;
 
+    ChevronView();
+
     void update(const RenderInfo& renderInfo) override;
     void clear(const RenderInfo& renderInfo);
     void render(const RenderInfo& renderInfo) override;

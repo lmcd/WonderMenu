@@ -19,12 +19,6 @@ void MaskedImageView::update(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    if (finalFrame != lastFinalFrame[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastFinalFrame[bufferIndex] = finalFrame;
-    }
-
     if (imageSurface.buffer != lastImageBuffer[bufferIndex]) {
         needsRender = true;
         lastImageBuffer[bufferIndex] = imageSurface.buffer;

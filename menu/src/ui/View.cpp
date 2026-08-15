@@ -448,4 +448,10 @@ void Drawable::update(const RenderInfo& renderInfo) {
 
         lastFinalIsHidden[bufferIndex] = finalIsHidden;
     }
+
+    if (finalFrame != lastFinalFrame[bufferIndex]) {
+        needsRender = true;
+        needsClear = true;
+        lastFinalFrame[bufferIndex] = finalFrame;
+    }
 }

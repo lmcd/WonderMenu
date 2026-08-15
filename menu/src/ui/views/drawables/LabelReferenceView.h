@@ -150,12 +150,6 @@ public:
 
         int bufferIndex = renderInfo.bufferIndex;
 
-        if (finalFrame != lastFinalFrame[bufferIndex]) {
-            needsClear = true;
-            needsRender = true;
-            lastFinalFrame[bufferIndex] = finalFrame;
-        }
-
         if (stringReference != lastStringReference[bufferIndex]) {
             needsClear = true;
             needsRender = true;

@@ -11,8 +11,6 @@
 
 struct ImageView : public Drawable {
 public:
-    const char* name() const override { return "ImageView"; }
-
     /**
      * How the sprite is sized and positioned within `frame`.
      */
@@ -27,10 +25,18 @@ public:
         // Stretched to exactly fill frame; aspect is not preserved.
         SCALE_TO_FILL,
     };
-
+    
+private:
     sprite_t* lastSprite[BUFF_COUNT] = {};
     ScaleMode lastScaleMode[BUFF_COUNT] = {};
     uint32_t lastSpriteVersion[BUFF_COUNT] = {};
+
+    // Fills in the blit params for the current scale mode and returns the rect
+    // the sprite will actually occupy on screen.
+    Rect layoutSprite(rdpq_blitparms_t& params) const;
+
+public:
+    const char* name() const override { return "ImageView"; }
 
     sprite_t* sprite = nullptr;
     ScaleMode scaleMode = SCALE_NONE;
@@ -42,9 +48,4 @@ public:
     void update(const RenderInfo& renderInfo) override;
     void clear(const RenderInfo& renderInfo);
     void render(const RenderInfo& renderInfo) override;
-
-private:
-    // Fills in the blit params for the current scale mode and returns the rect
-    // the sprite will actually occupy on screen.
-    Rect layoutSprite(rdpq_blitparms_t& params) const;
 };

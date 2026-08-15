@@ -39,8 +39,6 @@ private:
         return cache[radius];
     }
 
-    Rect lastFrame[BUFF_COUNT] = {};
-
 public:
     const char* name() const override { return "BorderView"; }
 
