@@ -55,7 +55,6 @@ public:
     Color fillColor = Color::WHITE;
     int radius = 0;
     bool isSmooth = false;
-    bool isBlendedWithBackground = false;
     bool isInverted = false;
 
     void update(const RenderInfo& renderInfo) override;

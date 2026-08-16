@@ -19,7 +19,7 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
 
     Color color = fillColor;
 
-    if (isBlendedWithBackground)  {
+    if (finalIsBlendedWithMemory)  {
         color.a *= finalOpacity;
     }
     else {
@@ -76,16 +76,7 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
 
     rdpq_mode_push();
 
-    Blender blender;
-
-    if (isBlendedWithBackground) {
-        blender = WITH_FRAMEBUFFER;
-    }
-    else {
-        blender = WITH_BLEND_COLOR;
-    }
-
-    setBlender(blender);
+    setBlender(finalIsBlendedWithMemory ? WITH_FRAMEBUFFER : WITH_BLEND_COLOR);
 
     setPrimitiveColor(color);
     setBlendColor(finalBlendColor);
@@ -100,7 +91,7 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
         //   (1, TEX0, PRIM, 0) = PRIM.a*(1-TEX0)   -- keeps opacity, as blended does
         //   (0, 1, TEX0, 1)    = -TEX0 + 1 = 1-TEX0 -- no PRIM.a, matching the
         //                        non-blended branch below
-        if (isBlendedWithBackground) {
+        if (finalIsBlendedWithMemory) {
             if (isInverted) {
                 setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (1, TEX0, PRIM, 0)));
             }
@@ -190,7 +181,7 @@ void RectView::update(const RenderInfo& renderInfo) {
     if (finalFrame != lastFinalFrame[bufferIndex]) {
         needsClear = true;
 
-        if (isInverted || isBlendedWithBackground) {
+        if (isInverted || finalIsBlendedWithMemory) {
             setNeedsDisplay();
         }
         else {
@@ -238,7 +229,7 @@ void RectView::update(const RenderInfo& renderInfo) {
 
         lastFinalFrame[bufferIndex] = finalFrame;
     }
-    else if (needsRender && isBlendedWithBackground) {
+    else if (needsRender && finalIsBlendedWithMemory) {
         needsClear = true;
 
         if (!isPendingFullRender) {

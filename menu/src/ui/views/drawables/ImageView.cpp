@@ -51,13 +51,18 @@ Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
 
         case ASPECT_FIT: {
             // Smaller ratio => the image fits entirely, letterboxed on one axis.
-            float scale = std::min(finalFrame.size.width  / spriteWidth,
-                                   finalFrame.size.height / spriteHeight);
+            float scale = std::min(
+                finalFrame.size.width  / spriteWidth,
+                finalFrame.size.height / spriteHeight
+            );
 
             params.scale_x = scale;
             params.scale_y = scale;
 
-            rect.size = Size(spriteWidth * scale, spriteHeight * scale);
+            rect.size = Size(
+                spriteWidth * scale,
+                spriteHeight * scale
+            );
             rect.origin = finalFrame.origin + Vec2(
                 (finalFrame.size.width  - rect.size.width)  / 2.0f,
                 (finalFrame.size.height - rect.size.height) / 2.0f
@@ -67,8 +72,10 @@ Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
 
         case ASPECT_FILL: {
             // Larger ratio => the image covers the finalFrame and overflows one axis.
-            float scale = std::max(finalFrame.size.width  / spriteWidth,
-                                   finalFrame.size.height / spriteHeight);
+            float scale = std::max(
+                finalFrame.size.width  / spriteWidth,
+                finalFrame.size.height / spriteHeight
+            );
 
             // Rather than blit the whole sprite and clip most of it away, crop
             // the source to the centred region that actually survives, so the

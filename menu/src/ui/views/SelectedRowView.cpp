@@ -12,7 +12,7 @@ SelectedRowView::SelectedRowView() {
     rightOutsetRectView.fillColor = Color::BLACK;
     rightOutsetRectView.backgroundColor = Color::BLACK;
 
-    rectView.isBlendedWithBackground = true;
+    rectView.isOpaque = false;
 
     addSubview(&leftOutsetRectView);
     addSubview(&rightOutsetRectView);

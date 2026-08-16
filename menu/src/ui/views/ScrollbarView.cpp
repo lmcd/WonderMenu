@@ -10,7 +10,7 @@
 ScrollbarView::ScrollbarView() {
     frame.size.width = 8;
 
-    knobView.isBlendedWithBackground = true;
+    knobView.isOpaque = false;
 
     addSubview(&knobView);
 }

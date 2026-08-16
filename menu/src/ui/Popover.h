@@ -76,7 +76,7 @@ public:
 
         rectView.radius = 30;
         rectView.isSmooth = true;
-        rectView.isBlendedWithBackground = true;
+        rectView.isOpaque = false;
     }
 
     std::string title = "";
@@ -230,7 +230,7 @@ public:
         scrollbarView.contentHeight = tableView.contentHeight();
         scrollbarView.scrollPosition = tableView.scrollPosition * tableView.paddedRowHeight();
         scrollbarView.backgroundColor = backgroundColor;
-        
+
         baseScene->updateViews(renderInfo);
     }
 };

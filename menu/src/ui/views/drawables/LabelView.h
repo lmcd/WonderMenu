@@ -53,12 +53,6 @@ public:
 
         int bufferIndex = renderInfo.bufferIndex;
 
-        if (this->finalFrame != this->lastFinalFrame[bufferIndex]) {
-            this->needsClear = true;
-            this->needsRender = true;
-            this->lastFinalFrame[bufferIndex] = this->finalFrame;
-        }
-
         if (strcmp(string, lastString[bufferIndex]) != 0) {
             this->needsClear = true;
             this->needsRender = true;

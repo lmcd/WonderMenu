@@ -210,10 +210,7 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
     finalIsHidden = isHidden;
     finalFrame    = Rect(Vec2::ZERO, frame.size);
     finalIsBlendedWithMemory = !isOpaque;
-
-    Color blendColor = (backgroundColor.a == 255) ? backgroundColor : Color::BLACK;
-
-    finalBlendColor = blendColor;
+    finalBlendColor = (backgroundColor.a == 255) ? backgroundColor : Color::BLACK;
 
     update(renderInfo);
 
@@ -222,7 +219,7 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
         finalOpacity,
         finalIsHidden,
         finalFrame.origin,
-        blendColor,
+        finalBlendColor,
         finalIsBlendedWithMemory
     );
 
