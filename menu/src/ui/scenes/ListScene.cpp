@@ -490,13 +490,13 @@ void ListScene::toggleFavourite() {
 
     gameLibrary->toggleFavourite(gameGroup);
 
-    moveSelectionBy(0);
+    moveSelectionBy(0, true);
 }
 
-void ListScene::moveSelectionBy(int offset) {
-    // if (offset == 0) {
-    //     return;
-    // }
+void ListScene::moveSelectionBy(int offset, bool force) {
+    if (offset == 0 && !force) {
+        return;
+    }
 
     setScrollPosition(scrollPosition + (rowHeight * offset));
 }

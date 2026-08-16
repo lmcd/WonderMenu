@@ -150,7 +150,7 @@ private:
 
     void setScrollPosition(int _scrollPosition);
 
-    void moveSelectionBy(int offset);
+    void moveSelectionBy(int offset, bool force = false);
 
     void performSelection();
     void toggleRetailGroupings();
