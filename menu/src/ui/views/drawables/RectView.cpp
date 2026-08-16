@@ -18,13 +18,8 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
     }
 
     Color color = fillColor;
+    color.a *= finalOpacity;
 
-    if (finalIsBlendedWithMemory)  {
-        color.a *= finalOpacity;
-    }
-    else {
-        color.rgb *= finalOpacity;
-    }
 
     bool needsScissor = !isPendingFullRender;
     Rect scissorRect = currentRect;
@@ -91,23 +86,18 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
         //   (1, TEX0, PRIM, 0) = PRIM.a*(1-TEX0)   -- keeps opacity, as blended does
         //   (0, 1, TEX0, 1)    = -TEX0 + 1 = 1-TEX0 -- no PRIM.a, matching the
         //                        non-blended branch below
-        if (finalIsBlendedWithMemory) {
+
             if (isInverted) {
                 setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (1, TEX0, PRIM, 0)));
             }
             else {
-                setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (PRIM, 0, TEX0, 0)));
+                if (finalOpacity == 1.0f) {
+                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (1, 0, TEX0, 0)));
+                }
+                else {
+                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (PRIM, 0, TEX0, 0)));
+                }
             }
-        }
-        else {
-            if (isInverted) {
-                setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (0, 1, TEX0, 1)));
-            }
-            else {
-                // TODO: why do we need to do this when alpha is 255
-                setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (1, 0, TEX0, 0)));
-            }
-        }
 
         rdpq_sync_tile();
         rdpq_sprite_upload(TILE0, sprite, NULL);

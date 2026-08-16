@@ -49,14 +49,14 @@ void StarView::renderIcon(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
     Color color = isOn ? onColor : offColor;
-    color.rgb *= finalOpacity;
+    color.a *= finalOpacity;
 
     int s0 = isOn ? 0 : 20;
 
     rdpq_mode_push();
 
     rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, TEX0)));
+        setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
         setBlender(WITH_BLEND_COLOR);
     rdpq_mode_end();
 

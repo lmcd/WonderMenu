@@ -33,15 +33,15 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
     Color titleColor = Color::WHITE;
-    titleColor.rgb *= 0.85f;
+    titleColor.a *= 0.85f;
 
     Color selectedTitleColor = Color::WHITE;
 
     Color subtitleColor = Color::WHITE;
-    subtitleColor.rgb *= 0.35f;
+    subtitleColor.a *= 0.35f;
     
     Color selectedSubtitleColor = Color::WHITE;
-    selectedSubtitleColor.rgb *= 0.50f;
+    selectedSubtitleColor.a *= 0.50f;
 
     Vec2 titlePosition(
         50 + (indentLevel * INDENT_WIDTH),

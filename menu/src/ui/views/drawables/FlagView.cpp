@@ -115,7 +115,6 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
     rdpq_mode_push();
 
     rdpq_mode_begin();
-        rdpq_set_mode_standard();
         setCombiner(RDPQ_COMBINER2(
             (0,0,0, TEX0),     (TEX0, 0, PRIM, 0),
             (0,0,0, COMBINED), (0, COMBINED, TEX1, COMBINED)

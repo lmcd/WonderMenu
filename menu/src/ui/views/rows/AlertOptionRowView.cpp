@@ -18,7 +18,7 @@ void AlertOptionRowView::update(const RenderInfo& renderInfo) {
     Color destructiveColor = Color(255, 13, 13);
 
     Color titleColor = isDestructive ? destructiveColor : Color::WHITE;
-    titleColor.rgb *= 0.85f;
+    titleColor.a *= 0.85f;
 
     Color selectedTitleColor = isDestructive ? destructiveColor : Color::WHITE;
 

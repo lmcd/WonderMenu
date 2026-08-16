@@ -17,7 +17,7 @@ void CheatOptionRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
     Color titleColor = Color::WHITE;
-    titleColor.rgb *= 0.85f;
+    titleColor.a *= 0.85f;
 
     Color selectedTitleColor = Color::WHITE;
     

@@ -51,18 +51,12 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
     rdpq_mode_push();
 
     rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, TEX0)));
+        setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
         setBlender(WITH_BLEND_COLOR);
     rdpq_mode_end();
 
     Color currentFillColor = fillColor;
-
-    if (finalIsBlendedWithMemory)  {
-        currentFillColor.a *= finalOpacity;
-    }
-    else {
-        currentFillColor.rgb *= finalOpacity;
-    }
+    currentFillColor.a *= finalOpacity;
 
     setPrimitiveColor(currentFillColor);
     setBlendColor(finalBlendColor);

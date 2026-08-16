@@ -201,7 +201,7 @@ void TabControlView::clear(const RenderInfo& renderInfo) {
 
 void TabControlView::layoutLabels() {
     Color textColor = Color::WHITE;
-    textColor.rgb *= 0.45f;
+    textColor.a *= 0.45f;
 
     Color selectedColor = Color(252, 204, 007);
 
@@ -361,7 +361,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     rButtonColor.rgb *= finalOpacity;
 
     Color barColor = Color(17);
-    barColor.rgb *= finalOpacity;
+    barColor.a *= finalOpacity;
     
     Color blackColor = Color::BLACK;
 

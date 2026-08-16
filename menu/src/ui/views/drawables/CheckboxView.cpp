@@ -56,13 +56,7 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
     rdpq_mode_end();
 
     Color currentFillColor = isOn ? onFillColor : offFillColor;
-
-    if (finalIsBlendedWithMemory)  {
-        currentFillColor.a *= finalOpacity;
-    }
-    else {
-        currentFillColor.rgb *= finalOpacity;
-    }
+    currentFillColor.a *= finalOpacity;
 
     setPrimitiveColor(currentFillColor);
     setBlendColor(finalBlendColor);
@@ -77,7 +71,7 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
         s0 += finalFrame.size.width;
 
         Color checkColor = DEFAULT_CHECK_COLOR;
-        checkColor.rgb *= finalOpacity;
+        checkColor.a *= finalOpacity;
 
         setPrimitiveColor(checkColor);
         setBlender(WITH_FRAMEBUFFER);
