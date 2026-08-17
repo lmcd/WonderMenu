@@ -20,15 +20,6 @@ CheatRowView::CheatRowView() {
     addSubview(&subtitleView);
 }
 
-void CheatRowView::setSubtitle(const char* utf8_fmt, ...) {
-    va_list va;
-    va_start(va, utf8_fmt);
-
-    subtitleView.setStringFromVAList(utf8_fmt, va);
-
-    va_end(va);
-}
-
 void CheatRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
@@ -65,6 +56,7 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
 
     subtitleView.frame.origin = subtitlePosition;
     subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor;
+    subtitleView.alternateColor = Color(2, 163, 238);
 
     checkboxView.frame.origin = checkboxPosition;
     checkboxView.isOn = isChecked;

@@ -46,6 +46,7 @@ private:
 
         uint8_t currentFontID = 0;
         int currentAtlas = -1;
+        int currentStyleID = -1;
 
         rdpq_mode_push();
 
@@ -77,8 +78,13 @@ private:
                     rdpq_mode_alphacompare(1);
                 rdpq_mode_end();
 
-                setPrimitiveColor(color);
                 setBlendColor(blendColor);
+            }
+
+            if (character->style_id != currentStyleID) {
+                currentStyleID = character->style_id;
+
+                setPrimitiveColor(currentStyleID == 0 ? color : alternateColor);
             }
 
             int tile = glyph->ntile;
@@ -131,6 +137,7 @@ public:
     rdpq_align_t align = ALIGN_LEFT;
     uint8_t fontID = 1;
     Color textColor = Color::WHITE;
+    Color alternateColor = Color::RED;
     const char* stringReference = nullptr;
 
     /**

@@ -46,7 +46,5 @@ struct CheatRowView : public BaseRowView {
 
     CheatRowView();
 
-    void setSubtitle(const char* utf8_fmt, ...);
-
     void update(const RenderInfo& renderInfo) override;
 };

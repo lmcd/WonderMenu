@@ -175,7 +175,12 @@ void CheatsScene::updateViews(const RenderInfo&) {
 
             rowView->titleView.stringReference = group.title;
 
-            rowView->setSubtitle("%i / %u", row.enabledCheatCount, group.cheatCount);
+            if (row.enabledCheatCount == 0) {
+                rowView->subtitleView.setString("%i / %u", row.enabledCheatCount, group.cheatCount);
+            }
+            else {
+                rowView->subtitleView.setString("^01%i^00 / %u", row.enabledCheatCount, group.cheatCount);
+            }
         }
         else {
             const Cheat& cheat = cheatsDatabase->cheats[row.index];
@@ -186,10 +191,10 @@ void CheatsScene::updateViews(const RenderInfo&) {
                 const CheatWildcardOption option =
                     cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + row.multipleChoiceIndex];
 
-                rowView->setSubtitle("%s", option.title);
+                rowView->subtitleView.setString("^01%s", option.title);
             }
             else {
-                rowView->setSubtitle("");
+                rowView->subtitleView.setString("");
             }
         }
     }
