@@ -74,13 +74,6 @@ int ListScene::getSelectedRow() {
     return scrollPosition / rowHeight;
 }
 
-// Maps a list row index to the on-screen row slot (0 = top, numberOfDisplayableRows - 1 = bottom).
-// The selected row is always centred, so its slot is numberOfOffEdgeRows.
-int ListScene::getVisibleRow(int rowIndex) {
-    Rect rect = rectForRow(rowIndex, scrollPosition);
-    return (int)std::round(rect.minY() / rowHeight);
-}
-
 // Translates an on-screen row slot (0..numberOfRows-1) to an gameGroups index using
 // the scroll position. The selected row sits at slot numberOfOffEdgeRows, so each
 // slot offsets from there. Returns -1 if the slot falls off the start/end of the list.
@@ -96,11 +89,6 @@ int ListScene::getEntryIndexForVisibleRow(int visibleRow) {
 
 int ListScene::getMaxScrollPosition() {
     return (gameGroups->size() - 1) * rowHeight;
-}
-
-Vec2 ListScene::cartPositionForSelectedRow() {
-    int selectedRow = getSelectedRow();
-    return cartPositionForEntry(selectedRow, scrollPosition);
 }
 
 void ListScene::preloadVisibleCartLabels() {
@@ -133,8 +121,6 @@ void ListScene::didBeginScene(SceneEntry) {
 
     preloadVisibleCartLabels();
     setupViews();
-
-    cart3DView.isHidden = false;
 
     wobbler.reset();
 }
@@ -277,17 +263,6 @@ void ListScene::setupViews() {
 }
 
 void ListScene::updateViews(const RenderInfo& renderInfo) {
-    Size tabControlSize = Size(332, 36);
-    Vec2 tabControlPosition = Vec2(
-        (view.frame.size.width - tabControlSize.width) / 2,
-        19
-    );
-
-    tabControlView.frame = Rect(
-        tabControlPosition,
-        tabControlSize
-    );
-    
     labelView.maxWidth = view.frame.size.width;
 
     const int frameNumber = renderInfo.frameNumber;
@@ -316,10 +291,6 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
 
         float rowOpacity = rowView.opacity;
 
-        if (i == 0) {
-            rowOpacity *= 0.2;
-        }
-
         if (!isRowHidden) {
             // Bind a reference into the vector (not a loop-local copy): rowView
             // keeps &gameGroup, which would dangle if it pointed at a local.
@@ -336,7 +307,7 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
             rowView.gameGroup = nullptr;
         }
 
-        Rect rowRect = rectForRow2(i);
+        Rect rowRect = rectForRow(i);
 
         rowView.frame = rowRect;
         rowView.isSelected = isRowSelected;
@@ -379,6 +350,10 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
     tableView.rowViews[0].titleView.setNeedsDisplay();
     tableView.rowViews[0].subtitleView.setNeedsDisplay();
 
+    tabControlView.frame.origin = Vec2(
+        (view.frame.size.width - tabControlView.frame.size.width) / 2,
+        19
+    );
     tabControlView.isEnabled = (popoverTransitionProgress == 0.0f);
     tabControlView.setNeedsDisplay();
 }

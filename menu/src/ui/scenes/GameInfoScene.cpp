@@ -36,17 +36,10 @@ void GameInfoScene::didBeginScene(SceneEntry) {
 }
 
 void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
-    Size tabControlSize = Size(332, 36);
-    Vec2 tabControlPosition = Vec2(
-        (view.frame.size.width - tabControlSize.width) / 2,
+    tabControlView.frame.origin = Vec2(
+        (view.frame.size.width - tabControlView.frame.size.width) / 2,
         19
     );
-
-    tabControlView.frame = Rect(
-        tabControlPosition,
-        tabControlSize
-    );
-
     tabControlView.isEnabled = (popoverTransitionProgress == 0.0f);
 
     scrollbarView.frame = Rect(

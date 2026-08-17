@@ -50,11 +50,7 @@ struct Range {
 class ListScene : public Scene {
 private:
     static constexpr Color SELECTED_ROW_COLOR = Color(24);
-    static constexpr Color STAR_ON_COLOR = Color(255, 204, 0);
-    static constexpr Color STAR_OFF_COLOR = Color(96);
     
-    static constexpr int TITLE_ALPHA = 255;
-    static constexpr int SUBTITLE_ALPHA = 128;
     static constexpr int MAX_VISIBLE_LIST_ITEMS = 7;
 
     CartRenderer* cartRenderer;
@@ -105,14 +101,7 @@ private:
     /**
      * Get the current drawing rect (in pixels) for any row in the list.
      */
-    Rect rectForRow(int rowIndex, int scrollPosition) {
-        Rect returnRect = selectedRowRect;
-        returnRect.origin.y += (rowIndex * rowHeight) - scrollPosition;
-
-        return returnRect;
-    }
-
-    Rect rectForRow2(int rowIndex) {
+    Rect rectForRow(int rowIndex) {
         Rect returnRect = selectedRowRect;
         returnRect.origin.y = (rowIndex * rowHeight);
         returnRect.origin.y += 2;
@@ -121,28 +110,23 @@ private:
     }
 
     Vec2 cartPositionForRow(int rowIndex) {
-        Rect rect = rectForRow2(rowIndex);
-
-        return Vec2(cartMiddleX, rect.midY());
-    }
-
-    Vec2 cartPositionForEntry(int rowIndex, int scrollPosition) {
-        Rect rect = rectForRow(rowIndex, scrollPosition);
+        Rect rect = rectForRow(rowIndex);
 
         return Vec2(cartMiddleX, rect.midY());
     }
 
     Range getRange(int inset = 0);
 
+    /**
+     * How many rows do we scroll by when paging up/down with C-buttons.
+     */
     int pageMoveAmount();
 
     int contentHeight();
 
     int getSelectedRow();
-    int getVisibleRow(int rowIndex);
     int getEntryIndexForVisibleRow(int visibleRow);
     int getMaxScrollPosition();
-    Vec2 cartPositionForSelectedRow();
 
     void preloadVisibleCartLabels();
 
@@ -155,6 +139,8 @@ private:
     void performSelection();
     void toggleRetailGroupings();
     void toggleFavourite();
+
+    Vec3f rotationForFrame(int frameNumber);
 
 public:
     const char* name() { return "ListScene"; }
@@ -184,8 +170,6 @@ public:
 
         return 1.0f;
     }
-
-    Vec3f rotationForFrame(int frameNumber);
 
     void setCurrentTab(Tab _currentTab);
 

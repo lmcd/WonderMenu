@@ -8,6 +8,8 @@
 #include "TabControlView.h"
 
 TabControlView::TabControlView() {
+    frame.size = Size(332, 36);
+    
     buttonRepeater.type = InputRepeater::L_R;
     buttonRepeater.repeatInterval = 10;
 
