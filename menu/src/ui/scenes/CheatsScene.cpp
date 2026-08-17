@@ -333,17 +333,16 @@ void CheatsScene::enableSelectedCheats() {
 
         uint16_t codesEnd = cheat.codesStartIndex + cheat.codesCount;
 
-        // For multiple choice cheats, the wildcard code's value comes from the
-        // chosen option (the code itself only holds the wildcard zeroed out).
+        // For multiple choice cheats, every wildcard code's value comes from the
+        // chosen option (the codes themselves only hold the wildcard zeroed out).
         int16_t multipleChoiceIndex = multipleChoiceIndexForCheat(cheatIndex);
-        uint16_t wildcardCodeIndex = cheat.codesStartIndex + cheat.codeWithWildcardIndex;
 
         for (uint16_t codeIndex = cheat.codesStartIndex; codeIndex < codesEnd; codeIndex++) {
             const CheatCode& code = cheatsDatabase->codes[codeIndex];
 
             uint16_t value = code.value;
 
-            if (multipleChoiceIndex != -1 && codeIndex == wildcardCodeIndex) {
+            if (multipleChoiceIndex != -1 && code.hasWildcard) {
                 const CheatWildcardOption& option =
                     cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + multipleChoiceIndex];
 

@@ -63,7 +63,6 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
         std::string title;
         uint16_t codesStartIndex;
         uint16_t codesCount;
-        uint16_t codeWithWildcardIndex;
         uint16_t wildcardStartIndex;
         uint16_t wildcardCount;
     };
@@ -235,8 +234,11 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
                 expectingWildcardOptions = true;
                 wildcardIsTwoBytes = isTwoByteWildcard;
 
-                cheatPool[currentCheatIndex].codeWithWildcardIndex = cheatPool[currentCheatIndex].codesCount;
-                cheatPool[currentCheatIndex].wildcardStartIndex = currentWildcardOptionIndex;
+                // A cheat can have any number of wildcard codes, but they all
+                // share the one list of options
+                if (cheatPool[currentCheatIndex].wildcardCount == 0) {
+                    cheatPool[currentCheatIndex].wildcardStartIndex = currentWildcardOptionIndex;
+                }
             }
 
             // Read `address` and `code` from the line
@@ -245,7 +247,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
                     wildcardBaseValue = value;
                 }
 
-                codes.push_back({address, value});
+                codes.push_back({address, value, (uint8_t)(isWildcardCode ? 1 : 0)});
                 cheatPool[currentCheatIndex].codesCount++;
             }
         }
@@ -297,7 +299,6 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
                 setTitle(c.title, sizeof(c.title), tc.title);
                 c.codesStartIndex = tc.codesStartIndex;
                 c.codesCount = tc.codesCount;
-                c.codeWithWildcardIndex = tc.codeWithWildcardIndex;
                 c.wildcardStartIndex = tc.wildcardStartIndex;
                 c.wildcardCount = tc.wildcardCount;
                 cheats.push_back(c);
@@ -330,7 +331,6 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
         out.insert(out.end(), cheat.title, cheat.title + sizeof(cheat.title));
         writeU16BE(out, cheat.codesStartIndex);
         writeU16BE(out, cheat.codesCount);
-        writeU16BE(out, cheat.codeWithWildcardIndex);
         writeU16BE(out, cheat.wildcardStartIndex);
         writeU16BE(out, cheat.wildcardCount);
     }
@@ -338,6 +338,7 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
     for (const auto& code : codes) {
         writeU32BE(out, code.address);
         writeU16BE(out, code.value);
+        out.push_back(code.hasWildcard);
     }
 
     for (const auto& wildcardOption : wildcardOptions) {

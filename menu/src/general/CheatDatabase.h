@@ -27,7 +27,6 @@ struct __attribute__((packed)) Cheat {
     char title[50];
     uint16_t codesStartIndex;
     uint16_t codesCount;
-    uint16_t codeWithWildcardIndex;
     uint16_t wildcardStartIndex;
     uint16_t wildcardCount;
 };
@@ -35,6 +34,9 @@ struct __attribute__((packed)) Cheat {
 struct __attribute__((packed)) CheatCode {
     uint32_t address;
     uint16_t value;
+    // Set when this code's value came from a wildcard ("??" or "????"). Every
+    // flagged code in a cheat takes the chosen option's value in full.
+    uint8_t hasWildcard;
 };
 
 struct CheatDatabase {
@@ -54,7 +56,7 @@ struct CheatDatabase {
     //.  uint16_t wildcardOptionsCount
     //   CheatGroup[groupCount]  { char title[50], u16 cheatStartIndex, u16 cheatCount, u16 groupStartIndex, u16 groupCount }
     //   Cheat[cheatCount]       { char title[50], u16 codesStartIndex, u16 codesCount }
-    //   CheatCode[codeCount]    { u32 address, u16 value }
+    //   CheatCode[codeCount]    { u32 address, u16 value, u8 hasWildcard }
     //   CheatWildcardOption[wildcardOptionsCount] { char title[50], u16 value }
     std::vector<uint8_t> serialize() const;
 
