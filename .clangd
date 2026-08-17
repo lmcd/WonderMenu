@@ -1,0 +1,8 @@
+CompileFlags:
+  Remove:
+    - -march=*
+    - -mtune=*
+    - -mabi=*
+    - -falign-functions=*
+    - -ftrivial-auto-var-init=*
+    - -fno-associative-math

@@ -15,6 +15,12 @@ menu/assets/sd/*/*.z64
 menu/filesystem
 menu/build
 
+# clangd: the compile database holds absolute paths to this machine's checkout
+# and toolchain, so it's regenerated locally rather than shared. `.cache` is
+# clangd's index. `.clangd` itself IS tracked -- it's shared configuration.
+compile_commands.json
+.cache/
+
 # Prerequisites
 *.d
 
