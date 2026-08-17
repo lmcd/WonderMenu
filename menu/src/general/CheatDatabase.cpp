@@ -216,6 +216,30 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             uint32_t address;
             uint16_t value;
 
+            // "88" codes only apply while the GameShark button is held, which
+            // this project has no way to offer. Drop the whole cheat: what's
+            // left of it without its activator wouldn't be the same cheat.
+            if (line.rfind("88", 0) == 0) {
+                TmpCheat& cheat = cheatPool[currentCheatIndex];
+
+                codes.resize(cheat.codesStartIndex);
+
+                if (cheat.wildcardCount > 0) {
+                    wildcardOptions.resize(cheat.wildcardStartIndex);
+                    currentWildcardOptionIndex = wildcardOptions.size();
+                }
+
+                // The cheat is always the most recent thing pushed, both to the
+                // pool and to the group holding it
+                nodes[currentParent()].items.pop_back();
+                cheatPool.pop_back();
+
+                currentCheatIndex = SIZE_MAX;
+                expectingWildcardOptions = false;
+
+                continue;
+            }
+
             // Wildcard values (e.g. "A032DDF9 30??" or "A032DDF9 ????") have
             // their question marks replaced with zeros -> "A032DDF9 3000".
             // The option lines that follow supply the real value.
@@ -254,6 +278,28 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
     }
 
     // ------------------------------------------------------------------
+    // Pass 1b: drop groups left without any cheats. A file whose "GS Button"
+    // group holds nothing but "88" codes would otherwise show as an empty
+    // folder.
+    // ------------------------------------------------------------------
+    std::function<bool(size_t)> pruneEmptyGroups = [&](size_t n) {
+        std::vector<TmpItem> kept;
+
+        for (const TmpItem& item : nodes[n].items) {
+            if (item.isGroup && pruneEmptyGroups(item.ref)) {
+                continue;
+            }
+
+            kept.push_back(item);
+        }
+
+        nodes[n].items = kept;
+
+        return nodes[n].items.empty();
+    };
+    pruneEmptyGroups(rootNode);
+
+    // ------------------------------------------------------------------
     // Pass 2a: assign group indices breadth-first so every node's direct
     // children land in a contiguous range (the layout the traversal needs).
     // ------------------------------------------------------------------
@@ -281,6 +327,10 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             bfs.push(it.ref);
         }
     }
+
+    // Pruned groups leave unreachable nodes behind, so trim the array back to
+    // what the traversal actually reaches
+    groups.resize(nextGroupIdx);
 
     // ------------------------------------------------------------------
     // Pass 2b: emit cheats depth-first in file order, recording each
