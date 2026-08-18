@@ -18,8 +18,13 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
     }
 
     Color color = fillColor;
-    color.a *= finalOpacity;
-
+    
+    if (finalIsBlendedWithMemory)  {
+        color.a *= finalOpacity;
+    }
+    else {
+        color.rgb *= finalOpacity;
+    }
 
     bool needsScissor = !isPendingFullRender;
     Rect scissorRect = currentRect;
@@ -77,27 +82,20 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
     setBlendColor(finalBlendColor);
 
     if (radius > 0) {
-        // When inverted, the corner pieces fill the OUTSIDE of the arc (the small
-        // region between the curve and the square corner) instead of the
-        // quarter-disc. The corner sprites carry their shape purely in alpha
-        // (intensity is a flat 255), so ONLY the alpha is inverted -- RGB stays
-        // PRIM*TEX0, which is just PRIM. The alpha MUL slot has no `1` input, so
-        // the inversion has to ride on the SUB/ADD terms:
-        //   (1, TEX0, PRIM, 0) = PRIM.a*(1-TEX0)   -- keeps opacity, as blended does
-        //   (0, 1, TEX0, 1)    = -TEX0 + 1 = 1-TEX0 -- no PRIM.a, matching the
-        //                        non-blended branch below
-
-            if (isInverted) {
-                setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (1, TEX0, PRIM, 0)));
+        if (isInverted) {
+            setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (1, TEX0, PRIM, 0)));
+        }
+        else {
+            if (finalOpacity == 1.0f) {
+                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (1, 0, TEX0, 0)));
+            }
+            else if (finalIsBlendedWithMemory)  {
+                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (PRIM, 0, TEX0, 0)));
             }
             else {
-                if (finalOpacity == 1.0f) {
-                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (1, 0, TEX0, 0)));
-                }
-                else {
-                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (PRIM, 0, TEX0, 0)));
-                }
+                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, TEX0)));
             }
+        }
 
         rdpq_sync_tile();
         rdpq_sprite_upload(TILE0, sprite, NULL);

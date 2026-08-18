@@ -363,7 +363,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     rButtonColor.rgb *= finalOpacity;
 
     Color barColor = Color(17);
-    barColor.a *= finalOpacity;
+    barColor.rgb *= finalOpacity;
     
     Color blackColor = Color::BLACK;
 
