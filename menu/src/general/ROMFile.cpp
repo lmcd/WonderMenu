@@ -44,7 +44,32 @@ bool ROMFile::hasROMExtension(const char* filename) {
            strcasecmp(ext, ".v64") == 0;
 }
 
-bool ROMFile::readAndValidateROMData(const char* path, size_t numBytes, unsigned char* buffer) {
+bool ROMFile::readROMBytes(const char* path, size_t numBytes, unsigned char* buffer) {
+    #ifdef N64
+    // Opening from the locator captured while the directory was enumerated
+    // costs no disk access, where fopen() has to resolve the path and scan the
+    // directory for the name -- once per ROM, over a library of hundreds.
+    if (hasFileObject()) {
+        FIL file;
+
+        FRESULT result = f_open_obj(&file, &fileObject, FA_READ);
+
+        if (result != FR_OK) {
+            debugf("[ROMFile] Failed to open %s from locator (%i)\n", path, (int)result);
+            return false;
+        }
+
+        this->size = (uint32_t)f_size(&file);
+
+        UINT bytesRead = 0;
+        result = f_read(&file, buffer, (UINT)numBytes, &bytesRead);
+
+        f_close(&file);
+
+        return (result == FR_OK) && (bytesRead == numBytes);
+    }
+    #endif
+
     // Open the ROM file
     FILE* file = fopen(path, "rb");
 
@@ -63,7 +88,11 @@ bool ROMFile::readAndValidateROMData(const char* path, size_t numBytes, unsigned
     size_t bytesRead = fread(buffer, 1, numBytes, file);
     fclose(file);
 
-    if (bytesRead != numBytes) {
+    return bytesRead == numBytes;
+}
+
+bool ROMFile::readAndValidateROMData(const char* path, size_t numBytes, unsigned char* buffer) {
+    if (!readROMBytes(path, numBytes, buffer)) {
         return false;
     }
 

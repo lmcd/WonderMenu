@@ -12,6 +12,7 @@
 
 #ifdef N64
 #include <libdragon.h>
+#include <fatfs/ff.h>
 #else
 #include <arpa/inet.h>
 #endif
@@ -31,6 +32,19 @@ struct ROMFile {
 
     // The file size in bytes
     uint32_t size;
+
+    #ifdef N64
+    /**
+     * Locator for this file's data, captured by `f_readdir_obj()` as the
+     * containing directory was enumerated. Opening from it costs no disk access
+     * at all, where opening by path has to walk and scan every component.
+     * `fs` is null when unset, and the locator only holds while the filesystem
+     * stays mounted.
+     */
+    FFOBJID fileObject = {};
+
+    bool hasFileObject() const { return fileObject.fs != nullptr; }
+    #endif
 
     uint32_t crc1;
     uint32_t crc2;
@@ -68,6 +82,12 @@ struct ROMFile {
      * @return true on success, false on failure
      */
     bool readAndValidateROMData(const char* path, size_t numBytes, unsigned char* buffer);
+
+    /**
+     * Read the first `numBytes` of the file into `buffer`, preferring the
+     * locator over the path when one was captured.
+     */
+    bool readROMBytes(const char* path, size_t numBytes, unsigned char* buffer);
 
     /**
      * Set metadata from ROM header buffer

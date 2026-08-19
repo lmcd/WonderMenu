@@ -8,6 +8,7 @@
 #include <cstring>
 #include <strings.h>
 
+#include "DirectoryScanner.h"
 #include "GameLibrary.h"
 
 CacheResult cache[MAX_NUMBER_OF_FILES] = {0};
@@ -427,7 +428,7 @@ void GameLibrary::loadGames() {
 
     entryIndexMap.reset();
 
-    dir_t entry;
+    DirectoryScanner scanner;
 
     int fileIndex = -1;
     int entryIndex = 0;
@@ -454,7 +455,7 @@ void GameLibrary::loadGames() {
         debugf("[GameLibrary] Reading ROM files in %s\n", scanPath);
 
         // Skip directories that are empty or don't exist
-        if (dir_findfirst(scanPath, &entry) != 0) {
+        if (!scanner.open(scanPath)) {
             debugf("[GameLibrary] No ROM files found in %s\n", scanPath);
             continue;
         }
@@ -462,11 +463,11 @@ void GameLibrary::loadGames() {
         // Process the first entry and continue with the rest
         do {
             // Skip directories
-            if (entry.d_type == DT_DIR) {
+            if (scanner.isDirectory) {
                 continue;
             }
 
-            const char* filename = entry.d_name;
+            const char* filename = scanner.name;
 
             // Skip files without a valid extension (e.g. .z64)
             if (!ROMFile::hasROMExtension(filename)) {
@@ -486,10 +487,15 @@ void GameLibrary::loadGames() {
 
             ROMFile* romFile = new ROMFile(fullPath);
 
+            #ifdef N64
+            // Lets loadHeader() below open the file with no directory lookup
+            romFile->fileObject = scanner.fileObject;
+            #endif
+
             GameDatabase::Entry* databaseEntry = nullptr;
 
             uint32_t hash = GameDatabase::djb2((const unsigned char*)filename, strlen(filename));
-            uint32_t fileSize = entry.d_size;
+            uint32_t fileSize = scanner.size;
 
             // Set the ROM size here so it is populated on the cache-hit path too;
             // loadHeader() (cache-miss only) would otherwise be the sole place it is
@@ -596,7 +602,7 @@ void GameLibrary::loadGames() {
 
                 favouriteGroups.emplace_back(lastGame);
             }
-        } while (dir_findnext(scanPath, &entry) == 0);
+        } while (scanner.next());
     }
 
     // database.releaseEntriesFromMemory();
@@ -653,17 +659,15 @@ void GameLibrary::loadGames() {
 
     debugf("[GameLibrary] Reading M64 files in %s\n", m64sPath);
 
-    int result = dir_findfirst(m64sPath, &entry);
-
     // Only proceed if folder exists
-    if (result == 0) {
+    if (scanner.open(m64sPath)) {
         do {
             // Skip directories
-            if (entry.d_type == DT_DIR) {
+            if (scanner.isDirectory) {
                 continue;
             }
 
-            const char* filename = entry.d_name;
+            const char* filename = scanner.name;
 
             // Skip files without a valid extension (e.g. .m64)
             if (!M64File::hasM64Extension(filename)) {
@@ -690,7 +694,7 @@ void GameLibrary::loadGames() {
                     }
                 }
             }
-        } while (dir_findnext(m64sPath, &entry) == 0);
+        } while (scanner.next());
     }
 
     debugf("[GameLibrary] File count %i\n", fileIndex);
