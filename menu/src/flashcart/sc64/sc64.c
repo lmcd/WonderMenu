@@ -346,13 +346,30 @@ static bool sc64_has_feature (flashcart_features_t feature) {
     }
 }
 
-sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, unsigned int initial_chunk) {
+sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
     FIL fil;
     UINT br;
 
     int32_t t0 = get_ticks();
 
-    if (f_open(&fil, strip_fs_prefix(rom_path), FA_READ) != FR_OK) {
+    // Opening from a locator captured when the directory was enumerated costs
+    // no disk access, where opening by path has to walk and scan every
+    // component. Falls back to the path when there's no usable locator.
+    FRESULT open_result = FR_INVALID_OBJECT;
+
+    if (rom_object != NULL && rom_object->fs != NULL) {
+        open_result = f_open_obj(&fil, rom_object, FA_READ);
+
+        if (open_result != FR_OK) {
+            debugf("[SC64] Locator open failed (%i), falling back to path\n", (int)open_result);
+        }
+    }
+
+    if (open_result != FR_OK) {
+        open_result = f_open(&fil, strip_fs_prefix(rom_path), FA_READ);
+    }
+
+    if (open_result != FR_OK) {
         return (sc64_load_rom_session_t) {};
     }
 

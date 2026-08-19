@@ -40,7 +40,7 @@ typedef struct {
     bool has_loaded_end_chunk;
 } sc64_load_rom_session_t;
 
-sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, unsigned int initial_chunk);
+sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk);
 flashcart_err_t sc64_finish_load_rom_session(sc64_load_rom_session_t* session, flashcart_progress_callback_t *progress);
 flashcart_err_t sc64_load_next_rom_chunk (sc64_load_rom_session_t* session, bool load_beginning_chunks);
 

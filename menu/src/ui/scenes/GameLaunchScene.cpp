@@ -190,7 +190,11 @@ void GameLaunchScene::beginROMLoadSession() {
 
     int initialChunk = 10; //200
 
-    session = sc64_begin_load_rom_session(romFilePath.data(), initialChunk);
+    // The locator was captured when GameLibrary enumerated the directory, so
+    // the ROM opens without a directory lookup
+    const FFOBJID* romObject = game->romFile.hasFileObject() ? &game->romFile.fileObject : nullptr;
+
+    session = sc64_begin_load_rom_session(romFilePath.data(), romObject, initialChunk);
 }
 
 void GameLaunchScene::loadNextROMChunk() {
