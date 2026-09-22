@@ -59,6 +59,12 @@ public:
             return;
         }
 
+        // Rows scrolled off the top or bottom of the display have nothing to
+        // contribute, so skip them rather than clipping every subview
+        if (!finalFrame.intersects(renderInfo.screenRect)) {
+            return;
+        }
+
         for (View* subview : subviews) {
             subview->render(renderInfo);
         }
