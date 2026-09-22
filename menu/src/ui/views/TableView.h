@@ -13,64 +13,10 @@
 #include "animation/Transition.h"
 #include "general/InputRepeater.h"
 #include "ui/View.h"
+#include "ui/views/BaseRowView.h"
 #include "ui/views/SelectedRowView.h"
 #include "ui/views/drawables/BottomShadowView.h"
 #include "ui/views/drawables/RectView.h"
-
-struct BaseRowView : public View {
-    static constexpr int FONT_ID = 3;
-
-    bool lastIsSelected[BUFF_COUNT] = {};
-    bool lastIsDown[BUFF_COUNT] = {};
-    float lastExpandProgress[BUFF_COUNT] = {};
-
-    bool isExpanded = false;
-    bool isSelected = false;
-    bool isDown = false;
-    float expandProgress = 0.0f;
-
-    BaseRowView() = default;
-    BaseRowView(const BaseRowView&) = delete;
-    BaseRowView& operator=(const BaseRowView&) = delete;
-
-    void update(const RenderInfo& renderInfo) {
-        int bufferIndex = renderInfo.bufferIndex;
-
-        if (isSelected != lastIsSelected[bufferIndex]) {
-            for (View* subview : subviews) {
-                static_cast<Drawable*>(subview)->setNeedsDisplay();
-            }
-            
-            lastIsSelected[bufferIndex] = isSelected;
-        }
-
-        if (isDown != lastIsDown[bufferIndex]) {
-            for (View* subview : subviews) {
-                static_cast<Drawable*>(subview)->setNeedsDisplay();
-            }
-            
-            lastIsDown[bufferIndex] = isDown;
-        }
-
-        if (expandProgress != lastExpandProgress[bufferIndex]) {
-            for (View* subview : subviews) {
-                static_cast<Drawable*>(subview)->setNeedsDisplay();
-            }
-            
-            lastExpandProgress[bufferIndex] = expandProgress;
-        }
-    }
-
-    void render(const RenderInfo& renderInfo) {
-        if (finalIsHidden) {
-            return;
-        }
-
-        for (View* subview : subviews) {
-            subview->render(renderInfo);
-        }
-    }
-};
 
 template <std::derived_from<BaseRowView> RV>
 struct TableView : public View {
