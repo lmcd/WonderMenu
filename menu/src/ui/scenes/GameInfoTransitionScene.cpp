@@ -91,17 +91,10 @@ void GameInfoTransitionScene::update(const UpdateInfo& updateInfo) {
 
     transition.advance();
 
-    vi_set_divot(false);
-    vi_set_aa_mode(VI_AA_MODE_NONE);
-
     if (transition.didReachBeginning()) {
         isFinishedCount++;
 
         if (isFinishedCount == BUFF_COUNT) {
-            vi_set_aa_mode(VI_AA_MODE_RESAMPLE_FETCH_ALWAYS);
-            vi_set_dedither(true);
-            vi_set_divot(true);
-
             popScene();
         }
     }
@@ -109,10 +102,6 @@ void GameInfoTransitionScene::update(const UpdateInfo& updateInfo) {
         isFinishedCount++;
 
         if (isFinishedCount == BUFF_COUNT) {
-            vi_set_aa_mode(VI_AA_MODE_RESAMPLE_FETCH_ALWAYS);
-            vi_set_dedither(true);
-            vi_set_divot(true);
-
             pushScene(gameInfoScene);
         }
     }
