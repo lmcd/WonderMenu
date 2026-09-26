@@ -10,6 +10,10 @@
 #include <vector>
 #include <istream>
 
+// A cheat's codes can draw from up to three wildcards, written X, Y and Z (with
+// "?" an alias for X). Each option line supplies one value per wildcard.
+static constexpr size_t MAX_CHEAT_WILDCARDS = 3;
+
 struct __attribute__((packed)) CheatGroup {
     char title[50];
     uint16_t cheatStartIndex;   // span of ALL cheats in sub-tree
@@ -18,9 +22,14 @@ struct __attribute__((packed)) CheatGroup {
     uint16_t groupCount;        // number of direct child groups
 };
 
+// One choice offered for a multiple choice cheat. valueN is the value taken by
+// every code flagged with wildcardIndex N, already merged with the code's own
+// non-wildcard digits.
 struct __attribute__((packed)) CheatWildcardOption {
-    char title[50];
-    uint16_t value;
+    char title[46];
+    uint16_t value1;
+    uint16_t value2;
+    uint16_t value3;
 };
 
 struct __attribute__((packed)) Cheat {
@@ -34,9 +43,10 @@ struct __attribute__((packed)) Cheat {
 struct __attribute__((packed)) CheatCode {
     uint32_t address;
     uint16_t value;
-    // Set when this code's value came from a wildcard ("??" or "????"). Every
-    // flagged code in a cheat takes the chosen option's value in full.
-    uint8_t hasWildcard;
+    // Which wildcard this code's value came from: 1 for X (or "?"), 2 for Y,
+    // 3 for Z, and 0 when the code holds a fixed value. A flagged code takes
+    // the chosen option's matching value.
+    uint8_t wildcardIndex;
 };
 
 struct CheatDatabase {
@@ -55,9 +65,9 @@ struct CheatDatabase {
     //   uint16_t codeCount
     //.  uint16_t wildcardOptionsCount
     //   CheatGroup[groupCount]  { char title[50], u16 cheatStartIndex, u16 cheatCount, u16 groupStartIndex, u16 groupCount }
-    //   Cheat[cheatCount]       { char title[50], u16 codesStartIndex, u16 codesCount }
-    //   CheatCode[codeCount]    { u32 address, u16 value, u8 hasWildcard }
-    //   CheatWildcardOption[wildcardOptionsCount] { char title[50], u16 value }
+    //   Cheat[cheatCount]       { char title[50], u16 codesStartIndex, u16 codesCount, u16 wildcardStartIndex, u16 wildcardCount }
+    //   CheatCode[codeCount]    { u32 address, u16 value, u8 wildcardIndex }
+    //   CheatWildcardOption[wildcardOptionsCount] { char title[46], u16 value1, u16 value2, u16 value3 }
     std::vector<uint8_t> serialize() const;
 
     size_t byteOffset = 0;

@@ -342,11 +342,23 @@ void CheatsScene::enableSelectedCheats() {
 
             uint16_t value = code.value;
 
-            if (multipleChoiceIndex != -1 && code.hasWildcard) {
+            if (multipleChoiceIndex != -1 && code.wildcardIndex > 0) {
                 const CheatWildcardOption& option =
                     cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + multipleChoiceIndex];
 
-                value = option.value;
+                switch (code.wildcardIndex) {
+                case 1:
+                    value = option.value1;
+                    break;
+                case 2:
+                    value = option.value2;
+                    break;
+                case 3:
+                    value = option.value3;
+                    break;
+                default:
+                    break;
+                }
             }
 
             debugf("[CheatsScene] Added cheat code: %08lX %04X\n", (unsigned long)code.address, value);

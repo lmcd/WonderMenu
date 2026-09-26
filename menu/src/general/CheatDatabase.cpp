@@ -104,38 +104,66 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
 
     // Options are collected as they're read and committed when the cheat ends,
     // because a file is free to list them either side of the codes they belong
-    // to and their value depends on the wildcard code's own value.
+    // to and their values depend on the wildcard codes' own values.
+    //
+    // An option line carries one value per wildcard, colon separated in X, Y, Z
+    // order, e.g. "00AB:CC Heart" for a cheat using X and Y.
     struct PendingOption {
-        uint16_t value;
+        uint16_t values[MAX_CHEAT_WILDCARDS];
         std::string title;
     };
 
     std::vector<PendingOption> pendingOptions;
 
-    bool hasWildcardCode = false;
-    // True for a "????" (2 byte) wildcard, false for a "??" (1 byte) one.
-    bool wildcardIsTwoBytes = false;
-    // The wildcard code's value with the question marks zeroed, e.g. 0xAB00 for
-    // "AB??". Option values are substituted into this.
-    uint16_t wildcardBaseValue = 0;
+    // Per-wildcard state for the cheat being parsed, indexed by wildcardIndex-1.
+    struct WildcardState {
+        // Set once a code in this cheat fills this wildcard
+        bool isUsed;
+        // True for a 2 byte wildcard ("XXXX"), false for a 1 byte one ("00XX").
+        bool isTwoBytes;
+        // The wildcard code's value with the placeholders zeroed, e.g. 0xAB00
+        // for "ABXX". Option values are substituted into this.
+        uint16_t baseValue;
+    };
+
+    WildcardState wildcards[MAX_CHEAT_WILDCARDS] = {};
+
+    auto resetWildcards = [&]() {
+        for (WildcardState& wildcard : wildcards) {
+            wildcard = WildcardState{};
+        }
+    };
 
     // Commits the options gathered for the cheat being parsed. Options without
     // a wildcard code to fill have nothing to apply to, so they're discarded.
     auto commitWildcardOptions = [&]() {
+        bool hasWildcardCode = false;
+        for (const WildcardState& wildcard : wildcards) {
+            hasWildcardCode |= wildcard.isUsed;
+        }
+
         if (currentCheatIndex != SIZE_MAX && hasWildcardCode) {
             TmpCheat& cheat = cheatPool[currentCheatIndex];
 
             cheat.wildcardStartIndex = (uint16_t)wildcardOptions.size();
 
             for (const PendingOption& pendingOption : pendingOptions) {
-                CheatWildcardOption option;
+                CheatWildcardOption option{};
                 setTitle(option.title, sizeof(option.title), pendingOption.title);
 
-                // Substitute the option into the code's value: a 2 byte
-                // wildcard replaces it outright, a 1 byte one only its low byte.
-                option.value = wildcardIsTwoBytes
-                    ? pendingOption.value
-                    : (uint16_t)((wildcardBaseValue & 0xFF00) | (pendingOption.value & 0x00FF));
+                uint16_t values[MAX_CHEAT_WILDCARDS];
+
+                for (size_t i = 0; i < MAX_CHEAT_WILDCARDS; i++) {
+                    // Substitute the option into the code's value: a 2 byte
+                    // wildcard replaces it outright, a 1 byte one only its low byte.
+                    values[i] = wildcards[i].isTwoBytes
+                        ? pendingOption.values[i]
+                        : (uint16_t)((wildcards[i].baseValue & 0xFF00) | (pendingOption.values[i] & 0x00FF));
+                }
+
+                option.value1 = values[0];
+                option.value2 = values[1];
+                option.value3 = values[2];
 
                 wildcardOptions.push_back(option);
                 cheat.wildcardCount++;
@@ -143,9 +171,40 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
         }
 
         pendingOptions.clear();
-        hasWildcardCode = false;
-        wildcardIsTwoBytes = false;
-        wildcardBaseValue = 0;
+        resetWildcards();
+    };
+
+    // Reads an option line's leading token — one hex value per wildcard, colon
+    // separated ("00AB:CC") — into outValues. Returns false when the token
+    // isn't one, which is also what tells an option line from a code line: an
+    // address is 8 digits, longer than any value a wildcard can take.
+    auto parseOptionValues = [](const std::string& token, uint16_t* outValues) {
+        size_t count = 0;
+        size_t segmentStart = 0;
+
+        while (true) {
+            size_t colon = token.find(':', segmentStart);
+            size_t segmentEnd = (colon == std::string::npos) ? token.size() : colon;
+            size_t segmentLength = segmentEnd - segmentStart;
+
+            if (segmentLength < 1 || segmentLength > 4 || count >= MAX_CHEAT_WILDCARDS) {
+                return false;
+            }
+
+            std::string segment = token.substr(segmentStart, segmentLength);
+
+            if (segment.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) {
+                return false;
+            }
+
+            outValues[count++] = (uint16_t)strtoul(segment.c_str(), nullptr, 16);
+
+            if (colon == std::string::npos) {
+                return true;
+            }
+
+            segmentStart = colon + 1;
+        }
     };
 
     while (std::getline(stream, line)) {
@@ -158,22 +217,18 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
         }
 
         if (currentCheatIndex != SIZE_MAX) {
-            // Wildcard option line, e.g. "04 Big Boo's Haunt" (1 byte) or
-            // "0104 Big Boo's Haunt" (2 bytes): a hex value, a space, then the
-            // name. Code lines always lead with an 8 digit address, so a token
-            // of 4 hex digits or fewer is what tells the two apart.
+            // Wildcard option line, e.g. "04 Big Boo's Haunt" (a single
+            // wildcard) or "00AB:CC Heart" (one value per wildcard): the hex
+            // values, a space, then the name.
             size_t valueEnd = line.find(' ');
 
-            bool isOptionLine =
-                valueEnd != std::string::npos
-             && valueEnd >= 1
-             && valueEnd <= 4
-             && line.find_first_not_of("0123456789abcdefABCDEF") == valueEnd;
+            PendingOption pendingOption{};
 
-            if (isOptionLine) {
-                uint16_t optionValue = (uint16_t)strtoul(line.substr(0, valueEnd).c_str(), nullptr, 16);
+            if (valueEnd != std::string::npos
+             && parseOptionValues(line.substr(0, valueEnd), pendingOption.values)) {
+                pendingOption.title = line.substr(valueEnd + 1);
 
-                pendingOptions.push_back({optionValue, line.substr(valueEnd + 1)});
+                pendingOptions.push_back(pendingOption);
 
                 continue;
             }
@@ -253,38 +308,65 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
                 currentCheatIndex = SIZE_MAX;
 
                 pendingOptions.clear();
-                hasWildcardCode = false;
+                resetWildcards();
 
                 continue;
             }
 
-            // Wildcard values (e.g. "A032DDF9 30??" or "A032DDF9 ????") have
-            // their question marks replaced with zeros -> "A032DDF9 3000".
-            // The option lines that follow supply the real value.
-            bool isOneByteWildcard = line.ends_with("??");
-            bool isTwoByteWildcard = line.ends_with("????");
+            // Wildcard values name the placeholder they fill — X, Y or Z, with
+            // "?" an alias for X — e.g. "A032DDF9 30XX", "A032DDF9 ????" or
+            // "8103802E 00YY". The placeholders are replaced with zeros ->
+            // "A032DDF9 3000", and the option lines supply the real values.
+            uint8_t wildcardIndex = 0;
 
-            bool isWildcardCode = isTwoByteWildcard || isOneByteWildcard;
+            switch (line.back()) {
+                case '?':
+                case 'X': case 'x': wildcardIndex = 1; break;
+                case 'Y': case 'y': wildcardIndex = 2; break;
+                case 'Z': case 'z': wildcardIndex = 3; break;
+                default: break;
+            }
+
+            size_t markCount = 0;
+
+            if (wildcardIndex != 0) {
+                char markCharacter = line.back();
+
+                while (markCount < line.size() && line[line.size() - 1 - markCount] == markCharacter) {
+                    markCount++;
+                }
+
+                // Only whole bytes can be wildcards: "XX" fills the value's low
+                // byte, "XXXX" the whole of it
+                if (markCount >= 4) {
+                    markCount = 4;
+                } else if (markCount >= 2) {
+                    markCount = 2;
+                } else {
+                    wildcardIndex = 0;
+                }
+            }
+
+            bool isWildcardCode = wildcardIndex != 0;
 
             if (isWildcardCode) {
-                size_t markCount = isTwoByteWildcard ? 4 : 2;
-
-                // Replace question makrs with zeroes.
+                // Replace placeholders with zeroes.
                 line.replace(line.size() - markCount, markCount, markCount, '0');
-
-                // A cheat can have any number of wildcard codes, but they all
-                // share the one list of options
-                hasWildcardCode = true;
-                wildcardIsTwoBytes = isTwoByteWildcard;
             }
 
             // Read `address` and `code` from the line
             if (sscanf(line.c_str(), "%8" SCNx32 " %4" SCNx16, &address, &value) == 2) {
                 if (isWildcardCode) {
-                    wildcardBaseValue = value;
+                    // A cheat can have any number of codes filling the one
+                    // wildcard, and they all take the same option value
+                    WildcardState& wildcard = wildcards[wildcardIndex - 1];
+
+                    wildcard.isUsed = true;
+                    wildcard.isTwoBytes = markCount == 4;
+                    wildcard.baseValue = value;
                 }
 
-                codes.push_back({address, value, (uint8_t)(isWildcardCode ? 1 : 0)});
+                codes.push_back({address, value, wildcardIndex});
                 cheatPool[currentCheatIndex].codesCount++;
             }
         }
@@ -403,12 +485,14 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
     for (const auto& code : codes) {
         writeU32BE(out, code.address);
         writeU16BE(out, code.value);
-        out.push_back(code.hasWildcard);
+        out.push_back(code.wildcardIndex);
     }
 
     for (const auto& wildcardOption : wildcardOptions) {
         out.insert(out.end(), wildcardOption.title, wildcardOption.title + sizeof(wildcardOption.title));
-        writeU16BE(out, wildcardOption.value);
+        writeU16BE(out, wildcardOption.value1);
+        writeU16BE(out, wildcardOption.value2);
+        writeU16BE(out, wildcardOption.value3);
     }
 
     return out;
