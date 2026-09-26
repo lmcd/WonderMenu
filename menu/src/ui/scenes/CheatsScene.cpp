@@ -32,7 +32,7 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
-    labelView.setString("No Cheats Found");
+    labelView.setString(is_memory_expanded() ? "No Cheats Found" : "Expansion Pak Required");
     labelView.textColor = Color(128);
 
     view.addSubview(&tableView);
@@ -148,7 +148,7 @@ void CheatsScene::updateViews(const RenderInfo&) {
     tableView.rowCount = rows.size();
     tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
 
-    bool tableIsHidden = (tableView.rowCount == 0);
+    bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded();
 
     // TODO: have TableView hide itself if there are no rows
     tableView.isHidden = tableIsHidden;

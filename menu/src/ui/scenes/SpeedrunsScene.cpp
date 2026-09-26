@@ -28,6 +28,13 @@ SpeedrunsScene::SpeedrunsScene(Game* game)
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     labelView.textColor = Color(128);
+
+    if (is_memory_expanded()) {
+        labelView.setString(game->supportsSpeedruns() ? "No Speedruns Found" : "Not Supported for this Game");
+    }
+    else {
+        labelView.setString("Expansion Pak Required");
+    }
 }
 
 void SpeedrunsScene::didBeginScene(SceneEntry) {
@@ -63,13 +70,9 @@ void SpeedrunsScene::updateViews(const RenderInfo&) {
     tableView.rowCount = game->m64Files.size();
     tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
 
-    bool tableIsHidden = (tableView.rowCount == 0);
+    bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded();
 
     tableView.isHidden = tableIsHidden;
-
-    if (tableIsHidden) {
-        labelView.setString(game->supportsSpeedruns() ? "No Speedruns Found" : "Not Supported for this Game");
-    }
 
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;
