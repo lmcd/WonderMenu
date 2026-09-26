@@ -39,6 +39,13 @@ void ListTransitionScene::didBeginScene(SceneEntry entry) {
     view.addSubview(&listScene->view);
 }
 
+void ListTransitionScene::didEndScene() {
+    for (int i = 0; i < MAX_VISIBLE_LIST_ITEMS; i++) {
+        float maxOpacity = listScene->opacityForRow(i);
+        listScene->tableView.rowViews[i].opacity = maxOpacity;
+    }
+}
+
 void ListTransitionScene::updateViews(const RenderInfo& renderInfo) {
     for (int i = 0; i < MAX_VISIBLE_LIST_ITEMS; i++) {
         float maxOpacity = listScene->opacityForRow(i);

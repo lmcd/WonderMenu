@@ -36,6 +36,7 @@ public:
     ListTransitionScene(IntroScene* IntroScene, ListScene* listScene);
 
     void didBeginScene(SceneEntry entry);
+    void didEndScene();
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };
