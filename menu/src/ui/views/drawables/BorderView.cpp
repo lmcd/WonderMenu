@@ -7,10 +7,6 @@
 
 #include "BorderView.h"
 
-void BorderView::update(const RenderInfo& renderInfo) {
-    Drawable::update(renderInfo);
-}
-
 void BorderView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 

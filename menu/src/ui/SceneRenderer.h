@@ -23,14 +23,14 @@ private:
     BaseView rootView;
 
     /*
-     * Scenes waiting to be freed
+     * Scenes waiting to be freed.
      */
     std::vector<Scene*> garbageScenes;
     
     bool hasEnded;
 
     /*
-     * Global, incrementing frame number
+     * Global, incrementing frame number.
      */
     int frameNumber;
 
@@ -49,9 +49,12 @@ private:
 
     int horizontalOverscan = 7;
 
-    // Destruct/free scenes that have been removed and are pending deletion
-    // Scenes owned by the renderer aren't immediately free'd on removal,
-    // as they need a few frames to properly clear from all the framebuffers first
+    /*
+     * Destruct/free scenes that have been removed and are pending deletion.
+     * Scenes owned by the renderer aren't immediately free'd on removal,
+     * as they need a few frames to properly clear from all the framebuffers
+     * first.
+     */
     void collectGarbageScenes();
 
 public:

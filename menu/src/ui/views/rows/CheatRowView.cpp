@@ -13,6 +13,7 @@ CheatRowView::CheatRowView() {
     subtitleView.maxWidth = 350;
     subtitleView.fontID = FONT_ID;
     subtitleView.align = ALIGN_RIGHT;
+    subtitleView.alternateColor = Color(2, 163, 238);
 
     addSubview(&checkboxView);
     addSubview(&chevronView);
@@ -56,7 +57,6 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
 
     subtitleView.frame.origin = subtitlePosition;
     subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor;
-    subtitleView.alternateColor = Color(2, 163, 238);
 
     checkboxView.frame.origin = checkboxPosition;
     checkboxView.isOn = isChecked;
