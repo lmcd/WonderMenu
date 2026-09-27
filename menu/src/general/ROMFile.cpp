@@ -209,16 +209,3 @@ bool ROMFile::loadHeader() {
 
     return true;
 }
-
-bool ROMFile::loadIPL3(unsigned char* buffer) {
-    // IPL3 is at offset 0x40, size 0xFC0 (4032 bytes)
-    // Read the full 0x1000 bytes so readAndValidateROMData can check the header
-    static unsigned char ipl3ReadBuffer[0x1000];
-
-    if (!readAndValidateROMData(path.c_str(), 0x1000, ipl3ReadBuffer)) {
-        return false;
-    }
-
-    memcpy(buffer, &ipl3ReadBuffer[0x40], 0xFC0);
-    return true;
-}

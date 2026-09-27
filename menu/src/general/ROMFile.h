@@ -112,5 +112,4 @@ struct ROMFile {
     std::string gameCode() const;
 
     bool loadHeader();
-    bool loadIPL3(unsigned char* buffer);
 };
