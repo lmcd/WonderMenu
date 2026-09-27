@@ -153,6 +153,42 @@ std::string ROMFile::project64Key() const {
 }
 #endif
 
+boot_tv_type_t ROMFile::tvType() {
+    switch (regionCode) {
+        case RegionCode::NORTH_AMERICA:
+        case RegionCode::JAPAN:
+        case RegionCode::ALL:
+        case RegionCode::GATEWAY_64_NTSC:
+            return BOOT_TV_TYPE_NTSC;
+        
+        case RegionCode::BRAZIL:
+            return BOOT_TV_TYPE_MPAL;
+        
+        case RegionCode::GERMANY:
+        case RegionCode::FRANCE:
+        case RegionCode::NETHERLANDS:
+        case RegionCode::ITALY:
+        case RegionCode::SPAIN:
+        case RegionCode::AUSTRALIA:
+        case RegionCode::SCANDINAVIA:
+        case RegionCode::GATEWAY_64_PAL:
+        case RegionCode::EUROPE:
+        // FIXME: There might be some interesting errors with OTHER_X and OTHER_Y (e.g. TGR Asia).
+        // But they are mainly PAL regions.
+        case RegionCode::EUROPE_X:
+        case RegionCode::EUROPE_Y:
+            return BOOT_TV_TYPE_PAL;
+        
+        // FIXME: We cannot be sure on these markets, so just return the default for the moment!
+        case RegionCode::CHINA:
+        case RegionCode::CANADA:
+        case RegionCode::KOREA:
+        case RegionCode::EUROPE_Z:
+        default:
+            return BOOT_TV_TYPE_PASSTHROUGH;
+    }
+}
+
 std::string ROMFile::gameCode() const {
     return {
         (char)categoryCode,

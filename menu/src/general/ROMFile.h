@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #endif
 
+#include "boot/boot.h"
 #include "Region.h"
 
 /**
@@ -101,6 +102,8 @@ struct ROMFile {
      */
     std::string project64Key() const;
     #endif
+
+    boot_tv_type_t tvType();
 
     /**
      * Returns the 4-character game code (e.g. "NBKP") combining

@@ -139,7 +139,7 @@ cheatLimitReached:
 
         boot_params.cheat_list = cheatList;
         boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
-        boot_params.tv_type = BOOT_TV_TYPE_PASSTHROUGH;
+        boot_params.tv_type = game->romFile.tvType();
         boot_params.detect_cic_seed = true;
 
         // Boot into the selected game.
