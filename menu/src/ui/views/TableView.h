@@ -113,6 +113,10 @@ struct TableView : public View {
     bool handleInputs(const UpdateInfo& updateInfo) {
         joypad_inputs_t joypad = updateInfo.joypad;
 
+        if (isHidden || rowCount == 0) {
+            return false;
+        }
+
         int slowScrollAmount1 = slowScrollRepeater1.update(joypad);
         int slowScrollAmount2 = slowScrollRepeater2.update(joypad);
         int fastScrollAmount  = fastScrollRepeater.update(joypad);
