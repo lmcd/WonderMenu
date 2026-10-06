@@ -74,7 +74,7 @@ MENU_RELEASE_ROM  = menu/WonderMenu-release.z64
 deploy: release
 	@command -v $(SC64DEPLOYER) >/dev/null || { echo "deploy: $(SC64DEPLOYER) not found in PATH"; exit 1; }
 	@echo "    [SC64] upload $(MENU_RELEASE_ROM)"
-	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_RELEASE_ROM)"
+	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_RELEASE_ROM)" --direct
 	$(SC64DEPLOYER) debug
 .PHONY: deploy
 
