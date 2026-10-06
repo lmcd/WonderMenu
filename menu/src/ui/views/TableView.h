@@ -167,8 +167,15 @@ struct TableView : public View {
         selectedRowView.fillColor = selectionColor;
         selectedRowView.selectedRowIndex = selectedSlot;
         selectedRowView.isDown = isADown;
-        selectedRowView.backgroundColor = drawsBackground ? DEFAULT_BACKGROUND_COLOR : Color::CLEAR;
         selectedRowView.expandProgress = expandTransition.progress;
+
+        // TODO: this is a hack for now to address compositing issues
+        if (isHidden) {
+            selectedRowView.backgroundColor = Color::BLACK;
+        }
+        else {
+            selectedRowView.backgroundColor = drawsBackground ? DEFAULT_BACKGROUND_COLOR : Color::CLEAR;
+        }
 
         for (int i = 0; i < 20; i++) {
             RV& rowView = rowViews[i];
