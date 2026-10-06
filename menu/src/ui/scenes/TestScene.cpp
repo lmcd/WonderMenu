@@ -16,53 +16,6 @@
 // Keeping the offset in one place lets the sprite be freed from its own pointer.
 static constexpr size_t SPRITE_HEADER_OFFSET = (64 - (sizeof(sprite_t) % 64)) % 64;
 
-sprite_t* TestScene::createScaledSprite(const surface_t* source, int width) {
-    if (source == nullptr) {
-        return nullptr;
-    }
-
-    // Keep the source aspect ratio (320x224 -> 160x112, 80x56, 40x28).
-    int height = (int)roundf((float)source->height * width / source->width);
-
-    int stride = width * 2;   // RGBA16: 2 bytes per pixel
-    int size   = stride * height;
-
-    void* allocation = memalign(64, SPRITE_HEADER_OFFSET + sizeof(sprite_t) + size);
-    sprite_t* sprite = (sprite_t*)((uint8_t*)allocation + SPRITE_HEADER_OFFSET);
-
-    memset(sprite, 0, sizeof(sprite_t));
-    sprite->width   = width;
-    sprite->height  = height;
-    sprite->flags   = FMT_RGBA16 & SPRITE_FLAGS_TEXFORMAT;
-    sprite->hslices = 1;
-    sprite->vslices = 1;
-
-    // Surface backed by the sprite's own pixels, so rendering into the surface
-    // fills the sprite directly -- no intermediate buffer or copy.
-    surface_t target = surface_make(sprite->data, FMT_RGBA16, width, height, stride);
-
-    rdpq_blitparms_t params = {};
-    params.scale_x = (float)width  / source->width;
-    params.scale_y = (float)height / source->height;
-    // Tells rdpq to compensate for filtering artifacts when it splits a wide
-    // source into TMEM-sized chunks.
-    params.filtering = true;
-
-    rdpq_attach_clear(&target, NULL);
-        rdpq_set_mode_standard();
-        rdpq_mode_filter(FILTER_BILINEAR);
-        rdpq_tex_blit(source, 0, 0, &params);
-    rdpq_detach();
-
-    return sprite;
-}
-
-void TestScene::freeScaledSprite(sprite_t* sprite) {
-    if (sprite != nullptr) {
-        free((uint8_t*)sprite - SPRITE_HEADER_OFFSET);
-    }
-}
-
 TestScene::TestScene()
     : Scene() {
 
