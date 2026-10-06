@@ -11,9 +11,11 @@
 namespace Fonts {
     constexpr int INTERDISPLAY_MEDIUM_14          = 7;
     constexpr int INTERDISPLAY_BOLD_14            = 8;
+    constexpr int INTERDISPLAY_BOLD_12            = 9;
     constexpr int INTERDISPLAY_SEMIBOLD_12        = 6;
     constexpr int INTERDISPLAY_SEMIBOLD_15        = 3;
     constexpr int INTERDISPLAY_DIGITS_SEMIBOLD_15 = 5;
+    constexpr int INTERDISPLAY_DIGITS_SEMIBOLD_12 = 10;
     constexpr int UNBOUNDED_BLACK_14              = 4;
     constexpr int UNBOUNDED95_BLACK_16            = 2;
 
@@ -34,8 +36,10 @@ namespace Fonts {
     inline void loadAll() {
         load(INTERDISPLAY_MEDIUM_14,          "InterDisplay-Medium", 14);
         load(INTERDISPLAY_BOLD_14,            "InterDisplay-Bold", 14);
+        load(INTERDISPLAY_BOLD_12,            "InterDisplay-Bold", 12);
         load(INTERDISPLAY_SEMIBOLD_12,        "InterDisplay-SemiBold", 12);
         load(INTERDISPLAY_SEMIBOLD_15,        "InterDisplay-SemiBold", 15);
+        load(INTERDISPLAY_DIGITS_SEMIBOLD_12, "InterDisplay-SemiBold-digits", 12);
         load(INTERDISPLAY_DIGITS_SEMIBOLD_15, "InterDisplay-SemiBold-digits", 15);
         load(UNBOUNDED_BLACK_14,              "Unbounded-Black", 14);
         load(UNBOUNDED95_BLACK_16,            "Unbounded-Black95", 16);
