@@ -101,7 +101,7 @@ void ListScene::preloadVisibleCartLabels() {
 
         Game* game = gameGroups->at(i).preferredGame();
 
-        cartRenderer->prerender2DCart(cartScale, game);
+        cartRenderer->preloadLabel(cartScale, game);
 
         dma_wait();
     }
@@ -183,13 +183,8 @@ void ListScene::update(const UpdateInfo& updateInfo) {
 
         Game* game = gameGroups->at(i).preferredGame();
 
-        if (game->cartLabel == nullptr || game->cartLabel->status == CartLabel::LABEL_PURGABLE) {
-            int loadedTileCount = cartRenderer->prerender2DCart(cartScale, game);
-            
-            totalLoadedTileCount += loadedTileCount;
-
-            // debugf("Loaded %i: %i %i %s\n", frameNumber, game->cartLabel->cacheIndex, loadedTileCount, game->databaseEntry->title);
-        }
+        int loadedTileCount = cartRenderer->preloadLabel(cartScale, game);
+        totalLoadedTileCount += loadedTileCount;
     }
 
     for (int i : purgableRange) {
@@ -201,11 +196,7 @@ void ListScene::update(const UpdateInfo& updateInfo) {
             continue;
         }
         else {
-            Game* game = gameGroups->at(i).preferredGame();
-
-            if (game->cartLabel != nullptr) {
-                game->cartLabel->status = CartLabel::LABEL_PURGABLE;
-            }
+            cartRenderer->freeLabelForGame(gameGroups->at(i).preferredGame());
         }
     }
 
@@ -223,9 +214,9 @@ void ListScene::update(const UpdateInfo& updateInfo) {
     else if (slowScrollRepeater2.isEngaged) {
         moveSelectionBy(slowScrollAmount2);
     }
-    // else if (btn.d_up) {
-    //     toggleRetailGroupings();
-    // }
+    else if (btn.d_left) {
+        toggleRetailGroupings();
+    }
     else if (btn.z) {
         toggleFavourite();
     }
@@ -365,6 +356,7 @@ void ListScene::setScrollPosition(int _scrollPosition) {
 
 void ListScene::setCurrentTab(Tab _currentTab) {
     tabScrollPositions[currentTab] = scrollPosition;
+    tabControlView.selectedSegment = (int)_currentTab;
 
     currentTab = _currentTab;
     
@@ -396,9 +388,9 @@ void ListScene::setCurrentTab(Tab _currentTab) {
     preloadVisibleCartLabels();
 }
 
-void ListScene::performSelection() {
+GameLaunchScene* ListScene::performSelection(bool animated) {
     if (gameGroups->size() == 0) {
-        return;
+        return nullptr;
     }
     
     // Reference the stored group, not a stack-local copy: the popover keeps the
@@ -413,10 +405,10 @@ void ListScene::performSelection() {
         game = result.value;
 
         if (game == nullptr) {
-            return;
+            return nullptr;
         }
 
-        cartRenderer->prerender2DCart(cartScale, game);
+        cartRenderer->preloadLabel(cartScale, game);
 
         dma_wait();
     }
@@ -424,10 +416,16 @@ void ListScene::performSelection() {
         game = gameGroup.preferredGame();
     }
 
-    GameLaunchScene* gameLaunchScene = new GameLaunchScene(game, cartRenderer, database);
+    GameLaunchScene* gameLaunchScene = new GameLaunchScene(*game, cartRenderer, *database);
     SelectionTransitionScene* transitionScene = new SelectionTransitionScene(this, gameLaunchScene);
 
     pushScene(transitionScene);
+
+    if (!animated) {
+        pushScene(gameLaunchScene);
+    }
+
+    return gameLaunchScene;
 }
 
 void ListScene::toggleRetailGroupings() {

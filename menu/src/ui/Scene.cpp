@@ -11,6 +11,19 @@
 Scene::Scene() {}
 
 Scene::~Scene() {
+    if (childScene != nullptr) {
+        childScene->view.removeFromSuperview();
+
+        if (renderer != nullptr) {
+            removeChildScene(childScene);
+        }
+        else {
+            delete childScene;
+
+            childScene = nullptr;
+        }
+    }
+
     debugf("[%s] Destruct\n", capturedName);
 }
 
@@ -46,6 +59,8 @@ void Scene::addChildScene(Scene* childScene) {
     childScene->setSceneRenderer(renderer);
 
     this->childScene = childScene;
+
+    childScene->didBeginScene(SCENE_PUSH);
 }
 
 void Scene::removeChildScene(Scene* childScene) {

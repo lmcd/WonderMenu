@@ -4,9 +4,12 @@
 */
 
 #include "LabelLoader.h"
+#include "Game.h"
+
+#include <algorithm>
 
 static Game* currentLargeLabelGame;
-static int currentLargeLabelChunkCount = 0;
+static int currentLargeLabelTileCount = 0;
 
 LabelLoader::LabelLoader(GameDatabase& database)
     : database(database) {
@@ -26,7 +29,6 @@ int LabelLoader::firstAvailableIndex() {
 
     for (int i = 0; i < LABEL_CACHE_MAX_S_ENTRIES; i++) {
         if (entries[i].status == CartLabel::LABEL_PURGABLE) {
-            // debugf("Reusing purgable\n");
             return i;
         }
     }
@@ -50,14 +52,12 @@ void LabelLoader::freeAll() {
     }
 }
 
-LoadResult LabelLoader::getSmallLabelDataForGame(Game* game, int _tileCount, bool isPreloading) {
+LoadResult LabelLoader::loadSmallLabelDataForGame(Game* game, int _tileCount, bool isPreloading) {
     assertf(_tileCount % DB_LABEL_TILES_PER_CHUNK == 0, "'tileCount' must be a multiple of %i", DB_LABEL_TILES_PER_CHUNK);
     assertf(_tileCount <= DB_S_LABEL_TILE_COUNT, "'tileCount' is greater than %i", DB_S_LABEL_TILE_COUNT);
     assertf(_tileCount != 0, "'tileCount' was 0");
 
-    int maximumTileCount = std::min(_tileCount, DB_S_LABEL_TILE_COUNT);
-
-    int tileCount = maximumTileCount;
+    int tileCount = _tileCount;
     int tileOffset = 0;
 
     CartLabel* cartLabel = game->cartLabel;
@@ -83,12 +83,8 @@ LoadResult LabelLoader::getSmallLabelDataForGame(Game* game, int _tileCount, boo
                     return LoadResult(0, cartLabel->data);
 
                 case CartLabel::LABEL_PARTIAL:
-                    tileCount = DB_S_LABEL_TILE_COUNT - cartLabel->currentChunkCount;
-                    tileOffset = cartLabel->currentChunkCount;
-
-                    // debugf("Found partial CartLabel\n");
-                    // debugf("tileCount: %i\n", tileCount);
-                    // debugf("tileOffset: %i\n", tileOffset);
+                    tileCount = DB_S_LABEL_TILE_COUNT - cartLabel->currentTileCount;
+                    tileOffset = cartLabel->currentTileCount;
 
                     break;
             }
@@ -125,15 +121,9 @@ LoadResult LabelLoader::getSmallLabelDataForGame(Game* game, int _tileCount, boo
     int bufferOffset = DB_S_LABEL_SIZE * cacheIndex;
     char* startBuffer = &smallLabelBuffer[bufferOffset];
 
-    // bufferOffset += (tileOffset / DB_LABEL_TILES_PER_CHUNK) * DB_LABEL_CHUNK_SIZE;
-
     char* currentBuffer = &smallLabelBuffer[bufferOffset];
 
     int chunksToRead = tileCount / DB_LABEL_TILES_PER_CHUNK;
-
-    // debugf("-cacheIndex %i\n", cacheIndex);
-    // debugf("-chunksToRead %i\n", chunksToRead);
-    // debugf("-bufferOffset %i\n", bufferOffset);
 
     for (int i = 0; i < chunksToRead; i++) {
         int tilesToRead = DB_LABEL_TILES_PER_CHUNK;
@@ -145,18 +135,7 @@ LoadResult LabelLoader::getSmallLabelDataForGame(Game* game, int _tileCount, boo
             break;
         }
 
-        // debugf("---chunk %i\n", i);
-        // debugf("---bufferOffset %i\n", bufferOffset);
-        // debugf("---tileOffset %i\n", tileOffset);
-        // debugf("---tilesToRead %i\n", tilesToRead);
-
-        // debugf("------------------\n");
-
         tileOffset += DB_LABEL_TILES_PER_CHUNK;
-
-        if (tileOffset == maximumTileCount) {
-            break;
-        }
     }
 
     cartLabel->game = game;
@@ -170,45 +149,51 @@ LoadResult LabelLoader::getSmallLabelDataForGame(Game* game, int _tileCount, boo
         cartLabel->status = CartLabel::LABEL_PARTIAL;
     }
 
-    cartLabel->currentChunkCount = tileOffset;
+    cartLabel->currentTileCount = tileOffset;
 
     game->cartLabel = cartLabel;
 
     return LoadResult(tileCount, startBuffer);
 }
 
-LoadResult LabelLoader::getLargeLabelDataForGame(Game* game, bool loadIncrementally) {
-    int maximumChunkCount = DB_L_LABEL_TILE_COUNT;
+LoadResult LabelLoader::loadLargeLabelDataForGame(Game* game, int _tileCount) {
+    assertf(_tileCount % DB_LABEL_TILES_PER_CHUNK == 0, "'tileCount' must be a multiple of %i", DB_LABEL_TILES_PER_CHUNK);
+    assertf(_tileCount <= DB_L_LABEL_TILE_COUNT, "'tileCount' is greater than %i", DB_L_LABEL_TILE_COUNT);
+    assertf(_tileCount != 0, "'tileCount' was 0");
+    
+    int maximumTileCount = DB_L_LABEL_TILE_COUNT;
 
-    if (game == currentLargeLabelGame && currentLargeLabelChunkCount == maximumChunkCount) {
+    if (game == currentLargeLabelGame && currentLargeLabelTileCount == maximumTileCount) {
         return LoadResult(0, (char*)largeLabelBuffer);
     }
 
     if (game != currentLargeLabelGame) {
-        currentLargeLabelChunkCount = 0;
+        currentLargeLabelTileCount = 0;
     }
 
-    int chunkCount;
-    int chunkOffset;
+    int tileOffset = currentLargeLabelTileCount;
 
-    if (loadIncrementally) {
-        chunkCount = DB_LABEL_TILES_PER_CHUNK;
-        chunkOffset = currentLargeLabelChunkCount;
+    // Picks up where a partial load left off, so only what is still missing is
+    // read: asking for the full count on top of a partial load would otherwise
+    // write past the end of `largeLabelBuffer`
+    int tilesToRead = std::min(_tileCount, maximumTileCount - tileOffset);
+    int chunksToRead = tilesToRead / DB_LABEL_TILES_PER_CHUNK;
+    int loadedTileCount = 0;
+
+    for (int i = 0; i < chunksToRead; i++) {
+        int tileCount = DB_LABEL_TILES_PER_CHUNK;
+        bool result = database.loadCartLabelChunk(game->databaseEntry, true, (char*)largeLabelBuffer, tileOffset, tileCount);
+        
+        if (!result) {
+            return LoadResult(0, nullptr);
+        }
+
+        loadedTileCount += tileCount;
+        tileOffset += tileCount;
     }
-    else {
-        chunkCount = maximumChunkCount - currentLargeLabelChunkCount;
-        chunkOffset = currentLargeLabelChunkCount;
-    }
 
-    currentLargeLabelChunkCount += chunkCount;
-
-    bool result = database.loadCartLabelChunk(game->databaseEntry, true, (char*)largeLabelBuffer, chunkOffset, chunkCount);
-    
-    if (!result) {
-        return LoadResult(0, nullptr);
-    }
-
+    currentLargeLabelTileCount += loadedTileCount;
     currentLargeLabelGame = game;
 
-    return LoadResult(chunkCount, (char*)largeLabelBuffer);
+    return LoadResult(loadedTileCount, (char*)largeLabelBuffer);
 }

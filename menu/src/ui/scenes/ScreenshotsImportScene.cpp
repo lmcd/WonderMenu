@@ -5,8 +5,6 @@
 
 #include <algorithm>
 #include <ctype.h>
-#include <math.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <strings.h>
 
@@ -15,7 +13,7 @@
 #include "ui/scenes/ScreenshotsImportScene.h"
 #include "utils/fs.h"
 
-ScreenshotsImportScene::ScreenshotsImportScene(IntroScene* introScene, Game* lastLaunchedGame, int count, ScreenshotsSDRAMReader* reader)
+ScreenshotsImportScene::ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, int count, ScreenshotsSDRAMReader& reader)
     : Scene(),
     introScene(introScene),
     lastLaunchedGame(lastLaunchedGame),
@@ -23,7 +21,7 @@ ScreenshotsImportScene::ScreenshotsImportScene(IntroScene* introScene, Game* las
     reader(reader) {
 
     ownedByRenderer = true;
-    directoryPath = "sd:/screenshots/" + lastLaunchedGame->directoryName();
+    directoryPath = "sd:/screenshots/" + lastLaunchedGame.directoryName();
 }
 
 ScreenshotsImportScene::~ScreenshotsImportScene() {
@@ -34,7 +32,7 @@ ScreenshotsImportScene::~ScreenshotsImportScene() {
     thumbnailWriter.close();
     closeScreenshotDir();
 
-    delete reader;
+    delete &reader;
 }
 
 // A single path component, relative to screenshotDir -- f_open_in_dir() rejects
@@ -78,9 +76,6 @@ void ScreenshotsImportScene::closeScreenshotDir() {
     }
 }
 
-// Screenshots accumulate across sessions, so numbering has to continue past
-// whatever is already on the card rather than overwriting from 0. Scans for
-// "<n>.SPR" and its "<n>T.SPR" thumbnail and returns one past the highest n.
 int ScreenshotsImportScene::nextScreenshotIndex() {
     dir_t entry;
 
@@ -149,7 +144,7 @@ void ScreenshotsImportScene::beginThumbnailWrite() {
 }
 
 void ScreenshotsImportScene::didBeginScene(SceneEntry) {
-    view.addSubview(&introScene->view);
+    view.addSubview(&introScene.view);
 
     view.addSubview(&screenshotThumbnailView);
     view.addSubview(&lineView);
@@ -191,7 +186,7 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     lineView.frame = Rect(linePositionX, screenshotThumbnailView.frame.maxY(), 1, 10);
     lineView.fillColor = Color::WHITE;
 
-    introScene->updateViews(renderInfo);
+    introScene.updateViews(renderInfo);
 }
 
 void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
@@ -237,7 +232,7 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    sprite_t* screenshotSprite = reader->nextSprite();
+    sprite_t* screenshotSprite = reader.nextSprite();
 
     // A stale or corrupt header on the cart is the only way this fails, and
     // there's no way to find the following records without it.
@@ -246,19 +241,19 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    screenshotThumbnailView.setFullSizeScreenshotSurface(reader->surfaceForSprite(screenshotSprite));
+    screenshotThumbnailView.setFullSizeScreenshotSurface(reader.surfaceForSprite(screenshotSprite));
 
     screenshotWriter.begin(
         &screenshotDir,
         filenameForScreenshot(currentScreenshotIndex, false),
-        (const void*)(uintptr_t)reader->recordOffset,
-        reader->recordSize,
+        (const void*)(uintptr_t)reader.recordOffset,
+        reader.recordSize,
         KiB(40)
     );
 
     // Held for beginThumbnailWrite(), which reuses this record once the
     // screenshot above has finished streaming out.
-    screenshotRecordOffset = reader->recordOffset;
+    screenshotRecordOffset = reader.recordOffset;
     writingScreenshotIndex = currentScreenshotIndex;
 
     currentScreenshotIndex++;

@@ -5,8 +5,11 @@
 
 #pragma once
 
+#include <ranges>
+
+#include "general/GameDatabase.h"
 #include "ui/View.h"
-#include "ui/views/TableView.h"
+#include "ui/views/BaseRowView.h"
 #include "ui/views/drawables/Cart2DView.h"
 #include "ui/views/drawables/FlagView.h"
 #include "ui/views/drawables/LabelReferenceView.h"
@@ -45,8 +48,8 @@ public:
     }
 
     Cart2DView cart2DView;
-    LabelReferenceView<50> titleView;
-    LabelReferenceView<50> subtitleView;
+    LabelReferenceView<DB_ENTRY_TITLE_LENGTH> titleView;
+    LabelReferenceView<DB_ENTRY_DEVELOPER_LENGTH> subtitleView;
     LabelView<6> versionNumberView;
     NumberView numberView;
     StarView starView;

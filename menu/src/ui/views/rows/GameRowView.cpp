@@ -47,6 +47,13 @@ void GameRowView::update(const RenderInfo&) {
     titleView.frame.origin = labelPosition;
     titleView.maxWidth = maxLabelWidth;
 
+    if (isSelected) {
+        titleView.startAnimating();
+    }
+    else {
+        titleView.stopAnimating();
+    }
+
     labelPosition.y += 20;
 
     subtitleView.frame.origin = labelPosition;
@@ -104,7 +111,7 @@ void GameRowView::update(const RenderInfo&) {
             uint8_t version = game->version();
 
             if (version > 1) {
-                versionNumberView.setString("%s", game->versionString());
+                versionNumberView.setString("%s", game->versionString().c_str());
                 versionNumberView.isHidden = false;
             }
             else {

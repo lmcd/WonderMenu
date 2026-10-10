@@ -8,7 +8,7 @@
 #include <string>
 
 #include "ui/View.h"
-#include "ui/views/TableView.h"
+#include "ui/views/BaseRowView.h"
 #include "ui/views/drawables/CheckboxView.h"
 #include "ui/views/drawables/LabelView.h"
 

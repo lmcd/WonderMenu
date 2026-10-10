@@ -11,7 +11,8 @@
 struct Transition {
     enum Direction {
         FORWARDS,
-        BACKWARDS
+        BACKWARDS,
+        IDLE
     };
 
     float progress = 0.0;
@@ -22,8 +23,11 @@ struct Transition {
         if (direction == FORWARDS) {
             return +1.0;
         }
-        else {
+        else if (direction == BACKWARDS) {
             return -1.0;
+        }
+        else {
+            return 0.0;
         }
     }
 

@@ -7,10 +7,9 @@
 
 #include <libdragon.h>
 
-#include "ui/popovers/AlertPopover.h"
 #include "ui/Scene.h"
 #include "ui/views/ScreenshotThumbnailView.h"
-#include "ui/views/drawables/MaskedImageView.h"
+#include "ui/views/drawables/LabelView.h"
 #include "ui/views/drawables/RectView.h"
 
 class TestScene : public Scene {
@@ -19,14 +18,13 @@ private:
     sprite_t* mario2Sprite = nullptr;
     sprite_t* mario3Sprite = nullptr;
 
+    LabelView<40> labelView;
+
     ScreenshotThumbnailView imageView1;
     ScreenshotThumbnailView imageView2;
     ScreenshotThumbnailView imageView3;
 
     RectView rectView;
-
-    static sprite_t* createScaledSprite(const surface_t* source, int width);
-    static void freeScaledSprite(sprite_t* sprite);
 
     float transitionProgress = 0.0;
     float transitionSpeed = 0.05f;

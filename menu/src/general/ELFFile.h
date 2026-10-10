@@ -2,6 +2,7 @@
 * @copyright 2026 - Lee McDermott
 * @license AGPLv3
 */
+
 #pragma once
 
 #include <libdragon.h>

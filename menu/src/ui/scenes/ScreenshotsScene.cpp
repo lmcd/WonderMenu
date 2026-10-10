@@ -3,13 +3,11 @@
 * @license AGPLv3
 */
 
-#include "ScreenshotsScene.h"
-
 #include <filesystem>
 #include <algorithm>
 #include <cstring>
 
-#include "main.h"
+#include "ScreenshotsScene.h"
 #include "general/Game.h"
 #include "ui/views/ScrollbarView.h"
 
@@ -38,6 +36,15 @@ void ScreenshotsScene::loadSprites() {
         return;
     }
 
+    // TEST: load bundled sprites from the ROM instead of the SD card
+    if (true) {
+        screenshotSprites[0] = sprite_load("rom:/ui/mario1.RGBA16.sprite");
+        screenshotSprites[1] = sprite_load("rom:/ui/mario2.RGBA16.sprite");
+        screenshotSprites[2] = sprite_load("rom:/ui/mario3.RGBA16.sprite");
+
+        return;
+    }
+
     for (int i = 0; i < SCREENSHOT_COUNT; i++) {
         char path[32];
         snprintf(path, sizeof(path), "sd:/screenshots/%s/%iT.SPR", game->directoryName().c_str(), i);
@@ -61,6 +68,12 @@ void ScreenshotsScene::didBeginScene(SceneEntry) {
 
 void ScreenshotsScene::updateViews(const RenderInfo&) {
     labelView.maxWidth = view.frame.size.width;
+
+    if (!labelView.isHidden) {
+        // This is a hack for a compositing issue (cart drawing over text)
+        // TODO: fix
+        labelView.setNeedsDisplay();
+    }
 
     bool hasScreenshots = (screenshotSprites[0] != nullptr);
 
@@ -92,8 +105,9 @@ void ScreenshotsScene::updateViews(const RenderInfo&) {
         cornerViews[i].radius = SCREENSHOT_RADIUS;
         cornerViews[i].fillColor = (i == 0) ? barColor : Color::BLACK;
         cornerViews[i].isInverted = true;
-        cornerViews[i].isSmooth = true;
+        // cornerViews[i].isSmooth = true;
         cornerViews[i].isHidden = !hasScreenshots;
+        cornerViews[i].isOpaque = false;
 
         x += SCREENSHOT_WIDTH + SCREENSHOT_SPACING;
     }

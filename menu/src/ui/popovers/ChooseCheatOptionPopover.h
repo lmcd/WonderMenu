@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "general/InputRepeater.h"
 #include "ui/Popover.h"
 #include "ui/views/rows/CheatOptionRowView.h"
 

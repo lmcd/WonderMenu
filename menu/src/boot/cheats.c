@@ -32,6 +32,14 @@
 // sits this many bytes higher. MUST match the payload_settings size in resume.S.
 #define GAME_CTX_OFFSET (64)
 
+// game_ctx offset of the pre-NMI jump's "already fired" flag. Cause.IP4 stays
+// set until the NMI itself, so without this every later exception would jump
+// into the payload again. MUST match the reservation in resume.S.
+#define PRE_NMI_FLAG_OFFSET (352)
+
+// TEST: 0 jumps on every exception that shows Cause.IP4, ignoring the flag above
+#define PRE_NMI_FIRE_ONCE (0)
+
 /** @brief Cheat structure */
 typedef struct {
     uint8_t type; /**< Cheat type */
@@ -56,6 +64,7 @@ typedef enum {
     SPECIAL_SET_STORE_LOCATION = 0xFF, /**< Set store location */
     SPECIAL_JUMP = 0xBD, /**< Unconditionally jump to the resident payload (every frame) */
     SPECIAL_GUARDED_JUMP = 0xBF, /**< Edge-detected jump to the resident payload (once per press) */
+    SPECIAL_JUMP_ON_PRE_NMI = 0xBE, /**< Jump to the resident payload once when the reset button is pressed */
     SPECIAL_SET_BITS = 0x40, /**< [addr] |= value mask   (0x40 byte, 0x41 halfword) */
     SPECIAL_CLEAR_BITS = 0x42, /**< [addr] &= ~value mask (0x42 byte, 0x43 halfword) */
     SPECIAL_BIT_TEST_CLEAR = 0x60, /**< run sub if (addr & mask)==0 (0x60 byte, 0x61 halfword) */
@@ -209,6 +218,26 @@ static io32_t *cheats_get_engine_address (uint32_t *cheat_list) {
 }
 
 /**
+ * @brief Find the pre-NMI jump in the cheat list.
+ *
+ * @param cheat_list Pointer to the cheat list.
+ * @param target Receives the jump target (cached KSEG0) when one is found.
+ * @return true if the list contains a SPECIAL_JUMP_ON_PRE_NMI cheat.
+ */
+static bool cheats_get_pre_nmi_jump (uint32_t *cheat_list, uint32_t *target) {
+    cheat_entry_t cheat;
+    while (cheats_get_next(&cheat_list, &cheat)) {
+        if (cheat.main.type == SPECIAL_JUMP_ON_PRE_NMI) {
+            // Same KSEG0 forcing as SPECIAL_JUMP: the 0xBE type byte leaks
+            // bits 31/29 into the masked address.
+            *target = (cheat.main.address & 0x007FFFFF) | 0x80000000;
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * @brief Update the cache for the specified memory range.
  * 
  * @param start The start address.
@@ -226,7 +255,7 @@ static void cheats_update_cache (volatile void *start, volatile void *end) {
  * @param cheat_list Pointer to the cheat list.
  * @return true if successful, false otherwise.
  */
-bool cheats_install (cic_type_t cic_type, uint32_t *cheat_list) {
+static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool patch_ipl3) {
     if (!cheat_list) {
         return false;
     }
@@ -237,17 +266,21 @@ bool cheats_install (cic_type_t cic_type, uint32_t *cheat_list) {
     io32_t *patcher_start = (io32_t *)(PATCHER_ADDRESS);
     io32_t *patcher_p = patcher_start;
 
-    if (cheats_patch_ipl3(cic_type, patcher_start)) {
+    // On the HLE path there is no IPL3 to hook: reboot.S jumps straight to the
+    // patcher once it has loaded the game, with the entry point already in t1.
+    if (patch_ipl3 && cheats_patch_ipl3(cic_type, patcher_start)) {
         return false;
     }
 
     io32_t *final_engine_address = cheats_get_engine_address(cheat_list);
 
+    uint32_t pre_nmi_target = 0;
+    bool has_pre_nmi_jump = cheats_get_pre_nmi_jump(cheat_list, &pre_nmi_target);
+
     // Original watch exception handler code written by Jay Oster 'Parasyte'
     // https://github.com/parasyte/alt64/blob/master/utils.c#L1024-L1054
 
     uint32_t ori_placeholder_instruction = I_ORI(REG_ZERO, REG_K0, A_OFFSET(RELOCATED_EXCEPTION_HANDLER_ADDRESS));
-    uint32_t ori_placeholder_address = (uint32_t)(final_engine_address + 20);
 
     // Load cause register
     *engine_p++ = I_MFC0(REG_K0, C0_REG_CAUSE);
@@ -256,6 +289,46 @@ bool cheats_install (cic_type_t cic_type, uint32_t *cheat_list) {
     *engine_p++ = I_ANDI(REG_K1, REG_K0, CAUSE_IRQ_PRE_NMI);
     *engine_p++ = I_BNEL(REG_K1, REG_ZERO, 1);
     *engine_p++ = I_MTC0(REG_ZERO, C0_REG_WATCH_LO);
+
+    if (has_pre_nmi_jump) {
+        debugf("Had pre-NMI cheat\n");
+        // Reset button pressed: jump to the resident payload once. k1 still
+        // holds Cause & IP4 from above. The jump skips the suspend-point gate
+        // the guarded jump uses -- waiting for a clean VI boundary could eat
+        // into the ~0.5s before the NMI -- and trampoline_enter already waits
+        // for the RDP to drain before it suspends.
+        io32_t *not_nmi_branch = engine_p;
+        *engine_p++ = I_NOP();                                              // patched: BEQ k1,0,not_nmi
+        *engine_p++ = I_NOP();
+
+        // IP4 stays set until the NMI, so every later exception lands here
+        // too. The flag lives in game_ctx (zero after staging) and is reached
+        // uncached so it's coherent on the next exception.
+        *engine_p++ = I_LUI(REG_K0, 0xA040);
+        *engine_p++ = I_LW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
+        io32_t *fired_branch = engine_p;
+        *engine_p++ = I_NOP();                                              // patched: BNE k1,0,not_nmi
+        *engine_p++ = I_NOP();
+        *engine_p++ = I_ORI(REG_K1, REG_ZERO, 1);
+        *engine_p++ = I_SW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
+
+        *engine_p++ = I_LUI(REG_K0, pre_nmi_target >> 16);
+        *engine_p++ = I_ORI(REG_K0, REG_K0, pre_nmi_target & 0xFFFF);
+        *engine_p++ = I_JR(REG_K0);
+        *engine_p++ = I_NOP();
+
+        *not_nmi_branch = I_BEQ(REG_K1, REG_ZERO, (engine_p - not_nmi_branch) - 1);
+        *fired_branch = PRE_NMI_FIRE_ONCE
+            ? I_BNE(REG_K1, REG_ZERO, (engine_p - fired_branch) - 1)
+            : I_NOP();
+
+        // The already-fired path clobbered k0, so reload Cause for the watch check
+        *engine_p++ = I_MFC0(REG_K0, C0_REG_CAUSE);
+    }
+
+    // The placeholder is the NOP 16 instructions after the ANDI below, so its
+    // position moves with the prologue above.
+    uint32_t ori_placeholder_address = (uint32_t)(final_engine_address + (engine_p - engine_start) + 16);
 
     // Check if watch exception occurred, if yes then proceed to relocate the game exception handler
     *engine_p++ = I_ANDI(REG_K0, REG_K0, CAUSE_EXC_CODE_MASK);
@@ -321,7 +394,8 @@ bool cheats_install (cic_type_t cic_type, uint32_t *cheat_list) {
             // not needed with N64FlashcartMenu's boot method
             case SPECIAL_SET_ENTRYPOINT_ADDR:
             // already handled
-            case SPECIAL_SET_STORE_LOCATION: {
+            case SPECIAL_SET_STORE_LOCATION:
+            case SPECIAL_JUMP_ON_PRE_NMI: {
                 // do nothing
                 break;
             }
@@ -659,4 +733,16 @@ bool cheats_install (cic_type_t cic_type, uint32_t *cheat_list) {
     cheats_update_cache(patcher_start, patcher_p);
 
     return true;
+}
+
+bool cheats_install (cic_type_t cic_type, uint32_t *cheat_list) {
+    return cheats_install_impl(cic_type, cheat_list, true);
+}
+
+bool cheats_install_hle (uint32_t *cheat_list) {
+    return cheats_install_impl(CIC_UNKNOWN, cheat_list, false);
+}
+
+uint32_t cheats_patcher_address (void) {
+    return PATCHER_ADDRESS;
 }

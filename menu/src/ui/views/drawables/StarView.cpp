@@ -32,7 +32,7 @@ void StarView::update(const RenderInfo& renderInfo) {
 void StarView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }

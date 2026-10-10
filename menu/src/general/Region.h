@@ -5,15 +5,7 @@
 
 #pragma once
 
-#ifdef N64
-#include <dir.h>
-#endif
-
-#include <cctype>
-#include <cstring>
-#include <strings.h>
 #include <cstdint>
-#include <functional>
 
 enum class SaveType : uint8_t {
     SAVE_TYPE_NONE           = 0,  /**< No expected save type */

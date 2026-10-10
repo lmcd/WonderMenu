@@ -7,7 +7,6 @@
 
 #include <libdragon.h>
 
-#include "ui/views/BaseView.h"
 #include "ui/views/drawables/RectView.h"
 
 struct ScrollbarView : public View {

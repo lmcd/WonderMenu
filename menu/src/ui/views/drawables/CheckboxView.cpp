@@ -32,7 +32,7 @@ void CheckboxView::update(const RenderInfo& renderInfo) {
 void CheckboxView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -52,7 +52,7 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
 
     rdpq_mode_begin();
         setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
-        setBlender(finalIsBlendedWithMemory ? WITH_FRAMEBUFFER : WITH_BLEND_COLOR);
+        setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
     rdpq_mode_end();
 
     Color currentFillColor = isOn ? onFillColor : offFillColor;
@@ -82,8 +82,7 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
     rdpq_mode_pop();
 
     if (hasScissor) {
-        Rect scissorRect = scissorStack.back();
-        rect = rect.intersection(scissorRect);
+        rect = rect.intersection(currentScissor());
     }
 
     drawnBoundingBox[bufferIndex] = rect;

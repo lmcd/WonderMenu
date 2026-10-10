@@ -5,18 +5,13 @@
 
 #pragma once
 
-#include <dir.h>
 #include <algorithm>
-#include <cstring>
-#include <strings.h>
 #include <vector>
 #include <deque>
 #include <string>
-#include <memory>
 
 #include "Game.h"
 #include "GameDatabase.h"
-#include "INIParser.h"
 #include "M64File.h"
 
 /**
@@ -29,18 +24,18 @@
 #define MAX_DIRECTORY_LENGTH 128
 
 struct __attribute__((packed)) CacheHeader {
-    /**
-     * The two-character unique ID of the last selected game.
-     * TODO: just read this from `PayloadData`?
-     */
-    char lastUniqueID[2];
-    RegionCode lastRegionCode;
+    uint8_t empty1[1] = {0};
+
+    uint16_t romFileCount;
 
     /**
      * The number of ROM directories the user has chosen to load ROMs from.
      */
     uint8_t directoryCount;
-    uint32_t empty2;
+
+    uint16_t m64FileCount;
+
+    uint16_t empty2;
 };
 
 static_assert(sizeof(CacheHeader) == 8, "CacheHeader must be 8 bytes");
@@ -51,6 +46,7 @@ struct __attribute__((packed)) CacheResult {
     int16_t entryIndex = -1;
     uint8_t version = 0;
     uint32_t crc1 = 0;
+    uint32_t sclust = 0;
 };
 
 class GameLibrary {
@@ -63,8 +59,8 @@ private:
     int cachedFileCount = 0;
 
     // loadCache() returns early in non-release builds and on any read
-    // failure, but loadGames() still matches against this to pick
-    // lastLaunchedGame, so it must never hold garbage.
+    // failure, but loadGames() still reads directoryCount back out of this,
+    // so it must never hold garbage.
     CacheHeader temporaryCacheHeader = {};
 
     uint8_t directoryCount() const {
@@ -76,8 +72,6 @@ public:
 
     /**
      * Typically the root path of the filesystem.
-     * rom:/sd/ on emulator
-     * sd:/ on console
      */
     const char* path;
 
@@ -99,6 +93,8 @@ public:
     std::vector<std::string> recentsPaths;
     std::vector<std::string> favouritesPaths;
 
+    std::vector<Game*> speedrunGames;
+
     /**
      * A list of paths the user has chosen to load ROMs from.
      */
@@ -106,9 +102,10 @@ public:
 
     GameLibrary(GameDatabase& database, const char* path = nullptr);
 
+    void createDirectories();
+
     bool loadCache();
     bool writeCache();
-    bool writeCacheHeader();
 
     void loadHistoryAndFavourites();
 
@@ -119,10 +116,22 @@ public:
      */
     bool saveHistoryAndFavourites();
 
+    void warmClusterOffsets();
+
+    void loadGamesFast();
+
     /**
      * Reload game list from the directories in `romDirectoryPaths`
      */
     void loadGames();
+
+    void loadM64Files();
+
+    /**
+     * Write the inputs the payload recorded into cart SDRAM out to a new .m64
+     * file in the speedruns directory.
+     */
+    bool writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint32_t sampleCount);
 
     /**
      * Traverse the filesystem looking for directories that contain at least

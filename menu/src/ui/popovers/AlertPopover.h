@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "general/InputRepeater.h"
 #include "ui/Popover.h"
 #include "ui/views/rows/AlertOptionRowView.h"
 

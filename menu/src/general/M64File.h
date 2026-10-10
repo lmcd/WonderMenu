@@ -5,18 +5,25 @@
 
 #pragma once
 
+#include <libdragon.h>
 #include <string>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
 #include <cstddef>
 #include <sys/stat.h>
-#include <libdragon.h>
+#include <fatfs/ff.h>
 
 struct M64File {
-    M64File(std::string _path) {
-        path = _path;
+    M64File(FFOBJID _fileObject) {
+        fileObject = _fileObject;
+        size = _fileObject.objsize;
     }
+
+    enum AuthoringProgram : uint32_t {
+        MUPEN64    = 0x4D55504E, // "MUPN"
+        WONDERMENU = 0x574E4452  // "WNDR"
+    };
 
     // Mupen64 .m64 movie header
     // Fixed 1024-byte (0x400) block that precedes raw controller input data.
@@ -36,7 +43,8 @@ struct M64File {
         uint32_t controllerFlags;     // 0x020 controller flags
 
         // 0x024 extended data -- only valid when extendedVersion != 0
-        uint32_t extAuthorship;       // 0x024 authoring program ("MUPN" = 0x4D55504E)
+
+        AuthoringProgram extAuthorship; // 0x024 authoring program
         uint32_t extBruteforce;       // 0x028 bruteforcing data
         uint32_t extRerecordHigh;     // 0x02C high word of the rerecord count
         char     extReserved[20];     // 0x030 reserved
@@ -55,16 +63,29 @@ struct M64File {
 
     static_assert(sizeof(Header) == 0x400, "M64 header must be 1024 bytes");
 
-    // The file path (e.g. sd:/speedruns/SM64.m64)
-    std::string path;
-
     // The file size in bytes
-    int size;
+    uint32_t size;
 
-    uint32_t romCRC32;
+    // The filename (e.g. SM64.m64)
+    std::string filename;
+
+    uint32_t payloadClusterOffset = 0;
+
+    /**
+     * Locator for this file's data, captured by `f_readdir_obj()` as the
+     * containing directory was enumerated. Opening from it costs no disk access
+     * at all, where opening by path has to walk and scan every component.
+     * `fs` is null when unset, and the locator only holds while the filesystem
+     * stays mounted.
+     */
+    FFOBJID fileObject = {};
+
+    uint32_t romCRC;
+    uint32_t crc;
     uint16_t countryCode;
+    AuthoringProgram authoringProgram;
+
     char author[222];
-    char description[256];
 
     static bool hasM64Extension(const char* filename);
 

@@ -7,12 +7,14 @@
 
 #include <libdragon.h>
 
-#include "general/GameLaunchSession.h"
-#include "flashcart/sc64/sc64.h"
+#include "main.h"
+
+#include "animation/Transition.h"
+#include "general/Worker.h"
 #include "ui/Scene.h"
 #include "ui/views/drawables/Cart3DView.h"
+#include "ui/views/drawables/LabelView.h"
 #include "ui/views/ProgressBarView.h"
-#include "main.h"
 
 #define HOUR_ANGLE(hour) hour * (2.0f * T3D_PI / 12.0f)
 
@@ -42,35 +44,50 @@ private:
      */
     float cartScale = 0.02f;
 
-    float transitionProgress = 0.0;
-    float transitionSpeed = 0.0;
-
     bool preferHighRes = true;
     bool preferFlatModel = false;
 
+    bool progressBarShouldTrackTransition = false;
+
+    bool hasInitiatedLaunch = false;
     bool isFinalisingROMLoad = false;
 
-    sc64_load_rom_session_t session;
+    /**
+     * Streams the ROM into the cart's SDRAM and then stages its first MiB into
+     * the Expansion Pak. Driven a step at a time from `update`.
+     */
+    LoadROMWorker romWorker;
 
 public:
     const char* name() { return "GameLaunchScene"; }
 
-    Game* game;
+    GameInfoState& state = warmResetState.sceneStates.gameInfoState;
+    Game& game;
     CartRenderer* cartRenderer;
-    GameDatabase* database;
+    GameDatabase& database;
     
+    Transition transition;
+
     Cart3DView cart3DView;
+    LabelView<32> labelView;
     
-    GameLaunchScene(Game* game, CartRenderer* cartRenderer, GameDatabase* database);
+    GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database);
 
     Vec3f rotationForFrame(int frameNumber);
 
     /**
-     * Open the ROM load session, if it isn't open already.
+     * Run one frame's worth of background work: streaming the ROM into the
+     * cart's SDRAM and then staging its first MiB into the Expansion Pak.
      */
-    void beginROMLoadSession();
+    void advanceWorkers();
 
-    void loadNextROMChunk();
+    /**
+     * Manually clear the area occupied on-screen by the progress bar before
+     * jumping to the game. We're trying to save frames here, and this seems
+     * like the quickest way of doing it.
+     */
+    void clearProgressBarArea();
+
     void showGameInfo();
 
     void update(const UpdateInfo& updateInfo) override;

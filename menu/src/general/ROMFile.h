@@ -5,11 +5,6 @@
 
 #pragma once
 
-#include <string>
-#include <cstdio>
-#include <cstring>
-#include <sys/stat.h>
-
 #ifdef N64
 #include <libdragon.h>
 #include <fatfs/ff.h>
@@ -17,8 +12,15 @@
 #include <arpa/inet.h>
 #endif
 
+#include <string>
+#include <cstdio>
+#include <cstring>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "boot/boot.h"
 #include "Region.h"
+#include "../../shared/src/PayloadData.h"
 
 /**
  * File entry for a game ROM on the filesystem.
@@ -26,13 +28,15 @@
  * Big/little endian ROMs formats (e.g. .v64/.z64) are supported.
  */
 struct ROMFile {
-    ROMFile(const std::string& path) : path(path) {}
+    ROMFile(const std::string& path, u_int16_t id) : path(path), _id(id) {}
 
     // The file path (e.g. sd:/Goldeneye.z64)
     std::string path;
 
     // The file size in bytes
     uint32_t size;
+
+    u_int16_t _id;
 
     #ifdef N64
     /**
@@ -42,7 +46,7 @@ struct ROMFile {
      * `fs` is null when unset, and the locator only holds while the filesystem
      * stays mounted.
      */
-    FFOBJID fileObject = {};
+    FFOBJID fileObject;
 
     bool hasFileObject() const { return fileObject.fs != nullptr; }
     #endif
@@ -69,8 +73,15 @@ struct ROMFile {
 
     /**
      * Returns true if the filename has a recognised N64 ROM extension (.z64, .n64, .v64)
+     *
+     * Prefer the overload taking the length wherever the caller already knows
+     * it, such as `DirectoryScanner::nameLength`.
      */
-    static bool hasROMExtension(const char* filename);
+    static bool hasROMExtension(const char* filename, size_t length);
+
+    static bool hasROMExtension(const char* filename) {
+        return hasROMExtension(filename, strlen(filename));
+    }
 
     bool hasHomebrewGameCode();
 
@@ -110,6 +121,10 @@ struct ROMFile {
      * `categoryCode`, `uniqueID` and `regionCode`.
      */
     std::string gameCode() const;
+
+    u_int16_t id() {
+        return _id;
+    };
 
     bool loadHeader();
 };

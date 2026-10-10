@@ -4,11 +4,41 @@
 */
 
 #include "M64File.h"
+#include "fatfs/ff.h"
 
 #include <algorithm>
 #include <filesystem>
 
 static M64File::Header headerBuffer;
+
+static uint32_t crc32Table[256];
+static bool crc32TableInitialised = false;
+
+// Standard CRC-32 (reflected, polynomial 0xEDB88320), which is what mkdatabase
+// computes, so a value from here can be compared against one in the database.
+static uint32_t calculateCRC32(const unsigned char* data, size_t length) {
+    if (!crc32TableInitialised) {
+        for (uint32_t i = 0; i < 256; i++) {
+            uint32_t crc = i;
+
+            for (int j = 0; j < 8; j++) {
+                crc = (crc & 1) ? ((crc >> 1) ^ 0xEDB88320) : (crc >> 1);
+            }
+
+            crc32Table[i] = crc;
+        }
+
+        crc32TableInitialised = true;
+    }
+
+    uint32_t crc = 0xFFFFFFFF;
+
+    for (size_t i = 0; i < length; i++) {
+        crc = (crc >> 8) ^ crc32Table[(crc ^ data[i]) & 0xFF];
+    }
+
+    return crc ^ 0xFFFFFFFF;
+}
 
 bool M64File::hasM64Extension(const char* filename) {
     size_t length = strlen(filename);
@@ -22,24 +52,32 @@ bool M64File::hasM64Extension(const char* filename) {
     }
 
     const char* ext = filename + length - 4;
-    
-    return strcasecmp(ext, ".m64") == 0;
+
+    return ext[0] == '.'
+        && (ext[1] | 0x20) == 'm'
+        && ext[2] == '6'
+        && ext[3] == '4';
 }
 
 bool M64File::loadHeader() {
-    FILE* file = fopen(path.c_str(), "rb");
+    FIL file;
 
-    if (!file) {
-        debugf("[M64File] Failed to open .m64 file\n");
+    FRESULT result = f_open_obj(&file, &fileObject, FA_READ);
+
+    if (result != FR_OK) {
+        debugf("[M64File] Failed to open file from locator (%i)\n", (int)result);
         return false;
     }
 
-    size_t bytesRead = fread(&headerBuffer, 1, sizeof(headerBuffer), file);
-    
-    fclose(file);
+    UINT bytesRead = 0;
+    result = f_read(&file, &headerBuffer, sizeof(headerBuffer), &bytesRead);
+
+    payloadClusterOffset = file.clust;
+
+    f_close(&file);
 
     if (bytesRead != sizeof(headerBuffer)) {
-        debugf("[M64File] File too small (%zu of %zu bytes)\n", bytesRead, sizeof(headerBuffer));
+        debugf("[M64File] File too small (%i of %zu bytes)\n", bytesRead, sizeof(headerBuffer));
         return false;
     }
 
@@ -51,8 +89,9 @@ bool M64File::loadHeader() {
         return false;
     }
 
-    romCRC32 = headerBuffer.romCRC32;
+    romCRC = headerBuffer.romCRC32;
     countryCode = headerBuffer.countryCode;
+    authoringProgram = headerBuffer.extAuthorship;
     memcpy(author, &headerBuffer.author, sizeof(headerBuffer.author));
     author[sizeof(author) - 1] = '\0';
 
@@ -77,46 +116,43 @@ bool M64File::loadHeader() {
     this->author[sizeof(this->author) - 1] = '\0';
 
     // Display name: base name (stem, extension dropped) with commas -> colons.
-    displayName = std::filesystem::path(path).stem().string();
+    displayName = std::filesystem::path(filename).stem().string();
     std::replace(displayName.begin(), displayName.end(), ',', ':');
 
-    memcpy(this->description, &headerBuffer.description, sizeof(headerBuffer.description));
+    crc = calculateCRC32((const unsigned char*)&headerBuffer, sizeof(headerBuffer));
 
     return true;
 }
 
 bool M64File::stageInputsTable(uint32_t stagingAddress) {
-    FILE* file = fopen(path.c_str(), "rb");
+    FIL file;
 
-    if (!file) {
-        debugf("[M64File] Failed to open .m64 file\n");
+    FRESULT result = f_open_obj(&file, &fileObject, FA_READ);
 
+    if (result != FR_OK) {
+        debugf("[M64File] Failed to open file from locator (%i)\n", (int)result);
         return false;
     }
 
-    struct stat st;
-    
-    if (stat(path.c_str(), &st) != 0) {
-        debugf("[M64File] Failed to stat .m64 file\n");
-
-        fclose(file);
-        return false;
-    }
-
-    long fileSize = st.st_size;
-    long dataSize = fileSize - sizeof(headerBuffer);
+    int dataSize = size - sizeof(headerBuffer);
 
     if (dataSize <= 0) {
-        debugf("[M64File] File too small (%ld bytes)\n", fileSize);
+        debugf("[M64File] File too small (%ld bytes)\n", size);
 
-        fclose(file);
+        f_close(&file);
         return false;
     }
 
-    fseek(file, sizeof(headerBuffer), SEEK_SET);
-    fread((void *)stagingAddress, 1, dataSize, file);
-    fclose(file);
+    if (payloadClusterOffset != 0) {
+        file.clust = payloadClusterOffset;
+        file.fptr = sizeof(headerBuffer);
+    }
+    else {
+        f_lseek(&file, sizeof(headerBuffer));
+    }
 
+    UINT bytesRead = 0;
+    f_read(&file, (void *)stagingAddress, dataSize, &bytesRead);
     data_cache_hit_writeback_invalidate((void *)stagingAddress, dataSize);
 
     return true;

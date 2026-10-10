@@ -2,7 +2,7 @@
  * @copyright 2026 - Lee McDermott
  * @license AGPLv3
  */
-#include "CheatDatabase.h"
+
 #include <cinttypes>
 #include <cstdlib>
 #include <cstring>
@@ -18,6 +18,8 @@
 #include <algorithm>
 #define PRINTF printf
 #endif
+
+#include "CheatDatabase.h"
 
 #ifndef N64
 static void setTitle(char* dest, size_t destSize, const std::string& src) {
@@ -100,7 +102,6 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
 
     std::string line;
     size_t currentCheatIndex = SIZE_MAX;
-    size_t currentCodeIndex = 0;
 
     // Options are collected as they're read and committed when the cheat ends,
     // because a file is free to list them either side of the codes they belong
@@ -161,9 +162,9 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
                         : (uint16_t)((wildcards[i].baseValue & 0xFF00) | (pendingOption.values[i] & 0x00FF));
                 }
 
-                option.value1 = values[0];
-                option.value2 = values[1];
-                option.value3 = values[2];
+                option.values[0] = values[0];
+                option.values[1] = values[1];
+                option.values[2] = values[2];
 
                 wildcardOptions.push_back(option);
                 cheat.wildcardCount++;
@@ -251,8 +252,6 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
         if (line.rfind("Name=", 0) == 0) {
             rootName = line.substr(5);
 
-            debugf("Name %s\n", rootName.c_str());
-            
             continue;
         }
 
@@ -490,9 +489,9 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
 
     for (const auto& wildcardOption : wildcardOptions) {
         out.insert(out.end(), wildcardOption.title, wildcardOption.title + sizeof(wildcardOption.title));
-        writeU16BE(out, wildcardOption.value1);
-        writeU16BE(out, wildcardOption.value2);
-        writeU16BE(out, wildcardOption.value3);
+        writeU16BE(out, wildcardOption.values[0]);
+        writeU16BE(out, wildcardOption.values[1]);
+        writeU16BE(out, wildcardOption.values[2]);
     }
 
     return out;

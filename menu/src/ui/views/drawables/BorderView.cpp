@@ -10,7 +10,7 @@
 void BorderView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -102,7 +102,7 @@ void BorderView::render(const RenderInfo& renderInfo) {
     Rect boundingBox = finalFrame;
 
     if (hasScissor) {
-        boundingBox = boundingBox.intersection(scissorStack.back());
+        boundingBox = boundingBox.intersection(currentScissor());
     }
 
     drawnBoundingBox[bufferIndex] = boundingBox;

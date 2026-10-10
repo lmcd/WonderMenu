@@ -5,41 +5,49 @@
 
 #include "GameLaunchScene.h"
 
-#include <algorithm>
-#include <cmath>
-#include <math.h>
-#include <sys/stat.h>
-#include <filesystem>
-
 #include "animation/TimingFunctions.h"
+#include "animation/Transition.h"
 #include "flashcart/flashcart.h"
+#include "general/BootSession.h"
+#include "general/CheatDatabase.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 #include "general/CartRenderer.h"
+#include "ui/SceneRenderer.h"
 #include "ui/scenes/GameInfoScene.h"
 #include "ui/scenes/GameInfoTransitionScene.h"
-#include "ui/SceneRenderer.h"
 
 SceneRenderer* GameLaunchScene::currentRenderer = nullptr;
 
-void GameLaunchScene::romLoadProgressHandler(float progress) {
+/** The DMA engines address RDRAM with the low 24 bits. */
+#define RDRAM_ADDRESS_MASK (0x00FFFFFF)
+
+void GameLaunchScene::romLoadProgressHandler(float) {
     currentRenderer->advance();
 }
 
-GameLaunchScene::GameLaunchScene(Game* game, CartRenderer* cartRenderer, GameDatabase* database)
+GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database)
     : Scene(),
+    romWorker(game.romFile),
     game(game),
     cartRenderer(cartRenderer),
     database(database) {
 
+    transition.speed = 0.03;
+    transition.direction = Transition::IDLE;
+
     cart3DView.cartRenderer = cartRenderer;
-    
-    session.initial_chunk = 0;
-    
+
     view.addSubview(&progressBarView);
+    view.addSubview(&labelView);
     view.addSubview(&cart3DView);
 
-    gameLaunchSession.game = game;
+    bootSession.game = &game;
+
+    if (game.id() != state.gameID) {
+        state.gameID = game.id();
+        state.clear();
+    }
 }
 
 Vec3f GameLaunchScene::rotationForFrame(int frameNumber) {
@@ -56,7 +64,7 @@ Vec3f GameLaunchScene::rotationForFrame(int frameNumber) {
 void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
     int frameNumber = renderInfo.frameNumber;
 
-    float value = TimingFunctions::easeInOutQuad(transitionProgress);
+    float value = TimingFunctions::easeInOutQuad(transition.progress);
 
     Size cartSize = cartRenderer->sizeForScale(cartScale);
 
@@ -67,19 +75,16 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 
     screenPosition.y = std::lerp(bgnY, endY, value);
 
-    Rect trackRect(0, 0, 150, 8);
-    trackRect.origin.x = (view.frame.size.width  - trackRect.size.width)  / 2;
-    trackRect.origin.y = (view.frame.size.height - trackRect.size.height) / 2;
+    Size trackSize = Size(158, 8);
+    progressBarView.frame = trackSize.centeredIn(view.frame);
 
-    progressBarView.frame = trackRect;
-
-    if (transitionSpeed > 0) {
-        if (session.progress == 1.0f) {
-            progressBarView.progress = transitionProgress;
+    if (hasInitiatedLaunch) {
+        if (progressBarShouldTrackTransition) {
+            progressBarView.progress = transition.progress;
         }
         else {
-            progressBarView.progress = session.progress;
-        }   
+            progressBarView.progress = romWorker.progress();
+        }
 
         progressBarView.isHidden = false;
     }
@@ -109,8 +114,36 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
     cart3DView.scale = cartScale;
     cart3DView.rotation = rotation;
     cart3DView.frame.origin = screenPosition;
-    cart3DView.game = game;
+    cart3DView.game = &game;
     cart3DView.flags = flags;
+
+    labelView.frame.origin = Vec2(0, 458);
+    labelView.maxWidth = view.frame.size.width;
+    labelView.textColor = Color(128);
+    labelView.align = ALIGN_CENTER;
+    labelView.fontID = Fonts::INTERDISPLAY_BOLD_12;
+    labelView.opacity = (1.0f - transition.progress);
+    labelView.isHidden = (transition.progress > 0.5);
+
+    int cheatsCount = state.cheatsState.enabledCheatIndexes.size();
+
+    if (state.speedrunsState.selectedRow != -1) {
+        labelView.setString("Speedrun Enabled");
+    }
+    else if (state.speedrunsState.isRecording) {
+        labelView.setString("Create a Speedrun");
+    }
+    else if (cheatsCount > 0) {
+        if (cheatsCount == 1) {
+            labelView.setString("%i $06Cheat Enabled", cheatsCount);
+        }
+        else {
+            labelView.setString("%i $06Cheats Enabled", cheatsCount);
+        }
+    }
+    else {
+        labelView.setString("");
+    }
 }
 
 void GameLaunchScene::update(const UpdateInfo& updateInfo) {
@@ -118,95 +151,110 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    joypad_buttons_t btn = updateInfo.btn;
+    if (transition.direction == Transition::IDLE) {
+        joypad_buttons_t btn = updateInfo.btn;
 
-    if (btn.a) {
-        transitionSpeed = +0.03;
-    }
-    else if (btn.b) {
-        if (transitionSpeed == 0.0f) {
+        if (btn.a) {
+            transition.direction = Transition::FORWARDS;
+            progressBarShouldTrackTransition = (romWorker.framesRemaining() < 34);
+
+            hasInitiatedLaunch = true;
+        }
+        else if (btn.b) {
             popScene();
         }
-    }
-    else if (btn.l) {
-        preferFlatModel = !preferFlatModel;
-    }
-    else if (btn.r) {
-        preferHighRes = !preferHighRes;
-    }
-    else if (btn.z) {
-        showGameInfo();
-    }
-
-    transitionProgress += transitionSpeed;
-    transitionProgress = std::clamp(transitionProgress, 0.0f, 1.0f);
-
-    if (transitionProgress == 1.0f) {
-        currentRenderer = renderer;
-
-        std::string romFilePath = game->romFile.path;
-
-        // TODO: much of this should be moved to `GameLaunchSession`
-
-        if (gameLaunchSession.m64File != nullptr) {
-            gameLaunchSession.m64File->stageInputsTable(0x80600000);
-
-            debugf("[GameLaunchSecene] Staged inputs table\n");
+        else if (btn.l) {
+            preferFlatModel = !preferFlatModel;
         }
-        else {
-            // Save file isn't loaded if speedrun is active
-
-            std::string saveFilename = std::filesystem::path(romFilePath).filename().replace_extension(".sav").string();
-            std::string saveFilePath = "sd:/saves/" + saveFilename;
-
-            debugf("[GameLaunchSecene] Save file %s\n", saveFilePath.c_str());
-
-            flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->saveType;
-
-            flashcart_load_save(saveFilePath.data(), saveType);
+        else if (btn.r) {
+            preferHighRes = !preferHighRes;
         }
+        else if (btn.z) {
+            showGameInfo();
+        }
+    }
+    else if (transition.didReachBeginning()) {
+        transition.direction = Transition::IDLE;
+    }
+    else if (transition.didReachEnd()) {
+        // Lets the boot path copy the game's opening MiB out of RDRAM rather
+        // than fetching it from the cart again.
+        bootSession.hasStagedFirstMB = romWorker.hasStagedFirstMB();
+        bootSession.applyUserChoices(state, database);
+        bootSession.loadSpeedrunFile();
+        bootSession.loadSaveFile();
 
         isFinalisingROMLoad = true;
-        sc64_finish_load_rom_session(&session, romLoadProgressHandler);
 
+        currentRenderer = renderer;
+        romWorker.finish(romLoadProgressHandler);
         currentRenderer = nullptr;
+
+        clearProgressBarArea();
 
         renderer->end();
 
         return;
     }
 
-    if (transitionSpeed > 0.0) {
-        loadNextROMChunk();
-    }
+    transition.advance();
+
+    advanceWorkers();
 }
 
-void GameLaunchScene::beginROMLoadSession() {
-    if (session.initial_chunk != 0) {
+void GameLaunchScene::advanceWorkers() {
+    // Only pull the game's opening chunks forward once the launch is committed;
+    // before that the worker keeps streaming the tail.
+    romWorker.loadBeginningChunks = hasInitiatedLaunch;
+    romWorker.advance();
+}
+
+void GameLaunchScene::clearProgressBarArea() {
+    // Wait for the start of the next frame by watching for the scanline to wrap,
+    // rather than using vi_wait_vblank(). Without the kernel that polls for the
+    // exact vblank line, which is also when the VI interrupt fires -- if the
+    // handler outlasts that line, the poll never sees it and spins forever.
+    int lastLine = vi_get_scanline(NULL);
+
+    while (true) {
+        int line = vi_get_scanline(NULL);
+
+        if (line < lastLine) {
+            break;
+        }
+
+        lastLine = line;
+    }
+
+    uint32_t origin = vi_read(VI_ORIGIN);
+
+    if (origin == 0) {
         return;
     }
 
-    std::string romFilePath = game->romFile.path;
+    const uint32_t stride = display_get_width() * sizeof(uint16_t);
 
-    int initialChunk = 10; //200
+    Rect frame = progressBarView.frame.insetBy(Vec2(0, -2));
 
-    // The locator was captured when GameLibrary enumerated the directory, so
-    // the ROM opens without a directory lookup
-    const FFOBJID* romObject = game->romFile.hasFileObject() ? &game->romFile.fileObject : nullptr;
+    int minRow = frame.minY();
+    int maxRow = frame.maxY();
 
-    session = sc64_begin_load_rom_session(romFilePath.data(), romObject, initialChunk);
-}
+    if (maxRow <= minRow) {
+        return;
+    }
 
-void GameLaunchScene::loadNextROMChunk() {
-    beginROMLoadSession();
+    uint8_t* rows = (uint8_t *)VirtualUncachedAddr(origin & RDRAM_ADDRESS_MASK) + (minRow * stride);
+    uint32_t length = (maxRow - minRow) * stride;
 
-    bool loadBeginningChunks = (transitionSpeed > 0);
+    // Drop any dirty lines covering the rows first, then write uncached, so
+    // nothing can be written back over the fill afterwards.
+    data_cache_hit_writeback_invalidate(rows, length);
 
-    sc64_load_next_rom_chunk(&session, loadBeginningChunks);
+    memset(rows, 0, length);
 }
 
 void GameLaunchScene::showGameInfo() {
-    GameInfoScene* gameInfoScene = new GameInfoScene(game, database);
+    GameInfoScene* gameInfoScene = new GameInfoScene(state, game, database);
     GameInfoTransitionScene* transitionScene = new GameInfoTransitionScene(this, gameInfoScene);
 
     pushScene(transitionScene);

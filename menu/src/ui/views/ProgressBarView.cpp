@@ -3,11 +3,11 @@
 * @license AGPLv3
 */
 
-#include "ProgressBarView.h"
-
+#include <libdragon.h>
 #include <algorithm>
 #include <cmath>
-#include <libdragon.h>
+
+#include "ProgressBarView.h"
 
 ProgressBarView::ProgressBarView() {
     rectView1.radius = 4;
@@ -33,7 +33,7 @@ void ProgressBarView::update(const RenderInfo&) {
     rectView1.fillColor = trackColor;
     rectView1.setNeedsDisplay();
 
-    rectView2.frame = Rect(Vec2::ZERO, frame.size);
+    rectView2.frame = rectView1.frame;
     rectView2.fillColor = barColor;
     rectView2.setNeedsDisplay();
 }

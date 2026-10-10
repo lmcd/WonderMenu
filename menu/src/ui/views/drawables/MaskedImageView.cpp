@@ -144,7 +144,7 @@ void MaskedImageView::renderCorner(surface_t* maskSheet, Rect destRect, Rect sou
 void MaskedImageView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -259,7 +259,7 @@ void MaskedImageView::render(const RenderInfo& renderInfo) {
     rdpq_mode_pop();
 
     if (hasScissor) {
-        rect = rect.intersection(scissorStack.back());
+        rect = rect.intersection(currentScissor());
     }
 
     drawnBoundingBox[bufferIndex] = rect;

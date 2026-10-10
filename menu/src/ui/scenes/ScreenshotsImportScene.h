@@ -14,12 +14,8 @@
 #include "ui/Scene.h"
 #include "ui/views/ProgressBarView.h"
 #include "ui/views/ScreenshotThumbnailView.h"
-#include "ui/views/drawables/BorderView.h"
-#include "ui/views/drawables/ImageView.h"
-#include "ui/views/drawables/LabelView.h"
 #include "ui/views/drawables/RectView.h"
 #include "utils/fs.h"
-#include "../../shared/src/PayloadData.h"
 
 class IntroScene;
 class Game;
@@ -35,10 +31,10 @@ private:
         THUMBNAIL_WRITE_CHUNK
     };
 
-    IntroScene* introScene;
-    Game* lastLaunchedGame;
+    IntroScene& introScene;
+    Game& lastLaunchedGame;
     int count;
-    ScreenshotsSDRAMReader* reader = nullptr;
+    ScreenshotsSDRAMReader& reader;
 
     ScreenshotThumbnailView screenshotThumbnailView;
     RectView lineView;
@@ -76,9 +72,20 @@ private:
     }
 
     std::string filenameForScreenshot(int index, bool isThumbnail);
-    int nextScreenshotIndex();
+
+    /*
+     * Open the screenshot `DIR` for the current game, creating the directory is it
+     * doesn't already exist.
+     */
     bool openScreenshotDir();
     void closeScreenshotDir();
+
+    /*
+     * Scan the filesystem/SD card and find the next available screenshot index
+     * for this game.
+     */
+    int nextScreenshotIndex();
+
     void beginThumbnailWrite();
 
     bool writeScreenshot(int width, int height);
@@ -87,7 +94,7 @@ private:
 public:
     const char* name() { return "ScreenshotsImportScene"; }
 
-    ScreenshotsImportScene(IntroScene* introScene, Game* lastLaunchedGame, int count, ScreenshotsSDRAMReader* reader);
+    ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, int count, ScreenshotsSDRAMReader& reader);
     ~ScreenshotsImportScene();
 
     void didBeginScene(SceneEntry entry);

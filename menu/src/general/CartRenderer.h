@@ -11,8 +11,6 @@
 
 #include "general/GameDatabase.h"
 #include "general/LabelLoader.h"
-#include "ui/SceneRenderer.h"
-#include "util/Color.h"
 #include "util/Rect.h"
 #include "util/Size.h"
 #include "util/Vec2.h"
@@ -117,7 +115,7 @@ public:
     CartRenderer(Size displaySize, LabelLoader& labelLoader);
     ~CartRenderer();
 
-    int preloadLabelDataForGame(Game* game, bool preferHighRes, int tileCount = -1);
+    int preloadLabelDataForGame(Game* game, bool preferHighRes, int tileCount);
     CartLabelType loadLabelDataForGame(Game* game, bool preferHighRes = false);
 
     void fillSurfaces();
@@ -128,7 +126,7 @@ public:
     Size sizeForScale(float scale) const;
 
     void finishPreload();
-    int prerender2DCart(float scale, Game* game);
+    int preloadLabel(float scale, Game* game);
 
     /**
      * Render a 2D orthographic cartridge
@@ -141,4 +139,6 @@ public:
     Rect render3DCart(int frameNumber, float scale, Vec3f position, Vec3f rotation, Vec2 screenPosition, Game* game, float intensity, uint8_t flags);
 
     void freeAllLabels();
+
+    void freeLabelForGame(Game* game);
 };

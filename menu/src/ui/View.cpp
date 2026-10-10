@@ -36,6 +36,10 @@ void View::applyScissor(const Rect& rect) {
 }
 
 void View::pushScissor(Rect rect) {
+    rect = rect.intersection(Rect(
+        0, 0, display_get_width(), display_get_height()
+    ));
+
     scissorStack.push_back(rect);
     applyScissor(rect);
 
@@ -54,7 +58,7 @@ void View::popScissor() {
         rdpq_set_scissor(0, 0, display_get_width(), display_get_height());
     }
     else {
-        applyScissor(scissorStack.back());
+        applyScissor(currentScissor());
     }
 }
 
@@ -164,7 +168,7 @@ void View::updateRecursive(const RenderInfo& renderInfo) {
     updateSubtree(renderInfo, 1.0f, isHidden, frame.origin);
 }
 
-void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsBlendedWithMemory) {
+void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsOpaque) {
     for (View* subview : subviews) {
         Color finalBlendColor2 = finalBlendColor;
 
@@ -188,7 +192,7 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
         subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
         subview->finalFrame.origin = finalPosition + subview->frame.origin;
         subview->finalFrame.size   = subview->frame.size;
-        subview->finalIsBlendedWithMemory = finalIsBlendedWithMemory ? true : !subview->isOpaque;
+        subview->finalIsOpaque = finalIsOpaque ? true : subview->isOpaque;
 
         subview->update(renderInfo);
 
@@ -198,7 +202,7 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
             subview->finalIsHidden,
             subview->finalFrame.origin,
             finalBlendColor2,
-            subview->finalIsBlendedWithMemory
+            subview->finalIsOpaque
         );
     }
 }
@@ -209,7 +213,7 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
     finalOpacity  = 1.0f;
     finalIsHidden = isHidden;
     finalFrame    = Rect(Vec2::ZERO, frame.size);
-    finalIsBlendedWithMemory = !isOpaque;
+    finalIsOpaque = isOpaque;
     finalBlendColor = (backgroundColor.a == 255) ? backgroundColor : Color::BLACK;
 
     update(renderInfo);
@@ -220,7 +224,7 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
         finalIsHidden,
         finalFrame.origin,
         finalBlendColor,
-        finalIsBlendedWithMemory
+        finalIsOpaque
     );
 
     int width  = finalFrame.size.width;
@@ -365,8 +369,10 @@ void Drawable::drawTexturedRect(rdpq_tile_t tile, Rect rect, int s, int t) {
     );
 }
 
-void Drawable::clearRects(const Rect& rect, Color clearColor) {
-    if (rect.size.width == 0) return;
+void Drawable::clearRect(const Rect& rect, Color clearColor) {
+    if (rect.size.width == 0) {
+        return;
+    }
 
     if (clearColor.a == 0) {
         drawFilledRect(rect);
@@ -374,11 +380,20 @@ void Drawable::clearRects(const Rect& rect, Color clearColor) {
     else {
         rdpq_mode_push();
 
-        rdpq_set_mode_fill(clearColor);
+        // On the Analogue3D using 32-bit color, `rdpq_set_mode_fill` seems to
+        // clamp the colour down to the nearest 16-bit colour
+        if (clearColor.isExactInRGBA16()) {
+            rdpq_set_mode_fill(clearColor);
+        }
+        else {
+            rdpq_set_mode_standard();
+            setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, PRIM)));
+            setPrimitiveColor(clearColor);
+        }
 
         drawFilledRect(rect);
 
-        rdpq_set_mode_fill({0, 0, 0, 255});
+        rdpq_set_mode_fill(Color::BLACK);
 
         rdpq_mode_pop();
     }

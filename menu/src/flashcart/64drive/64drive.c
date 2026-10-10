@@ -128,53 +128,39 @@ static flashcart_firmware_version_t d64_get_firmware_version (void) {
 }
 
 /**
- * @brief Load a ROM into the 64drive.
+ * @brief Start a chunked ROM load session on the 64drive.
  * 
  * @param rom_path Path to the ROM file.
+ * @param rom_object Optional file locator captured while enumerating the directory (may be NULL).
+ * @param initial_chunk The chunk to start loading from.
+ * @return flashcart_load_rom_session_t The load session, zeroed out on failure.
+ */
+static flashcart_load_rom_session_t d64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
+    return flashcart_utils_begin_load_rom_session(rom_path, rom_object, initial_chunk, MiB(64));
+}
+
+/**
+ * @brief Load the next ROM chunk into the 64drive.
+ * 
+ * @param session Pointer to the load session.
+ * @param load_beginning_chunks Whether to keep loading the chunks before the initial chunk once the end of the ROM has been reached.
+ * @return flashcart_err_t Error code.
+ */
+static flashcart_err_t d64_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks) {
+    return flashcart_utils_load_next_rom_chunk(session, ROM_ADDRESS, load_beginning_chunks);
+}
+
+/**
+ * @brief Load everything left in a chunked ROM load session into the 64drive.
+ * 
+ * @param session Pointer to the load session.
  * @param progress Progress callback function.
  * @return flashcart_err_t Error code.
  */
-static flashcart_err_t d64_load_rom (char *rom_path, flashcart_progress_callback_t *progress) {
-    FIL fil;
-    UINT br;
-
-    if (f_open(&fil, strip_fs_prefix(rom_path), FA_READ) != FR_OK) {
-        return FLASHCART_ERR_LOAD;
-    }
-
-    fatfs_fix_file_size(&fil);
-
-    size_t rom_size = f_size(&fil);
-
-    if (rom_size > MiB(64)) {
-        f_close(&fil);
-        return FLASHCART_ERR_LOAD;
-    }
-
-    size_t sdram_size = MiB(64);
-
-    size_t chunk_size = KiB(128);
-    for (unsigned int offset = 0; offset < sdram_size; offset += chunk_size) {
-        size_t block_size = MIN(sdram_size - offset, chunk_size);
-        if (f_read(&fil, (void *) (ROM_ADDRESS + offset), block_size, &br) != FR_OK) {
-            f_close(&fil);
-            return FLASHCART_ERR_LOAD;
-        }
-        if (progress) {
-            progress(f_tell(&fil) / (float) (f_size(&fil)));
-        }
-    }
-    if (f_tell(&fil) != rom_size) {
-        f_close(&fil);
-        return FLASHCART_ERR_LOAD;
-    }
-
-    if (f_close(&fil) != FR_OK) {
-        return FLASHCART_ERR_LOAD;
-    }
-
-    return FLASHCART_OK;
+static flashcart_err_t d64_finish_load_rom_session (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress) {
+    return flashcart_utils_finish_load_rom_session(session, ROM_ADDRESS, progress);
 }
+
 
 /**
  * @brief Load a file into the 64Drive.
@@ -359,18 +345,20 @@ static flashcart_err_t d64_set_bootmode (flashcart_reboot_mode_t boot_mode) {
     return FLASHCART_OK;
 }
 
-
 /** @brief Flashcart structure for 64drive. */
 static flashcart_t flashcart_d64 = {
     .init = d64_init,
     .deinit = d64_deinit,
     .has_feature = d64_has_feature,
     .get_firmware_version = d64_get_firmware_version,
-    .load_rom = d64_load_rom,
+    .begin_load_rom_session = d64_begin_load_rom_session,
+    .load_next_rom_chunk = d64_load_next_rom_chunk,
+    .finish_load_rom_session = d64_finish_load_rom_session,
     .load_file = d64_load_file,
     .load_save = d64_load_save,
     .load_64dd_ipl = NULL,
     .load_64dd_disk = NULL,
+    .load_64dd_disks = NULL,
     .set_save_type = d64_set_save_type,
     .set_save_writeback = d64_set_save_writeback,
     .set_next_boot_mode = d64_set_bootmode,

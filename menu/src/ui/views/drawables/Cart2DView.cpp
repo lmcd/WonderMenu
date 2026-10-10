@@ -50,7 +50,7 @@ void Cart2DView::update(const RenderInfo& renderInfo) {
 void Cart2DView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex]);
+    clearRect(drawnBoundingBox[bufferIndex]);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }

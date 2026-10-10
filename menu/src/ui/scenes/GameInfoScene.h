@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "main.h"
+
 #include "ui/Scene.h"
 #include "ui/scenes/GameInfoTabScene.h"
 #include "ui/View.h"
@@ -16,8 +18,13 @@ class GameDatabase;
 
 class GameInfoScene : public Scene {
 private:
-    Game* game;
-    GameDatabase* database;
+    using Tab = GameInfoTab;
+    using enum GameInfoTab;
+    
+    GameInfoState& state;
+    Game& game;
+    GameDatabase& database;
+    Tab& currentTab;
 
     View tabContainerView;
 
@@ -26,22 +33,20 @@ private:
 public:
     const char* name() override { return "GameInfoScene"; }
 
-    enum Tab {
-        TAB_CHEATS,
-        TAB_SCREENSHOTS,
-        TAB_SPEEDRUNS,
-        TAB_SETTINGS
-    };
-
-    GameInfoScene(Game* game, GameDatabase* database);
+    GameInfoScene(GameInfoState& state, Game& game, GameDatabase& database);
 
     int contentYOffset = 0;
-    Tab currentTab = TAB_SETTINGS;
     TabControlView tabControlView;
     ScrollbarView scrollbarView;
-    View* mainContentView;
+    View* mainContentView = nullptr;
 
-    void setCurrentTab(Tab _currentTab);
+    void setCurrentTab(Tab _currentTab, bool force = false);
+
+    // Builds the scene for the tab saved in the state. Forced, as `currentTab`
+    // already holds that tab, so a plain setCurrentTab() would do nothing.
+    void loadCurrentTab() {
+        setCurrentTab(currentTab, true);
+    }
 
     void didBeginScene(SceneEntry entry);
     void updateViews(const RenderInfo& renderInfo) override;

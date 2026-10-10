@@ -102,7 +102,7 @@ bool file_has_extensions(char *path, const char *extensions[]);
  * @param path The path to the directory.
  * @return true if the directory exists, false otherwise.
  */
-bool directory_exists(char *path);
+bool directory_exists(const char *path);
 
 /**
  * @brief Create a directory at the given path.
@@ -112,7 +112,7 @@ bool directory_exists(char *path);
  * @param path The path to the directory.
  * @return false if the directory was successfully created, true if there was an error.
  */
-bool directory_create(char *path);
+bool directory_create(const char *path);
 
 #ifdef __cplusplus
 }

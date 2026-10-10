@@ -11,19 +11,10 @@
 
 #include "GameDatabase.h"
 #include "utils/fs.h"
-
-#define KiB(x)         ((x) * 1024)
-#define MiB(x)         ((x) * 1024 * 1024)
-
-// DMA reads from ROM only work on hardware/flashcart; enable for release builds only
-#ifdef RELEASE_BUILD
-#define USE_DMA        true
-#else
-#define USE_DMA        false
-#endif
+#include "utils/utils.h"
 
 #ifdef N64
-#define ROM_ADDRESS_HEADER   (0x10000000 + rom_scratch_offset())
+#define ROM_ADDRESS_HEADER   (ROM_ADDRESS + rom_scratch_offset())
 #define ROM_ADDRESS_TILES_A  (ROM_ADDRESS_HEADER  + KiB(256))
 #define ROM_ADDRESS_TILES_B  (ROM_ADDRESS_TILES_A + DB_L_LABEL_SIZE)
 // Scratch cart SDRAM used to stage database reads before they're DMA'd into RDRAM.
@@ -37,7 +28,7 @@ static uint32_t rom_scratch_offset(void) {
     static uint32_t offset = 0;
 
     if (offset == 0) {
-        uint32_t romSize = io_read(0x10000000 + 0x18);
+        uint32_t romSize = io_read(ROM_ADDRESS + 0x18);
 
         offset = (romSize > 0 && romSize <= MiB(16))
             ? ((romSize + MiB(1) - 1) & ~(uint32_t)(MiB(1) - 1))
@@ -56,33 +47,62 @@ static unsigned char headerBuffer[DB_ENTRIES_START_OFFSET];
 
 uint32_t GameDatabase::djb2(const unsigned char* data, size_t length) {
     uint32_t hash = 5381;
-    for (size_t i = 0; i < length; i++) {
-        hash = ((hash << 5) + hash) + data[i];
+
+    // Unrolled by four. The arithmetic is three single-cycle ops per byte, so
+    // the loop's own increment and branch were a third of the instructions; the
+    // byte offsets fold into the loads instead.
+    const unsigned char* end = data + length;
+    const unsigned char* blockEnd = data + (length & ~(size_t)3);
+
+    while (data < blockEnd) {
+        hash = ((hash << 5) + hash) + data[0];
+        hash = ((hash << 5) + hash) + data[1];
+        hash = ((hash << 5) + hash) + data[2];
+        hash = ((hash << 5) + hash) + data[3];
+
+        data += 4;
     }
+
+    while (data < end) {
+        hash = ((hash << 5) + hash) + *data++;
+    }
+
     return hash;
 }
 
-// GameDatabase::Entry implementation
-GameDatabase::Entry::Entry() : uniqueID("0") {
-    memset(title, 0, sizeof(title));
-    memset(developer, 0, sizeof(developer));
-    memset(uniqueID, 0, sizeof(uniqueID));
-
-    cheatByteOffset = 0;
-}
-
 // GameDatabase implementation
-GameDatabase::GameDatabase() : databaseFile(nullptr) {
+GameDatabase::GameDatabase() {
     titleLookupMap.reserve(10);
 }
 
 GameDatabase::~GameDatabase() {
-    releaseEntriesFromMemory();
+    close();
+}
 
-    if (databaseFile) {
-        fclose(databaseFile);
-        databaseFile = nullptr;
-    }
+bool GameDatabase::isDatabaseOpen() {
+    #ifndef N64
+    return false;
+    #else
+    return file.obj.fs != nullptr;
+    #endif
+}
+
+bool GameDatabase::seekTo(long offset) {
+    #ifndef N64
+    return false;
+    #else
+    return f_lseek(&file, offset) == FR_OK;
+    #endif
+}
+
+bool GameDatabase::readBytes(void* buffer, size_t size) {
+    #ifndef N64
+    return false;
+    #else
+    UINT bytesRead = 0;
+
+    return f_read(&file, buffer, size, &bytesRead) == FR_OK && bytesRead == size;
+    #endif
 }
 
 int GameDatabase::getLabelTileOffset(int tileIndex) {
@@ -94,7 +114,7 @@ bool GameDatabase::loadEntriesIntoMemory() {
         return true;
     }
 
-    if (!databaseFile || entryCount == 0) {
+    if (!isDatabaseOpen() || entryCount == 0) {
         return false;
     }
 
@@ -118,23 +138,13 @@ bool GameDatabase::loadEntriesIntoMemory() {
         return false;
     }
 
-    if (USE_DMA) {
-        #ifdef N64
-        // `load()` already staged this region in cart SDRAM, so it's one
-        // transfer straight out of there
-        data_cache_hit_writeback_invalidate(data, allocationSize);
-        dma_read_raw_async(data, ROM_ADDRESS_HEADER + entriesStartOffset, allocationSize);
-        dma_wait();
-        #endif
-    }
-    else {
-        if (fseek(databaseFile, entriesStartOffset, SEEK_SET) != 0 ||
-            fread(data, size, 1, databaseFile) != 1) {
-            debugf("[GameDatabase] Failed to read entries block\n");
-            free(data);
-            return false;
-        }
-    }
+    #ifdef N64
+    // `load()` already staged this region in cart SDRAM, so it's one
+    // transfer straight out of there
+    data_cache_hit_writeback_invalidate(data, allocationSize);
+    dma_read_raw_async(data, ROM_ADDRESS_HEADER + entriesStartOffset, allocationSize);
+    dma_wait();
+    #endif
 
     entriesData = data;
 
@@ -153,7 +163,7 @@ void GameDatabase::releaseEntriesFromMemory() {
 }
 
 GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
-    if (!databaseFile) {
+    if (!isDatabaseOpen()) {
         return nullptr;
     }
 
@@ -170,23 +180,12 @@ GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
     if (entriesData != nullptr) {
         memcpy(entry, entriesData + ((size_t)index * size), size);
     }
-    else if (USE_DMA) {
+    else {
         #ifdef N64
         data_cache_hit_writeback_invalidate(entry, size);
         dma_read_raw_async(entry, ROM_ADDRESS_HEADER + offset, size);
         dma_wait();
         #endif
-    }
-    else {
-        if (fseek(databaseFile, offset, SEEK_SET) != 0) {
-            delete entry;
-            return nullptr;
-        }
-
-        if (fread(entry, size, 1, databaseFile) != 1) {
-            delete entry;
-            return nullptr;
-        }
     }
 
     entry->entryIndex = index;
@@ -202,12 +201,13 @@ RegionCode GameDatabase::readRegionCodeAtIndex(uint16_t index) {
         + sizeof(Entry::categoryCode)
         + sizeof(Entry::uniqueID);
 
-    if (fseek(databaseFile, offset, SEEK_SET) != 0) {
+    if (!seekTo(offset)) {
         return RegionCode::UNKNOWN;
     }
 
     RegionCode regionCode = RegionCode::UNKNOWN;
-    if (fread(&regionCode, sizeof(regionCode), 1, databaseFile) != 1) {
+
+    if (!readBytes(&regionCode, sizeof(regionCode))) {
         return RegionCode::UNKNOWN;
     }
 
@@ -285,7 +285,7 @@ GameDatabase::Entry* GameDatabase::entryForUniqueID(char uniqueID[2], RegionCode
 }
 
 GameDatabase::Entry* GameDatabase::entryForROMFile(ROMFile* romFile) {
-    if (!databaseFile) {
+    if (!isDatabaseOpen()) {
         return nullptr;
     }
     
@@ -297,32 +297,29 @@ GameDatabase::Entry* GameDatabase::entryForROMFile(ROMFile* romFile) {
     }
 }
 
-void GameDatabase::warmLabelClusterOffset(Entry* entry) {
-    if (!databaseFile) {
-        return;
+#ifdef N64
+void GameDatabase::warmClusterOffsets(const std::vector<GameDatabase::Entry*>& entries) {
+    for (GameDatabase::Entry* entry : entries) {
+        uint16_t tileIndex = entry->smallLabelTileIndex;
+        int tileOffset = getLabelTileOffset(tileIndex);
+
+        // Cache FAT cluster offsets of each label in the database
+        f_lseek(&file, tileOffset);
+        entry->labelTileCluster = file.clust;
     }
 
-    #ifndef RELEASE_BUILD
-    return;
-    #endif
-
-    #ifdef N64
-    uint16_t tileIndex = entry->smallLabelTileIndex;
-    int tileOffset = getLabelTileOffset(tileIndex);
-
-    if (USE_DMA) {
-        if (entry->labelTileCluster == 0) {
-            f_lseek(&fil, tileOffset);
-            entry->labelTileCluster = fil.clust;
+    for (GameDatabase::Entry* entry : entries) {
+        if (!entry->hasCheatDatabase()) {
+            continue;
         }
+        
+        f_lseek(&file, cheatsStartOffset + entry->cheatByteOffset);
+        entry->cheatsCluster = file.clust;
     }
-    #endif
 }
 
-#ifdef N64
 bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, int chunkOffset, int chunkCount) {
-    if (!databaseFile) {
-        debugf("no entry!\n");
+    if (!isDatabaseOpen()) {
         return false;
     }
 
@@ -332,10 +329,8 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 
         entry = &placeholderEntry;
     }
-    else {
-        if (highRes && entry->largeLabelTileIndex == 0) {
-            return false;
-        }
+    else if (highRes && entry->largeLabelTileIndex == 0) {
+        return false;
     }
 
     uint16_t tileIndex = highRes ? entry->largeLabelTileIndex : entry->smallLabelTileIndex;
@@ -344,44 +339,33 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 
     size_t size = DB_LABEL_TILE_SIZE * chunkCount;
 
-    int tileOffset = getLabelTileOffset(tileIndex);
+    int tileByteOffset = getLabelTileOffset(tileIndex);
 
     int bufferOffset = DB_LABEL_TILE_SIZE * chunkOffset;
 
-    if (USE_DMA) {
-        if (entry->labelTileCluster != 0 && !highRes) {
-            fil.clust = entry->labelTileCluster;
-            fil.fptr = tileOffset;
-        }
-        else {
-            f_lseek(&fil, tileOffset);
-
-            if (!highRes) {
-                entry->labelTileCluster = fil.clust;
-            }
-        }
-
-        UINT bytesRead = 0;
-
-        size_t chunk = size;
-        chunk += (DB_LABEL_PADDING_PER_CHUNK * (chunkCount / DB_LABEL_TILES_PER_CHUNK));
-
-        f_read(&fil, (void *) (useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), chunk, &bytesRead);
-        data_cache_hit_writeback_invalidate(buffer + bufferOffset, size);
-        dma_read_raw_async(buffer + bufferOffset, (useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), size);
-        // dma_wait();
-
-        useBSpace = !useBSpace;
+    if (entry->labelTileCluster != 0 && !highRes) {
+        file.clust = entry->labelTileCluster;
+        file.fptr = tileByteOffset;
     }
     else {
-        fseek(databaseFile, tileOffset, SEEK_SET);
+        f_lseek(&file, tileByteOffset);
 
-        if (fread(buffer + bufferOffset, size, 1, databaseFile) != 1) {
-            return false;
+        if (!highRes) {
+            entry->labelTileCluster = file.clust;
         }
-
-        data_cache_hit_writeback_invalidate(buffer + bufferOffset, size);
     }
+
+    UINT bytesRead = 0;
+
+    size_t chunk = size;
+    chunk += (DB_LABEL_PADDING_PER_CHUNK * (chunkCount / DB_LABEL_TILES_PER_CHUNK));
+
+    f_read(&file, (void *)(useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), chunk, &bytesRead);
+    data_cache_hit_writeback_invalidate(buffer + bufferOffset, size);
+    dma_read_raw_async(buffer + bufferOffset, (useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), size);
+    // dma_wait();
+
+    useBSpace = !useBSpace;
 
     #ifdef N64
     // data_cache_hit_writeback(buffer + bufferOffset, size);
@@ -391,12 +375,78 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 }
 #endif
 
-CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
-    if (!databaseFile) {
+SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
+    if (!isDatabaseOpen()) {
         return nullptr;
     }
 
-    if (!entry || entry->cheatByteOffset == 0xFFFFFFFF) {
+    if (!entry || !entry->hasSpeedrunDatabase()) {
+        debugf("[GameDatabase] No speedruns for this entry\n");
+        return nullptr;
+    }
+
+    long offset = speedrunsStartOffset + (long)entry->speedrunsByteOffset;
+
+    debugf("[GameDatabase] Reading speedruns at local offset: %li\n", (long)entry->speedrunsByteOffset);
+    debugf("[GameDatabase] Global offset: %li\n", offset);
+
+    if (!seekTo(offset)) {
+        debugf("[GameDatabase] Failed to seek to offset %li\n", offset);
+        return nullptr;
+    }
+
+    uint32_t addresses[4] = {};
+
+    // TODO: Read straight into database header instead
+    if (!readBytes(addresses, sizeof(addresses))) {
+        debugf("[GameDatabase] Failed to read speedrun addresses\n");
+        return nullptr;
+    }
+
+    uint8_t counts[4] = {};
+
+    if (!readBytes(counts, sizeof(counts))) {
+        debugf("[GameDatabase] Failed to read speedrun counts\n");
+        return nullptr;
+    }
+
+    int8_t frameDelayOffset = (int8_t)counts[0];
+    uint8_t groupCount = counts[1];
+    uint8_t speedrunCount = counts[2];
+
+    SpeedrunDatabase* speedrunDatabase = new SpeedrunDatabase();
+
+    speedrunDatabase->gameCRC1 = addresses[0];
+    speedrunDatabase->currentFrameAddress = addresses[1];
+    speedrunDatabase->controllerWriteAddress = addresses[2];
+    speedrunDatabase->controllerReadAddress = addresses[3];
+    speedrunDatabase->frameDelayOffset = frameDelayOffset;
+
+    speedrunDatabase->groups.resize(groupCount);
+    speedrunDatabase->entries.resize(speedrunCount);
+
+    bool didReadAll =
+        readBytes(speedrunDatabase->groups.data(),  sizeof(SpeedrunGroup) * groupCount)
+     && readBytes(speedrunDatabase->entries.data(), sizeof(SpeedrunEntry) * speedrunCount)
+    ;
+
+    if (!didReadAll) {
+        debugf("[GameDatabase] Failed to read speedrun database\n");
+
+        delete speedrunDatabase;
+
+        return nullptr;
+    }
+
+    return speedrunDatabase;
+}
+
+CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
+    if (!isDatabaseOpen()) {
+        return nullptr;
+    }
+
+    if (!entry || !entry->hasCheatDatabase()) {
         debugf("[GameDatabase] No cheats for this entry\n");
         return nullptr;
     }
@@ -406,7 +456,12 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     debugf("[GameDatabase] Reading cheats at local offset: %li\n", (long)entry->cheatByteOffset);
     debugf("[GameDatabase] Global offset: %li\n", offset);
 
-    if (fseek(databaseFile, offset, SEEK_SET) != 0) {
+    // if (entry->cheatsCluster != 0) {
+    //     file.clust = entry->cheatsCluster;
+    //     file.fptr = offset;
+    // }
+    // else
+    if (!seekTo(offset)) {
         debugf("[GameDatabase] Failed to seek to offset %li\n", cheatsStartOffset);
         return nullptr;
     }
@@ -414,7 +469,7 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     uint16_t counts[4] = {};
 
     // TODO: Read straight into database header instead
-    if (fread(counts, sizeof(uint16_t), 4, databaseFile) != 4) {
+    if (!readBytes(counts, sizeof(counts))) {
         debugf("[GameDatabase] Failed to read cheat counts\n");
         return nullptr;
     }
@@ -432,10 +487,10 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     cheatDatabase->wildcardOptions.resize(wildcardOptionsCount);
 
     bool didReadAll =
-        fread(cheatDatabase->groups.data(),          sizeof(CheatGroup),          groupCount,           databaseFile) == groupCount
-     && fread(cheatDatabase->cheats.data(),          sizeof(Cheat),               cheatCount,           databaseFile) == cheatCount
-     && fread(cheatDatabase->codes.data(),           sizeof(CheatCode),           codeCount,            databaseFile) == codeCount
-     && fread(cheatDatabase->wildcardOptions.data(), sizeof(CheatWildcardOption), wildcardOptionsCount, databaseFile) == wildcardOptionsCount
+        readBytes(cheatDatabase->groups.data(),          sizeof(CheatGroup)          * groupCount)
+     && readBytes(cheatDatabase->cheats.data(),          sizeof(Cheat)               * cheatCount)
+     && readBytes(cheatDatabase->codes.data(),           sizeof(CheatCode)           * codeCount)
+     && readBytes(cheatDatabase->wildcardOptions.data(), sizeof(CheatWildcardOption) * wildcardOptionsCount)
     ;
 
     if (!didReadAll) {
@@ -451,57 +506,34 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
 
 #ifdef N64
 bool GameDatabase::load(const char* filename) {
-    databaseFile = fopen(filename, "rb");
-
-    if (!databaseFile) {
+    if (f_open(&file, strip_fs_prefix((char*)filename), FA_READ) != FR_OK) {
         debugf("Failed to open database file: %s\n", filename);
+        file = {};
         return false;
     }
 
-    if (USE_DMA) {
-        #ifdef N64
-        f_open(&fil, strip_fs_prefix((char*)filename), FA_READ);
+    UINT bytesRead = 0;
 
-        UINT bytesRead = 0;
+    f_read(&file, (void *)(ROM_ADDRESS_HEADER), DB_DMA_SIZE, &bytesRead);
 
-        // TODO: Determine the actual size of this
-        size_t chunk = KiB(106);
-        f_read(&fil, (void *) (ROM_ADDRESS_HEADER), chunk, &bytesRead);
-
-        data_cache_hit_writeback_invalidate(headerBuffer, sizeof(headerBuffer));
-        dma_read_raw_async(headerBuffer, ROM_ADDRESS_HEADER, sizeof(headerBuffer));
-        dma_wait();
-        #endif
-    }
-    else {
-        if (fread(headerBuffer, sizeof(headerBuffer), 1, databaseFile) != 1) {
-            debugf("Failed to read database header\n");
-            fclose(databaseFile);
-            databaseFile = nullptr;
-            return false;
-        }
-    }
+    data_cache_hit_writeback_invalidate(headerBuffer, sizeof(headerBuffer));
+    dma_read_raw_async(headerBuffer, ROM_ADDRESS_HEADER, sizeof(headerBuffer));
+    dma_wait();
 
     int cursor = 0;
 
-    // READ HEADER
+    // READ MAGIC
     // 4 bytes
-    char header[4];
-    
-    memcpy(&header, &headerBuffer[cursor], 4);
     cursor += 4;
 
-    if (header[0] != 'N' || header[1] != 'U' || header[2] != 'F' || header[3] != 'M') {
+    if (headerBuffer[0] != 'N' || headerBuffer[1] != 'U' || headerBuffer[2] != 'F' || headerBuffer[3] != 'M') {
         debugf("Invalid database header\n");
-        fclose(databaseFile);
-        databaseFile = nullptr;
+        close();
         return false;
     }
 
     // READ ENTRY COUNT
     // 2 bytes
-    entryCount = 0;
-
     memcpy(&entryCount, &headerBuffer[cursor], 2);
     cursor += sizeof(entryCount);
 
@@ -538,6 +570,13 @@ bool GameDatabase::load(const char* filename) {
         titleLookupMap.insert({hash, index});
     }
 
+    // READ COMBINED CHEAT DATABASE SIZE
+    // 4 bytes
+    uint32_t cheatsTotalSize = 0;
+
+    memcpy(&cheatsTotalSize, &headerBuffer[cursor], sizeof(cheatsTotalSize));
+    cursor += sizeof(cheatsTotalSize);
+
     entriesStartOffset = DB_ENTRIES_START_OFFSET;
 
     labelsStartOffset = entriesStartOffset + (entryCount * DB_ENTRY_SIZE);
@@ -550,11 +589,17 @@ bool GameDatabase::load(const char* filename) {
     // end of the tiles block. getLabelTileOffset() applies the same padding math.
     cheatsStartOffset = getLabelTileOffset(tileCount);
 
-    debugf("[GameDatabase] Database Entries:     %d\n", entryCount);
-    debugf("[GameDatabase] Entries Start Offset: %li\n", entriesStartOffset);
-    debugf("[GameDatabase] Pre-labels Padding:   %li\n", labelsPadding);
-    debugf("[GameDatabase] Labels Start Offset:  %li\n", labelsStartOffset);
-    debugf("[GameDatabase] Cheats Start Offset:  %li\n", cheatsStartOffset);
+    // The cheat databases are written back to back with no padding, so the
+    // speedrun section begins directly after the last of them
+    speedrunsStartOffset = cheatsStartOffset + cheatsTotalSize;
+
+    debugf("[GameDatabase] Database Entries:       %d\n", entryCount);
+    debugf("[GameDatabase] Entries Start Offset:   %li\n", entriesStartOffset);
+    debugf("[GameDatabase] Pre-labels Padding:     %li\n", labelsPadding);
+    debugf("[GameDatabase] Labels Start Offset:    %li\n", labelsStartOffset);
+    debugf("[GameDatabase] Cheats Start Offset:    %li\n", cheatsStartOffset);
+    debugf("[GameDatabase] Cheats Total Size:      %lu\n", (unsigned long)cheatsTotalSize);
+    debugf("[GameDatabase] Speedruns Start Offset: %li\n", speedrunsStartOffset);
 
     return true;
 }
@@ -563,6 +608,11 @@ bool GameDatabase::load(const char* filename) {
 void GameDatabase::close() {
     releaseEntriesFromMemory();
 
-    fclose(databaseFile);
-    databaseFile = NULL;
+    #ifdef N64
+    if (isDatabaseOpen()) {
+        f_close(&file);
+    }
+
+    file = {};
+    #endif
 }

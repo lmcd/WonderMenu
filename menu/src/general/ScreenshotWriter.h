@@ -9,9 +9,7 @@
 #include <fatfs/ff.h>
 #include <string>
 
-#ifndef KiB
-#define KiB(x) ((x) * 1024)
-#endif
+#include "utils/utils.h"
 
 /**
  * Streams a pre-built .sprite image out to a file a chunk at a time, so a large

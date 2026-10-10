@@ -26,6 +26,30 @@ extern "C" {
  */
 bool cheats_install(cic_type_t cic_type, uint32_t *cheat_list);
 
+/**
+ * @brief Installs cheats for the HLE boot path.
+ *
+ * Identical to #cheats_install except that the IPL3 in SP DMEM is left alone,
+ * because the HLE path never runs it. `reboot.S` jumps to the patcher itself
+ * after loading the game, with the entry point in `t1` -- the same register
+ * the IPL3 hook would have supplied.
+ *
+ * @param cheat_list A pointer to an array of cheats to be installed.
+ * @return true if the cheats were successfully installed, false otherwise.
+ */
+bool cheats_install_hle(uint32_t *cheat_list);
+
+/**
+ * @brief Address the cheat patcher is staged at.
+ *
+ * The HLE boot path jumps here instead of into the game when cheats were
+ * installed; the patcher relocates the engine, hooks the exception handler and
+ * then continues to the entry point held in `t1`.
+ *
+ * @return The patcher's KSEG0 address.
+ */
+uint32_t cheats_patcher_address(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -41,7 +41,7 @@ struct GameIDMap {
         int a = charToIndex(id[0]);
         int b = charToIndex(id[1]);
 
-        if (a < 0 || b < 0) {
+        if ((a | b) < 0) {
             // Mutable scratch: a bad lookup must not hand back a ref that,
             // when written through, corrupts the shared const fallback.
             static T invalid = Invalid;
@@ -56,7 +56,7 @@ struct GameIDMap {
         int a = charToIndex(id[0]);
         int b = charToIndex(id[1]);
 
-        if (a < 0 || b < 0) {
+        if ((a | b) < 0) {
             static const T invalid = Invalid;
             return invalid;
         }

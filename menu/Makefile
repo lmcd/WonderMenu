@@ -1,5 +1,6 @@
 BUILD_DIR=build/emulator
 T3D_INST=$(N64_INST)
+# N64_ROM_HEADER = /Users/lee/Documents/GitHub/libdragon/boot/bin/ipl3_dev.z64
 
 include $(N64_INST)/include/n64.mk
 include $(N64_INST)/include/t3d.mk
@@ -19,6 +20,15 @@ EXTRA_DEFINES ?=
 # (omitted members are value-initialised) and intentional. Enabling it would mean
 # either listing third-party members we don't set, or rewriting every site.
 N64_CXXFLAGS += -Wall -Wextra -Wno-missing-field-initializers -std=gnu++20 -Os -fno-exceptions -fno-rtti -fno-threadsafe-statics -Isrc $(EXTRA_DEFINES)
+
+# n64.mk passes -MMD but not -MP, so the generated .d files list headers as real
+# prerequisites with no rule to build them. Deleting or moving a header then
+# breaks the build outright ("No rule to make target ...") until the stale .d is
+# removed by hand. -MP emits a phony target for each header, so a missing one
+# just triggers a rebuild of the objects that used it.
+N64_CFLAGS += -MP
+N64_CXXFLAGS += -MP
+N64_ASFLAGS += -MP
 
 MKSPRITE_FLAGS=
 
@@ -174,12 +184,10 @@ clean:
 	rm -rf filesystem
 
 release:
-	rm -rf filesystem/sd
-	$(MAKE) all assets_n64= assets_ini= assets_bin= BUILD_DIR=build/console EXTRA_DEFINES=-DRELEASE_BUILD PROJECT_NAME=$(PROJECT_NAME)-release
+	$(MAKE) all assets_n64= assets_ini= assets_bin= BUILD_DIR=build/console PROJECT_NAME=$(PROJECT_NAME)-release
 
 release-bundle:
-	rm -rf filesystem/*.n64 filesystem/*.v64
-	$(MAKE) all BUILD_DIR=build/console EXTRA_DEFINES=-DRELEASE_BUILD PROJECT_NAME=$(PROJECT_NAME)-release-bundle
+	$(MAKE) all BUILD_DIR=build/console PROJECT_NAME=$(PROJECT_NAME)-release-bundle
 
 build_lib:
 	rm -rf $(BUILD_DIR) *.z64

@@ -19,19 +19,18 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
 
     Color color = fillColor;
     
-    if (finalIsBlendedWithMemory)  {
-        color.a *= finalOpacity;
+    if (finalIsOpaque)  {
+        color.rgb *= finalOpacity;
     }
     else {
-        color.rgb *= finalOpacity;
+        color.a *= finalOpacity;
     }
 
     bool needsScissor = !isPendingFullRender;
     Rect scissorRect = currentRect;
 
     if (needsScissor) {
-        Rect r = scissorRect.intersection(renderInfo.screenRect);
-        pushScissor(r);
+        pushScissor(scissorRect);
     }
 
     sprite_t* sprite = nullptr;
@@ -76,7 +75,7 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
 
     rdpq_mode_push();
 
-    setBlender(finalIsBlendedWithMemory ? WITH_FRAMEBUFFER : WITH_BLEND_COLOR);
+    setBlender(finalIsOpaque ? WITH_BLEND_COLOR : WITH_FRAMEBUFFER);
 
     setPrimitiveColor(color);
     setBlendColor(finalBlendColor);
@@ -89,11 +88,11 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
             if (finalOpacity == 1.0f) {
                 setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (1, 0, TEX0, 0)));
             }
-            else if (finalIsBlendedWithMemory)  {
-                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (PRIM, 0, TEX0, 0)));
+            else if (finalIsOpaque)  {
+                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, TEX0)));
             }
             else {
-                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, TEX0)));
+                setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (PRIM, 0, TEX0, 0)));
             }
         }
 
@@ -138,7 +137,7 @@ void RectView::update(const RenderInfo& renderInfo) {
 
         lastFinalOpacity[bufferIndex] = finalOpacity;
 
-        if (finalIsBlendedWithMemory) {
+        if (!finalIsOpaque) {
             needsClear = true;
         }
     }
@@ -169,7 +168,7 @@ void RectView::update(const RenderInfo& renderInfo) {
     if (finalFrame != lastFinalFrame[bufferIndex]) {
         needsClear = true;
 
-        if (isInverted || finalIsBlendedWithMemory) {
+        if (isInverted || !finalIsOpaque) {
             setNeedsDisplay();
         }
         else {
@@ -217,7 +216,7 @@ void RectView::update(const RenderInfo& renderInfo) {
 
         lastFinalFrame[bufferIndex] = finalFrame;
     }
-    else if (needsRender && finalIsBlendedWithMemory) {
+    else if (needsRender && !finalIsOpaque) {
         needsClear = true;
 
         if (!isPendingFullRender) {
@@ -236,23 +235,21 @@ void RectView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
     if (!needsPartialClear) {
-        clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+        clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
     }
     else {
         for (int i = 0; i < 4; i++) {
             Rect rect = rectsToClear[i];
 
-            if (rect.size.width == 0) {
-                continue;
-            }
-
-            clearRects(rect, finalBlendColor);
+            clearRect(rect, finalBlendColor);
         }
 
         rectsToClear[0].size.width = 0;
         rectsToClear[1].size.width = 0;
         rectsToClear[2].size.width = 0;
         rectsToClear[3].size.width = 0;
+
+        needsPartialClear = false;
     }
 
     drawnBoundingBox[bufferIndex] = Rect();

@@ -11,7 +11,6 @@
 #include "general/Game.h"
 #include "general/InputRepeater.h"
 #include "ui/Scene.h"
-#include "ui/SceneRenderer.h"
 #include "ui/views/GameListView.h"
 #include "ui/views/ScrollbarView.h"
 #include "ui/views/drawables/Cart3DView.h"
@@ -23,6 +22,7 @@ class CartRenderer;
 class GameDatabase;
 class GameLibrary;
 class ChooseVersionPopover;
+class GameLaunchScene;
 
 struct Range {
     int startIndex;
@@ -136,7 +136,6 @@ private:
 
     void moveSelectionBy(int offset, bool force = false);
 
-    void performSelection();
     void toggleRetailGroupings();
     void toggleFavourite();
 
@@ -170,6 +169,8 @@ public:
 
         return 1.0f;
     }
+
+    GameLaunchScene* performSelection(bool animated = true);
 
     void setCurrentTab(Tab _currentTab);
 

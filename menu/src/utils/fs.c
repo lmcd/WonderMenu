@@ -179,7 +179,7 @@ bool file_has_extensions(char *path, const char *extensions[]) {
  * @param path The path to the directory.
  * @return true if the directory exists, false otherwise.
  */
-bool directory_exists(char *path) {
+bool directory_exists(const char *path) {
     struct stat st;
     int error = stat(path, &st);
     return ((error == 0) && S_ISDIR(st.st_mode));
@@ -193,7 +193,7 @@ bool directory_exists(char *path) {
  * @param path The path to the directory.
  * @return false if the directory was successfully created, true if there was an error.
  */
-bool directory_create(char *path) {
+bool directory_create(const char *path) {
     bool error = false;
 
     if (directory_exists(path)) {

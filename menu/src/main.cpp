@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 
 // Game data and database
+#include "flashcart/flashcart.h"
 #include "general/GameDatabase.h"
 #include "general/GameLibrary.h"
 
@@ -18,14 +19,15 @@
 #include "ui/scenes/IntroScene.h"
 #include "ui/scenes/TestScene.h"
 
-GameLaunchSession gameLaunchSession;
+BootSession bootSession;
+WarmResetState warmResetState;
 
 uint32_t get_rom_size(void) {
-    return io_read(0x10000000 + 0x18);  // header reserved word, big-endian
+    return io_read(ROM_ADDRESS + 0x18);  // header reserved word, big-endian
 }
 
 uint32_t get_entry_point(void) {
-    return io_read(0x10000000 + 0x08);  // header entry point (initial PC), big-endian
+    return io_read(ROM_ADDRESS + 0x08);  // header entry point (initial PC), big-endian
 }
 
 // We don't ever return from `main`
@@ -44,13 +46,12 @@ int main()
 
     flashcart_init(&storagePrefix);
 
+    // Restore state from previous launch of WonderMenu, following warm-reset
+    warmResetState.restore();
+
     uint32_t t1 = get_ticks();
 
     debugf("[main] Base loaded: %.3fs\n", (float)TICKS_TO_MS(t1 - t0) / 1000.0f);
-
-    if (strcmp(storagePrefix, "rom:/") == 0) {
-        storagePrefix = "rom:/sd/";
-    }
 
     resolution_t resolution = RESOLUTION_640x480;
 
@@ -100,17 +101,14 @@ int main()
     t3d_destroy();
 
     // Record the launched game in the recents list before booting into it.
-    if (gameLaunchSession.game != nullptr) {
-        gameLibrary.addToRecents(GameGroup(*gameLaunchSession.game));
-
-        gameLibrary.lastLaunchedGame = gameLaunchSession.game;
-        gameLibrary.writeCacheHeader();
+    if (bootSession.game != nullptr) {
+        gameLibrary.addToRecents(GameGroup(*bootSession.game));
     }
     
     // This must be disabled to keep the cart SDRAM writable by the payload.
     // flashcart_deinit();
 
-    gameLaunchSession.launch();
+    bootSession.launch();
 
     assertf(false, "Unexpected return from 'boot' function");
 

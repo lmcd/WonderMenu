@@ -31,6 +31,13 @@ void CheatOptionRowView::update(const RenderInfo& renderInfo) {
 
     titleView.frame.origin = titlePosition;
     titleView.maxWidth = frame.size.width - 20;
-    titleView.maxWidth = 195;
+    titleView.maxWidth = 180;
     titleView.textColor = isSelected ? selectedTitleColor : titleColor;
+
+    if (isSelected) {
+        titleView.startAnimating();
+    }
+    else {
+        titleView.stopAnimating();
+    }
 }

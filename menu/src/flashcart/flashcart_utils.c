@@ -4,6 +4,8 @@
  * @ingroup flashcart
  */
 
+#include <math.h>
+
 #include <libdragon.h>
 
 #include "flashcart_utils.h"
@@ -117,4 +119,174 @@ bool fatfs_get_file_sectors (char *path, uint32_t *address, address_type_t type,
     }
 
     return error;
+}
+
+/**
+ * @brief Update the progress bookkeeping of a chunked load session.
+ * 
+ * @param session Pointer to the load session.
+ * @param loaded Number of bytes loaded by the last read.
+ */
+static void update_load_rom_session_progress (flashcart_load_rom_session_t *session, UINT loaded) {
+    session->loaded_bytes += loaded;
+    session->progress = fminf(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
+}
+
+flashcart_load_rom_session_t flashcart_utils_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk, size_t max_rom_size) {
+    FIL fil;
+
+    // Opening from a locator captured when the directory was enumerated costs
+    // no disk access, where opening by path has to walk and scan every
+    // component. Falls back to the path when there's no usable locator.
+    FRESULT open_result = FR_INVALID_OBJECT;
+
+    if (rom_object != NULL && rom_object->fs != NULL) {
+        open_result = f_open_obj(&fil, rom_object, FA_READ);
+
+        if (open_result != FR_OK) {
+            debugf("[FLASHCART] Locator open failed (%i), falling back to path\n", (int)open_result);
+        }
+    }
+
+    if (open_result != FR_OK) {
+        open_result = f_open(&fil, strip_fs_prefix(rom_path), FA_READ);
+    }
+
+    if (open_result != FR_OK) {
+        return (flashcart_load_rom_session_t) {};
+    }
+
+    fatfs_fix_file_size(&fil);
+
+    size_t rom_size = f_size(&fil);
+
+    if (rom_size > max_rom_size) {
+        f_close(&fil);
+        return (flashcart_load_rom_session_t) {};
+    }
+
+    size_t chunk_size = KiB(128);
+
+    size_t sdram_size = rom_size;
+
+    unsigned int offset = chunk_size * initial_chunk;
+
+    f_lseek(&fil, offset);
+
+    return (flashcart_load_rom_session_t) {
+        fil,
+        chunk_size,
+        sdram_size,
+        initial_chunk,
+        rom_size,
+        initial_chunk,
+        0,
+        0,
+        false
+    };
+}
+
+flashcart_err_t flashcart_utils_load_next_rom_chunk (flashcart_load_rom_session_t *session, uint32_t rom_address, bool load_beginning_chunks) {
+    FIL *fil = &session->fil;
+    UINT br;
+    size_t sdram_size = session->sdram_size;
+
+    unsigned int offset = session->chunk_size * session->current_chunk;
+
+    if (session->has_loaded_end_chunk) {
+        if (!load_beginning_chunks) {
+            return FLASHCART_ERR_LOAD;
+        }
+
+        if (session->current_chunk >= session->initial_chunk) {
+            return FLASHCART_ERR_LOAD;
+        }
+    }
+
+    if (offset >= sdram_size) {
+        session->has_loaded_end_chunk = true;
+        session->current_chunk = 0;
+
+        offset = 0;
+
+        f_lseek(fil, 0);
+
+        if (!load_beginning_chunks || session->initial_chunk == 0) {
+            return FLASHCART_ERR_LOAD;
+        }
+    }
+
+    size_t block_size = MIN(sdram_size - offset, session->chunk_size);
+    if (f_read(fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
+        f_close(fil);
+        return FLASHCART_ERR_LOAD;
+    }
+
+    update_load_rom_session_progress(session, br);
+
+    session->current_chunk++;
+
+    return FLASHCART_OK;
+}
+
+flashcart_err_t flashcart_utils_finish_load_rom_session (flashcart_load_rom_session_t *session, uint32_t rom_address, flashcart_progress_callback_t *progress) {
+    FIL *fil = &session->fil;
+    UINT br;
+    size_t sdram_size = session->sdram_size;
+    size_t chunk_size = session->chunk_size;
+
+    unsigned int start_offset = chunk_size * session->current_chunk;
+
+    if (!session->has_loaded_end_chunk) {
+        for (unsigned int offset = start_offset; offset < sdram_size; offset += chunk_size) {
+            size_t block_size = MIN(sdram_size - offset, chunk_size);
+            if (f_read(fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
+                f_close(fil);
+                return FLASHCART_ERR_LOAD;
+            }
+
+            update_load_rom_session_progress(session, br);
+
+            if (progress) {
+                progress(session->progress);
+            }
+
+            session->current_chunk++;
+        }
+
+        if (f_tell(fil) != sdram_size) {
+            f_close(fil);
+            return FLASHCART_ERR_LOAD;
+        }
+
+        f_lseek(fil, 0);
+
+        session->has_loaded_end_chunk = true;
+        session->current_chunk = 0;
+        start_offset = 0;
+    }
+
+    unsigned int end_offset = chunk_size * session->initial_chunk;
+
+    for (unsigned int offset = start_offset; offset < end_offset; offset += chunk_size) {
+        size_t block_size = MIN(sdram_size - offset, chunk_size);
+        if (f_read(fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
+            f_close(fil);
+            return FLASHCART_ERR_LOAD;
+        }
+
+        update_load_rom_session_progress(session, br);
+
+        if (progress) {
+            progress(session->progress);
+        }
+
+        session->current_chunk++;
+    }
+
+    if (f_close(fil) != FR_OK) {
+        return FLASHCART_ERR_LOAD;
+    }
+
+    return FLASHCART_OK;
 }

@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include <libdragon.h>
 #include <cstring>
 #include <cmath>
-#include <libdragon.h>
 
 #include "../libdragon/rdpq_font_internal.h"
 #include "ui/Fonts.h"
@@ -32,15 +32,25 @@ struct LabelReferenceView : public Drawable {
 private:
     const char* lastStringReference[BUFF_COUNT] = {};
 
-    void renderLabel(const RenderInfo&) {
+    uint16_t animationFrame = 0;
+
+    // Shift applied to the unclipped layout so its first glyph lands exactly
+    // where the static layout's did, rather than jumping to wherever the
+    // unclipped layout would put it (a few pixels off for anything not
+    // left-aligned). Relative to the frame.
+    int animationStartX = 0;
+
+    // How far the text has scrolled left of `animationStartX`
+    int animationOffset = 0;
+
+    int animationDelayFrames = 0;
+
+    void renderLabel(const RenderInfo&, int x0, int y0) {
         Color color = textColor;
         color.a *= finalOpacity;
 
         Color blendColor = finalBlendColor;
         blendColor.a = 0;
-
-        int x0 = finalFrame.origin.x + layout->x0;
-        int y0 = finalFrame.origin.y + layout->y0;
 
         const rdpq_font_t* font = nullptr;
 
@@ -74,7 +84,7 @@ private:
 
                 rdpq_mode_begin();
                     setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
-                    setBlender(finalIsBlendedWithMemory ? WITH_FRAMEBUFFER : WITH_BLEND_COLOR);
+                    setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
                     rdpq_mode_alphacompare(1);
                 rdpq_mode_end();
 
@@ -109,10 +119,28 @@ protected:
 
     rdpq_paragraph_t* layout = nullptr;
 
+    bool lastIsAnimating[BUFF_COUNT] = {};
+
+    void updateAnimation(const RenderInfo& renderInfo) {
+        int bufferIndex = renderInfo.bufferIndex;
+
+        if (isAnimating != lastIsAnimating[bufferIndex]) {
+            needsClear = true;
+            needsRender = true;
+
+            lastIsAnimating[bufferIndex] = isAnimating;
+        }
+
+        if (isAnimating) {
+            needsClear = true;
+            needsRender = true;
+        }
+    }
+
     void updateParagraphLayout() {
         rdpq_textparms_t params = {
-            .width = (int16_t)maxWidth,
-            .align = align,
+            .width = isAnimating ? (int16_t)10000 : (int16_t)maxWidth,
+            .align = isAnimating ? ALIGN_LEFT : align,
             .wrap = WRAP_ELLIPSES,
             .disable_aa_fix = true
         };
@@ -140,6 +168,55 @@ public:
     Color alternateColor = Color::RED;
     const char* stringReference = nullptr;
 
+    bool isAnimating = false;
+
+    void startAnimating(int delayFrames = 45) {
+        if (isAnimating) {
+            return;
+        }
+
+        // `layout` might be `nullptr`, so update the layout to be sure.
+        updateParagraphLayout();
+
+        float staticStartX = layout->x0 + layout->bbox.x0;
+
+        isAnimating = true;
+        animationFrame = 0;
+        animationOffset = 0;
+        animationDelayFrames = delayFrames;
+
+        // Layout will be different now, as it takes into account `isAnimating`.
+        updateParagraphLayout();
+
+        float textWidth = layout->bbox.x1 - layout->bbox.x0;
+
+        // Text that already fits has nothing to scroll.
+        if (textWidth <= maxWidth) {
+            stopAnimating();
+            return;
+        }
+
+        // Taken against the unclipped layout's own start, so drawing it at the
+        // frame plus this puts its first glyph exactly on `staticStartX`
+        float unclippedStartX = layout->x0 + layout->bbox.x0;
+
+        animationStartX = (int)roundf(staticStartX - unclippedStartX);
+    }
+
+    void stopAnimating() {
+        if (!isAnimating) {
+            return;
+        }
+
+        isAnimating = false;
+        animationFrame = 0;
+        animationOffset = 0;
+        animationDelayFrames = 0;
+        animationStartX = 0;
+
+        updateParagraphLayout();
+    }
+
     /**
      * Size the frame to the laid-out text
      */
@@ -147,8 +224,8 @@ public:
         updateParagraphLayout();
 
         frame.size = Size(
-            (int)(layout->bbox.x1 - layout->bbox.x0),
-            (int)(layout->bbox.y1 - layout->bbox.y0)
+             (int)ceilf(layout->bbox.x1 - layout->bbox.x0) + 1,
+            (int)ceilf(layout->bbox.y1 - layout->bbox.y0) + 1
         );
     }
 
@@ -162,21 +239,28 @@ public:
             needsRender = true;
 
             updateParagraphLayout();
+            stopAnimating();
 
             lastStringReference[bufferIndex] = stringReference;
         }
+
+        updateAnimation(renderInfo);
     }
 
     void clear(const RenderInfo& renderInfo) {
         int bufferIndex = renderInfo.bufferIndex;
 
-        clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+        clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
         drawnBoundingBox[bufferIndex] = Rect();
     }
 
     void render(const RenderInfo& renderInfo) override {
         if (finalIsHidden) {
+            return;
+        }
+
+        if (finalOpacity == 0.0f) {
             return;
         }
 
@@ -188,36 +272,68 @@ public:
             return;
         }
 
+        if (layout->nchars == 0) {
+            drawnBoundingBox[renderInfo.bufferIndex] = Rect();
+            finishRender();
+            return;
+        }
+
         int bufferIndex = renderInfo.bufferIndex;
 
-        renderLabel(renderInfo);
+        int x0 = finalFrame.origin.x + layout->x0;
+        int y0 = finalFrame.origin.y + layout->y0;
 
-        int advanceX = (int)ceil(layout->advance_x);
+        int textY = y0 + (int)floorf(layout->bbox.y0);
+        int textHeight = (int)ceilf(layout->bbox.y1 - layout->bbox.y0) + 1;
 
-        if (advanceX == 0) {
-            advanceX = maxWidth;
+        if (isAnimating) {
+            Rect scissorRect = Rect(
+                finalFrame.origin.x,
+                textY,
+                maxWidth,
+                textHeight
+            );
+
+            // Nothing of the label is on screen, so there's nothing to draw (or
+            // to clear next time)
+            if (scissorRect.size.width == 0 || scissorRect.size.height == 0) {
+                drawnBoundingBox[bufferIndex] = Rect();
+
+                finishRender();
+
+                return;
+            }
+
+            pushScissor(scissorRect);
+
+            x0 = finalFrame.origin.x + animationStartX - animationOffset;
+
+            // Don't animate until the specified delay has elapsed
+            if (animationFrame >= animationDelayFrames) {
+                animationOffset++;
+            }
+            
+            animationFrame++;
         }
 
-        int textX = finalFrame.origin.x;
-        int textY = finalFrame.origin.y + layout->bbox.y0;
+        renderLabel(renderInfo, x0, y0);
 
-        if (align == ALIGN_RIGHT) {
-            textX += (maxWidth - advanceX);
-        }
-        else if (align == ALIGN_CENTER) {
-            textX += (maxWidth - advanceX) / 2;
-        }
-
+        // Built from the same x0 the text was drawn at, so the next clear of
+        // this buffer erases it wherever it has scrolled to. Taken while the
+        // animation's scissor is still pushed, so it's clipped to it too.
         Rect boundingBox = Rect(
-            textX,
+            x0 + (int)floorf(layout->bbox.x0),
             textY,
-            (int)(layout->bbox.x1 - layout->bbox.x0),
-            (int)(layout->bbox.y1 - layout->bbox.y0)
+            (int)ceilf(layout->bbox.x1 - layout->bbox.x0) + 1,
+            textHeight
         );
-        boundingBox = boundingBox.insetBy(Vec2(-1, 0));
-        
+
         if (hasScissor) {
-            boundingBox = boundingBox.intersection(scissorStack.back());
+            boundingBox = boundingBox.intersection(currentScissor());
+        }
+
+        if (isAnimating) {
+            popScissor();
         }
 
         drawnBoundingBox[bufferIndex] = boundingBox;

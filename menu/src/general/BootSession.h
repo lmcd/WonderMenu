@@ -13,6 +13,7 @@
 #include <filesystem>
 
 #include "boot/boot.h"
+#include "flashcart/flashcart.h"
 #include "general/CheatDatabase.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
@@ -37,7 +38,7 @@ struct BootSession {
     bool hasStagedFirstMB = false;
 
     // `PayloadData` lives at the start of the expansion pak's upper 4 MiB.
-    PayloadData* payloadData = (PayloadData*)0xA0400000;
+    PayloadData* payloadData = (PayloadData*)PAYLOAD_ADDRESS;
     SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
     GameInfo* gameInfo = &payloadData->gameInfo;
@@ -93,23 +94,31 @@ cheatLimitReached:
         m64File = nullptr;
         cheatCodes.clear();
 
-        if (speedrunsState.selectedCRC != 0) {
+        if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
             SpeedrunDatabase* speedrunDatabase = database.loadSpeedrunDatabase(game->databaseEntry);
 
-            for (M64File* candidate : game->m64Files) {
-                if (candidate->crc == speedrunsState.selectedCRC) {
-                    m64File = candidate;
-                    break;
+            if (speedrunsState.isRecording) {
+                cheatCodes.push_back({0xBE400240, 0x0000}); // NMI-reset handler
+                cheatCodes.push_back({0xBD400250, 0x0000}); // M64-write
+            }
+            else {
+                for (M64File* candidate : game->m64Files) {
+                    if (candidate->crc == speedrunsState.selectedCRC) {
+                        m64File = candidate;
+                        break;
+                    }
+                }
+
+                if (m64File != nullptr) {
+                    cheatCodes.push_back({0xBD400248, 0x0000}); // M64-read
                 }
             }
 
-            if (m64File != nullptr) {
-                cheatCodes.push_back({0xBD400248, 0x0000});
-
-                speedrunSettings->controllerInputAddress = speedrunDatabase->controllerInputAddress;
-                speedrunSettings->currentFrameAddress = speedrunDatabase->currentFrameAddress;
-                speedrunSettings->frameDelayOffset = speedrunDatabase->frameDelayOffset;
-            }
+            speedrunSettings->controllerWriteAddress = speedrunDatabase->controllerWriteAddress;
+            speedrunSettings->controllerReadAddress = speedrunDatabase->controllerReadAddress;
+            speedrunSettings->currentFrameAddress = speedrunDatabase->currentFrameAddress;
+            speedrunSettings->frameDelayOffset = speedrunDatabase->frameDelayOffset;
+            speedrunSettings->isRecording = speedrunsState.isRecording;
         }
         else {
             CheatDatabase* cheatsDatabase = database.loadCheatDatabase(game->databaseEntry);
@@ -150,13 +159,17 @@ cheatLimitReached:
             return;
         }
 
-        m64File->stageInputsTable(0x80600000);
+        m64File->stageInputsTable(M64_INPUTS_ADDRESS);
 
-        debugf("[BootSession] Staged inputs table\n");
+        debugf("[BootSession] Staged inputs table from %s (%lu bytes)\n", m64File->filename.c_str(), (unsigned long)m64File->size);
     }
 
     void loadSaveFile() {
         if (m64File != nullptr) {
+            return;
+        }
+
+        if (speedrunSettings->isRecording) {
             return;
         }
 

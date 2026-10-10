@@ -10,6 +10,7 @@
 #include <math.h>
 
 #include "animation/TimingFunctions.h"
+#include "general/SceneStates.h"
 #include "ui/scenes/GameInfoScene.h"
 #include "ui/scenes/GameLaunchScene.h"
 
@@ -39,7 +40,7 @@ void GameInfoTransitionScene::didBeginScene(SceneEntry entry) {
 
         gameInfoScene->view.frame = view.frame;
         gameInfoScene->renderer = renderer;
-        gameInfoScene->setCurrentTab(GameInfoScene::TAB_CHEATS);
+        gameInfoScene->loadCurrentTab();
     }
     else {
         transition.direction = Transition::BACKWARDS;
@@ -57,14 +58,15 @@ void GameInfoTransitionScene::updateViews(const RenderInfo& renderInfo) {
 
     float yOffset = std::lerp(renderInfo.screenRect.size.height, 0, value);
 
-    gameLaunchScene->cart3DView.intensity = opacityOut;
-
     gameInfoScene->contentYOffset = yOffset;
     gameInfoScene->tabControlView.opacity = opacityIn;
     gameInfoScene->scrollbarView.opacity = opacityIn;
 
     gameLaunchScene->updateViews(renderInfo);
     gameInfoScene->updateViews(renderInfo);
+
+    gameLaunchScene->cart3DView.intensity = opacityOut;
+    gameLaunchScene->labelView.opacity = opacityOut;
 
     View* mainContentView = gameInfoScene->mainContentView;
     bool needsScissor = (mainContentView != nullptr);

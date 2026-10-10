@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "utils/utils.h"
 #ifdef N64
 #include <libdragon.h>
 #include <fatfs/ff.h>
@@ -22,66 +23,88 @@ extern "C" {
 #include "GameIDMap.h"
 #include "Region.h"
 #include "ROMFile.h"
+#include "SpeedrunDatabase.h"
 
 /**
- * Width in pixels of each label tile segment
+ * Width in pixels of each label tile.
  */
 constexpr int DB_LABEL_TILE_WIDTH  = 38;
+
 /**
- * Height in pixels of each label tile segment
+ * Height in pixels of each label tile.
  */
 constexpr int DB_LABEL_TILE_HEIGHT = 44;
+
 /**
- * Number of tiles used to display a small cartridge label
+ * Number of tiles used to display a small cartridge label.
  */
 constexpr int DB_S_LABEL_TILE_COUNT = 4; 
+
 /**
- * Number of tiles used to display a large cartridge label
+ * Number of tiles used to display a large cartridge label.
  */
 constexpr int DB_L_LABEL_TILE_COUNT = 16; 
+
 /**
- * Size in bytes of each label tile segment
+ * Size in bytes of each label tile.
  */
 constexpr int DB_LABEL_TILE_SIZE = (DB_LABEL_TILE_WIDTH * DB_LABEL_TILE_HEIGHT * 2);
+
 /**
- * How many tiles can be fetched at once
+ * How many tiles can be fetched at once.
  */
 constexpr int DB_LABEL_TILES_PER_CHUNK = 4;
+
 constexpr int DB_LABEL_CHUNKS_PER_S_LABEL = DB_S_LABEL_TILE_COUNT / DB_LABEL_TILES_PER_CHUNK;
 constexpr int DB_LABEL_CHUNKS_PER_L_LABEL = DB_L_LABEL_TILE_COUNT / DB_LABEL_TILES_PER_CHUNK;
 
 /**
- * Number of bytes to pad to take DB_LABEL_TILE_SIZE to a multuple of 512
+ * Number of bytes to pad to take DB_LABEL_TILE_SIZE to a multiple of 512.
  */
 constexpr int DB_LABEL_PADDING_PER_CHUNK = (512 - ((DB_LABEL_TILE_SIZE * DB_LABEL_TILES_PER_CHUNK) % 512)) % 512;
 
 constexpr int DB_LABEL_CHUNK_SIZE = (DB_LABEL_TILES_PER_CHUNK * DB_LABEL_TILE_SIZE) + DB_LABEL_PADDING_PER_CHUNK;
+
 /**
- * Size in bytes of each game entry in the database
- */
-constexpr size_t DB_ENTRY_SIZE = 50 + 50 + 4 + 1 + 2 + 2 + 4 + 1;
-/**
- * Size in bytes of each small game label in the database
+ * Size in bytes of each small game label in the database.
  */
 constexpr size_t DB_S_LABEL_SIZE = DB_LABEL_TILE_SIZE * DB_S_LABEL_TILE_COUNT;
+
 /**
- * Size in bytes of each large game label in the database
+ * Size in bytes of each large game label in the database.
  */
 constexpr size_t DB_L_LABEL_SIZE = DB_LABEL_TILE_SIZE * DB_L_LABEL_TILE_COUNT;
 
 constexpr size_t DB_S_LABEL_SIZE_PADDED = DB_S_LABEL_SIZE + (DB_LABEL_CHUNKS_PER_S_LABEL * DB_LABEL_PADDING_PER_CHUNK);
 constexpr size_t DB_L_LABEL_SIZE_PADDED = DB_L_LABEL_SIZE + (DB_LABEL_CHUNKS_PER_L_LABEL * DB_LABEL_PADDING_PER_CHUNK);
 
+constexpr size_t DB_ENTRY_TITLE_LENGTH = 64;
+constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
+
+/**
+ * Spare bytes padded to the end of every entry.
+ */
+constexpr size_t DB_ENTRY_RESERVED_LENGTH = 6;
+
+/**
+ * Size in bytes of each game entry in the database
+ */
+constexpr size_t DB_ENTRY_SIZE = DB_ENTRY_TITLE_LENGTH + DB_ENTRY_DEVELOPER_LENGTH + 4 + 1 + 1 + 2 + 2 + 4 + 4
+                               + DB_ENTRY_RESERVED_LENGTH;
+
+static_assert(DB_ENTRY_SIZE == 120, "DB_ENTRY_SIZE must stay at 120 bytes");
+
+// Every entry must begin on a 2-byte boundary, which single-entry PI DMA requires
+static_assert(DB_ENTRY_SIZE % 2 == 0, "DB_ENTRY_SIZE must stay even for PI DMA");
+
 // TODO: don't hardcode
 constexpr int DB_ENTRIES_START_OFFSET = 5224;
 
+constexpr int DB_DMA_SIZE = KiB(112);
+// constexpr int DB_DMA_SIZE = DB_ENTRIES_START_OFFSET + (DB_ENTRY_SIZE * 906);
+
 /**
- * Parses the WonderMenu.db format
- * The database contains a list of all games released for the N64 with various metadata:
- *  - Title
- *  - Developer
- *  - Unique Game ID
- *  - Binary Label Data
+ * Represents the WonderMenu.db database format.
  */
 class GameDatabase {
 public:
@@ -90,32 +113,50 @@ public:
      */
     struct __attribute__((packed)) Entry {
         // The title of the game (e.g. Banjo Kazooie)
-        char title[50];
+        char title[DB_ENTRY_TITLE_LENGTH];
 
         // The developer of the game (e.g. Rareware)
-        char developer[50];
+        char developer[DB_ENTRY_DEVELOPER_LENGTH];
 
         // An alphanumeric character that specifies the kind of media the game is stored on.
         CategoryCode categoryCode;
 
         // The 2 character game ID (e.g. BK)
-        char uniqueID[2];
+        char uniqueID[2] = "0";
 
         RegionCode regionCode;
 
         SaveType saveType;
 
-        uint16_t smallLabelTileIndex = 0;
-        uint16_t largeLabelTileIndex = 0;
-        uint32_t cheatByteOffset;  // byte offset into cheat data section, 0xFFFFFFFF = no cheats
+        uint8_t cicType;
 
-        uint8_t supportsSpeedruns = 0;
+        uint16_t smallLabelTileIndex;
+        uint16_t largeLabelTileIndex;
+
+        // Byte offset into cheat data section
+        // 0xFFFFFFFF = no cheats
+        uint32_t cheatByteOffset;
+
+        // Byte offset into speedrun data section
+        // 0xFFFFFFFF = no speedruns
+        uint32_t speedrunsByteOffset;
+
+        // Spare room for fields added later
+        uint8_t reserved[DB_ENTRY_RESERVED_LENGTH];
 
         // Not imported from .db file:
+
         uint32_t labelTileCluster = 0;
+        uint32_t cheatsCluster = 0;
         uint16_t entryIndex;
 
-        Entry();
+        bool hasSpeedrunDatabase() {
+            return speedrunsByteOffset != NO_SPEEDRUNS_DATABASE;
+        }
+
+        bool hasCheatDatabase() {
+            return cheatByteOffset != NO_CHEATS_DATABASE;
+        }
 
         bool hasHomebrewGameCode() {
             // Homebrew developed with libdragon has a 'ED' unique ID
@@ -136,15 +177,12 @@ private:
     GameIDMap<DatabaseLookupEntry> gameIDMap;
 
     std::unordered_map<uint32_t, uint16_t> titleLookupMap;
-    
-    // The file handler pointing to WonderMenu.db
-    // We read from this during the lifetime of `GameDatabase`
-    FILE* databaseFile;
-    
+
     Entry placeholderEntry;
 
     #ifdef N64
-    FIL fil;
+    // Zeroed so `obj.fs` reads as null (not open) until load() opens it
+    FIL file = {};
     #endif
 
     /**
@@ -162,14 +200,20 @@ private:
     long entriesStartOffset;
     long labelsStartOffset;
     long cheatsStartOffset;
+    long speedrunsStartOffset;
 
     bool useBSpace = false;
+
+    bool seekTo(long offset);
+    bool readBytes(void* buffer, size_t size);
 
 public:
     GameDatabase();
     ~GameDatabase();
 
     static uint32_t djb2(const unsigned char* data, size_t length);
+
+    bool isDatabaseOpen();
 
     int getLabelTileOffset(int tileIndex);
 
@@ -219,14 +263,20 @@ public:
 
     void close();
 
-    void warmLabelClusterOffset(Entry* entry);
-
     #ifdef N64
+    void warmClusterOffsets(const std::vector<GameDatabase::Entry*>& entries);
+
     bool loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, int chunkOffset, int chunkCount);
     #endif
 
     /**
-     * Load the CheatDatabase for a given database entry
+     * Load the CheatDatabase for a given database entry.
      */
     CheatDatabase* loadCheatDatabase(Entry* entry);
+
+    /**
+     * Load the SpeedrunDatabase for a given database entry, or `nullptr` when
+     * the entry has none. The caller owns the result.
+     */
+    SpeedrunDatabase* loadSpeedrunDatabase(Entry* entry);
 };

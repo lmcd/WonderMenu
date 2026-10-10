@@ -17,6 +17,10 @@ class ListScene;
 
 class IntroScene : public Scene {
 private:
+    enum Job {
+        JOB_LOAD_DEBUG_WELCOME_TEXT
+    };
+    
     GameLibrary* gameLibrary;
 
     RectView rectView;

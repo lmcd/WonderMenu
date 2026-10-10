@@ -10,24 +10,20 @@
 #include <string>
 
 #include "main.h"
+
 #include "general/CheatDatabase.h"
 #include "general/Game.h"
 #include "ui/popovers/ChooseCheatOptionPopover.h"
 #include "ui/SceneRenderer.h"
 #include "ui/views/ScrollbarView.h"
 
-CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
+CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase)
     : GameInfoTabScene(),
-      cheatsDatabase(cheatsDatabase) {
-
-    if (cheatsDatabase) {
-        expandedGroupIndexes.clear();
-        enabledCheatIndexes.clear();
-    }
-
+      cheatsDatabase(cheatsDatabase),
+      expandedGroupIndexes(state.expandedGroupIndexes),
+      enabledCheatIndexes(state.enabledCheatIndexes),
+      multipleChoiceIndexes(state.multipleChoiceIndexes) {
     rebuildRows();
-
-    mainContentView = &tableView;
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
@@ -37,6 +33,10 @@ CheatsScene::CheatsScene(CheatDatabase* cheatsDatabase)
 
     view.addSubview(&tableView);
     view.addSubview(&labelView);
+
+    if (rows.size() > 0) {
+        mainContentView = &tableView;
+    }
 }
 
 CheatsScene::~CheatsScene() {
@@ -57,9 +57,9 @@ uint8_t CheatsScene::countEnabledCheatsForGroup(uint16_t groupIndex) {
 }
 
 int16_t CheatsScene::multipleChoiceIndexForCheat(uint16_t cheatIndex) {
-    auto it = multipleChoiceIndexes.find(cheatIndex);
+    const uint16_t* option = multipleChoiceIndexes.find(cheatIndex);
 
-    return (it != multipleChoiceIndexes.end()) ? (int16_t)it->second : -1;
+    return option ? (int16_t)*option : -1;
 }
 
 void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, uint16_t parentRowIndex, uint8_t indent) {
@@ -135,8 +135,6 @@ void CheatsScene::rebuildRows() {
 }
 
 void CheatsScene::updateViews(const RenderInfo&) {
-    labelView.maxWidth = view.frame.size.width;
-    
     bool needsRowRebuild = tableView.updateGroupTransition();
 
     if (needsRowRebuild) {
@@ -145,15 +143,22 @@ void CheatsScene::updateViews(const RenderInfo&) {
 
     int yPosition = 84;
 
-    tableView.rowCount = rows.size();
-    tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
-
     bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded();
 
-    // TODO: have TableView hide itself if there are no rows
+    tableView.rowCount = rows.size();
+    tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
     tableView.isHidden = tableIsHidden;
 
+    scrollbarView->isHidden = tableIsHidden;
+    
+    labelView.maxWidth = view.frame.size.width;
     labelView.isHidden = !tableIsHidden;
+
+    if (!labelView.isHidden) {
+        // This is a hack for a compositing issue (cart drawing over text)
+        // TODO: fix
+        labelView.setNeedsDisplay();
+    }
 
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;
@@ -217,37 +222,36 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
         const int selectedIndex = tableView.selectedRowIndex;
         RowInfo& row = rows[selectedIndex];
 
-        if (!row.isGroup) {
-            int index = row.index;
+        if (row.isGroup) {
+            return;
+        }
 
-            const Cheat& cheat = cheatsDatabase->cheats[row.index];
+        int index = row.index;
 
-            if (cheat.wildcardCount > 0) {
-                if (enabledCheatIndexes.contains(index)) {
-                    enabledCheatIndexes.erase(index);
-                }
-                else {
-                    tableView.isADown = false;
+        const Cheat& cheat = cheatsDatabase->cheats[index];
 
-                    CheatWildcardOption* firstOption = &cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex];
-                    int wildcardCount = cheat.wildcardCount;
+        if (cheat.wildcardCount > 0) {
+            if (!enabledCheatIndexes.erase(index)) {
+                tableView.isADown = false;
 
-                    // Re-open on the previously chosen option, if there is one
-                    int optionIndex = (row.multipleChoiceIndex != -1) ? row.multipleChoiceIndex : 0;
+                CheatWildcardOption* firstOption = &cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex];
+                int wildcardCount = cheat.wildcardCount;
 
-                    auto result = presentPopover<ChooseCheatOptionPopover>(firstOption, wildcardCount, optionIndex);
+                // Re-open on the previously chosen option, if there is one
+                int optionIndex = (row.multipleChoiceIndex != -1) ? row.multipleChoiceIndex : 0;
 
-                    if (result.didSucceed()) {
-                        row.multipleChoiceIndex = result.value;
-                        multipleChoiceIndexes[index] = result.value;
+                auto result = presentPopover<ChooseCheatOptionPopover>(firstOption, wildcardCount, optionIndex);
 
-                        enabledCheatIndexes.insert(index);
-                    }
+                if (result.didSucceed()) {
+                    row.multipleChoiceIndex = result.value;
+                    multipleChoiceIndexes[index] = result.value;
+
+                    enabledCheatIndexes.insert(index);
                 }
             }
-
-            finishCheatSelection(row);
         }
+
+        finishCheatSelection(row);
     }
     else if (aButtonEvent == InputWatcher::BUTTON_DOWN) {
         const int selectedIndex = tableView.selectedRowIndex;
@@ -319,51 +323,5 @@ void CheatsScene::finishCheatSelection(const RowInfo& row) {
         }
 
         parentIndex = parent.parentRowIndex;
-    }
-
-    // TODO: this should be called when exiting the scene
-    enableSelectedCheats();
-}
-
-void CheatsScene::enableSelectedCheats() {
-    gameLaunchSession.userCheatCodes.clear();
-
-    for (int cheatIndex : enabledCheatIndexes) {
-        const Cheat& cheat = cheatsDatabase->cheats[cheatIndex];
-
-        uint16_t codesEnd = cheat.codesStartIndex + cheat.codesCount;
-
-        // For multiple choice cheats, every wildcard code's value comes from the
-        // chosen option (the codes themselves only hold the wildcard zeroed out).
-        int16_t multipleChoiceIndex = multipleChoiceIndexForCheat(cheatIndex);
-
-        for (uint16_t codeIndex = cheat.codesStartIndex; codeIndex < codesEnd; codeIndex++) {
-            const CheatCode& code = cheatsDatabase->codes[codeIndex];
-
-            uint16_t value = code.value;
-
-            if (multipleChoiceIndex != -1 && code.wildcardIndex > 0) {
-                const CheatWildcardOption& option =
-                    cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + multipleChoiceIndex];
-
-                switch (code.wildcardIndex) {
-                case 1:
-                    value = option.value1;
-                    break;
-                case 2:
-                    value = option.value2;
-                    break;
-                case 3:
-                    value = option.value3;
-                    break;
-                default:
-                    break;
-                }
-            }
-
-            debugf("[CheatsScene] Added cheat code: %08lX %04X\n", (unsigned long)code.address, value);
-
-            gameLaunchSession.userCheatCodes.push_back({code.address, value});
-        }
     }
 }

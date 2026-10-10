@@ -6,16 +6,16 @@
 #pragma once
 
 #include <libdragon.h>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-#include "general/InputRepeater.h"
+#include "main.h"
+
+#include "collections/StaticMap.h"
+#include "collections/StaticSet.h"
 #include "ui/scenes/GameInfoTabScene.h"
 #include "ui/views/TableView.h"
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/rows/CheatRowView.h"
-#include "main.h"
 
 struct CheatDatabase;
 
@@ -33,8 +33,8 @@ private:
         // true if row represents a group
         // false if row represents a cheat
         bool isGroup;
-        // Indexes `CheatDatabase::groups` when `isGroup` equals `true`
-        // Indexes `CheatDatabase::cheats` when `isGroup` equals `false`
+        // Indexes `CheatDatabase::groups` when `isGroup` is `true`
+        // Indexes `CheatDatabase::cheats` when `isGroup` is `false`
         uint16_t index;
         uint16_t parentRowIndex;
         uint8_t indentLevel = 0;
@@ -52,11 +52,9 @@ private:
     // Flat list of currently visible items (re-built on expand/collapse)
     std::vector<RowInfo> rows;
 
-    std::unordered_set<int> expandedGroupIndexes;
-    std::unordered_set<int> enabledCheatIndexes;
-
-    // Option chosen for each multiple choice cheat, keyed by cheat index.
-    std::unordered_map<int, int> multipleChoiceIndexes;
+    StaticSet<uint16_t, MAX_ENABLED_CHEATS>& expandedGroupIndexes;
+    StaticSet<uint16_t, MAX_ENABLED_CHEATS>& enabledCheatIndexes;
+    StaticMap<uint16_t, uint16_t, MAX_ENABLED_CHEATS * 2, IntHash>& multipleChoiceIndexes;
 
     TableView<CheatRowView> tableView;
     LabelView<64> labelView;
@@ -69,12 +67,11 @@ private:
     int16_t multipleChoiceIndexForCheat(uint16_t cheatIndex);
 
     void finishCheatSelection(const RowInfo& row);
-    void enableSelectedCheats();
 
 public:
     const char* name() override { return "CheatsScene"; }
 
-    CheatsScene(CheatDatabase* cheatsDatabase = nullptr);
+    CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase = nullptr);
     ~CheatsScene();
 
     void updateViews(const RenderInfo& renderInfo) override;

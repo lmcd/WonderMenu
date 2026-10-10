@@ -119,7 +119,7 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
             (0,0,0, TEX0),     (TEX0, 0, PRIM, 0),
             (0,0,0, COMBINED), (0, COMBINED, TEX1, COMBINED)
         ));
-        setBlender(finalIsBlendedWithMemory ? WITH_FRAMEBUFFER : WITH_BLEND_COLOR);
+        setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
     rdpq_mode_end();
 
     setPrimitiveColor(alphaColor);
@@ -163,7 +163,7 @@ void FlagView::update(const RenderInfo& renderInfo) {
 void FlagView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }

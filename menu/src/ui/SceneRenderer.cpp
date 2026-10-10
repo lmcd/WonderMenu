@@ -5,8 +5,8 @@
 
 #include "SceneRenderer.h"
 
-#include <t3d/t3d.h>
 #include <libdragon.h>
+#include <t3d/t3d.h>
 
 #include "ui/RenderInfo.h"
 #include "ui/Scene.h"
@@ -93,7 +93,7 @@ void SceneRenderer::popScene() {
         if (currentScene) {
             currentScene->didEndScene();
             currentScene->view.removeFromSuperview();
-            
+
             if (currentScene->ownedByRenderer) {
                 garbageScenes.push_back(currentScene);
             }
@@ -141,17 +141,19 @@ void SceneRenderer::advance() {
 }
 
 void SceneRenderer::collectGarbageScenes() {
-    for (auto it = garbageScenes.begin(); it != garbageScenes.end(); ) {
-        Scene* scene = *it;
+    for (size_t i = 0; i < garbageScenes.size(); ) {
+        Scene* scene = garbageScenes[i];
 
         if (View::isPendingRemoval(&scene->view)) {
             // Still being cleared across the frame buffers -- not safe yet.
-            ++it;
+            i++;
         }
         else {
             debugf("[SceneRenderer] Destructing scene %s\n", scene->name());
+
+            garbageScenes.erase(garbageScenes.begin() + i);
+
             delete scene;
-            it = garbageScenes.erase(it);
         }
     }
 }

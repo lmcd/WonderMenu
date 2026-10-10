@@ -5,14 +5,7 @@
 
 #pragma once
 
-#include <list>
-#include <unordered_map>
-#include <cstdint>
-
 #include "GameDatabase.h"
-#include "Game.h"
-#include "util/Color.h"
-#include "util/Rect.h"
 
 #define LABEL_CACHE_MAX_S_ENTRIES 24
 #define LABEL_CACHE_MAX_L_ENTRIES 1
@@ -40,7 +33,7 @@ struct CartLabel {
     char* data;
     Status status;
     int cacheIndex;
-    int currentChunkCount;
+    int currentTileCount;
     Game* game;
 };
 
@@ -53,14 +46,15 @@ private:
     alignas(8) char smallLabelBuffer[DB_S_LABEL_SIZE * LABEL_CACHE_MAX_S_ENTRIES];
     alignas(8) char largeLabelBuffer[DB_L_LABEL_SIZE * LABEL_CACHE_MAX_L_ENTRIES];
 
+    int firstAvailableIndex();
+
 public:
     LabelLoader(GameDatabase& database);
     ~LabelLoader();
 
     void freeLabelForGame(Game* game);
     void freeAll();
-    int firstAvailableIndex();
 
-    LoadResult getSmallLabelDataForGame(Game* game, int tileCount, bool isPreloading = false);
-    LoadResult getLargeLabelDataForGame(Game* game, bool loadIncrementally = false);
+    LoadResult loadSmallLabelDataForGame(Game* game, int tileCount, bool isPreloading = false);
+    LoadResult loadLargeLabelDataForGame(Game* game, int tileCount = DB_L_LABEL_TILE_COUNT);
 };

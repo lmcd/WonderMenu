@@ -5,10 +5,11 @@
 
 #pragma once
 
+#include "main.h"
+
 #include "ui/scenes/GameInfoTabScene.h"
 #include "ui/views/TableView.h"
 #include "ui/views/drawables/LabelView.h"
-#include "ui/views/rows/M64RowView.h"
 
 class Game;
 
@@ -16,7 +17,6 @@ class SettingsScene : public GameInfoTabScene {
 private:
     Game* game;
 
-    TableView<M64RowView> tableView;
     LabelView<64> labelView;
 
 public:

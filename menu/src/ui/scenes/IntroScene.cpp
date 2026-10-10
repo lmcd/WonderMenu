@@ -6,9 +6,13 @@
 #include "IntroScene.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <math.h>
 
 #include "main.h"
+
+#include "animation/Transition.h"
+#include "general/BootSession.h"
 #include "general/ELFFile.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
@@ -16,6 +20,8 @@
 #include "ui/Fonts.h"
 #include "ui/popovers/ChooseFoldersPopover.h"
 #include "ui/popovers/ScreenshotsImportPopover.h"
+#include "ui/popovers/SpeedrunImportPopover.h"
+#include "ui/scenes/GameLaunchScene.h"
 #include "ui/scenes/ListScene.h"
 #include "ui/scenes/ListTransitionScene.h"
 #include "ui/scenes/ScreenshotsImportScene.h"
@@ -53,11 +59,10 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
     rectView.frame = renderInfo.screenRect;
     rectView.usesMultipliedOpacity = false;
 
-    float x = view.frame.midX() - logoSprite->width  / 2.0f;
-    float y = view.frame.midY() - logoSprite->height / 2.0f;
+    Size imageSize = Size(logoSprite->width, logoSprite->height);
 
     imageView.sprite = logoSprite;
-    imageView.frame.origin = Vec2(x, y);
+    imageView.frame = imageSize.centeredIn(view.frame);
 
     labelView.frame.origin = Vec2(0, 458);
     labelView.maxWidth = view.frame.size.width;
@@ -71,7 +76,10 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 void IntroScene::update(const UpdateInfo& updateInfo) {
     float seconds = 0;
 
-    if (updateInfo.sceneFrameNumber == 2) {
+    bool hasWarmResetState = warmResetState.didRestore;
+    Game* lastLaunchedGame = gameLibrary->lastLaunchedGame;
+
+    if (updateInfo.sceneFrameNumber == 2 && !hasWarmResetState) {
         seconds = measure([&] {
             FILE* introFile = fopen("rom:/WonderMenu.txt", "rb");
 
@@ -122,7 +130,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         }
     }
 
-    if (updateInfo.sceneFrameNumber == 7) {
+    if (updateInfo.sceneFrameNumber == 5) {
         seconds = measure([&] {
             gameLibrary->loadHistoryAndFavourites();
             gameLibrary->loadGames();
@@ -132,38 +140,16 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Game Library: %.3fs\n", seconds);
     }
     
-    if (updateInfo.sceneFrameNumber == 10) {
+    if (updateInfo.sceneFrameNumber == 6) {
         seconds = measure([&] {
-            GameDatabase& database = gameLibrary->database;
-
-            std::vector<GameDatabase::Entry*> entries;
-            entries.reserve(gameLibrary->allGames.size());
-
-            for (Game& game : gameLibrary->allGames) {
-                if (game.databaseEntry != nullptr) {
-                    entries.push_back(game.databaseEntry);
-                }
-            }
-
-            // Sort entries by tile offset, as seeking the filesystem from left
-            // to right is faster
-            std::sort(entries.begin(), entries.end(),
-                [](const GameDatabase::Entry* a, const GameDatabase::Entry* b) {
-                    return a->smallLabelTileIndex < b->smallLabelTileIndex;
-                }
-            );
-
-            for (GameDatabase::Entry* entry : entries) {
-                // Cache FAT cluster offsets of each label in the database
-                database.warmLabelClusterOffset(entry);
-            }
+            gameLibrary->warmClusterOffsets();
         });
         totalSeconds += seconds;
 
         debugf("[IntroScene] Loaded Label Cluster Offsets: %.3fs\n", seconds);
     }
 
-    if (updateInfo.sceneFrameNumber == 12) {
+    if (updateInfo.sceneFrameNumber == 7) {
         seconds = measure([&] {
             ELFFile payloadFile("payload.elf.stripped");
 
@@ -175,17 +161,20 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded Payload: %.3fs\n", seconds);
     }
 
-    if (updateInfo.sceneFrameNumber == 14) {
-        Game* lastLaunchedGame = gameLibrary->lastLaunchedGame;
-
-        if (lastLaunchedGame != nullptr) {
+    if (updateInfo.sceneFrameNumber == 8) {
+        // The import below hands the game to `ScreenshotsImportScene`, so both
+        // halves have to be there before any of it runs.
+        if (hasWarmResetState && lastLaunchedGame != nullptr) {
             uint32_t baseReadOffset = ROM_ADDRESS + lastLaunchedGame->romFile.size;
 
             // Only the magic word is needed to decide whether there's anything to
             // import, so read that single word straight over the PI bus.
             uint32_t magic = io_read(baseReadOffset);
 
-            if (magic == SCREENSHOT_MAGIC) {
+            if (magic == ROM_SCREENSHOT_MAGIC) {
+                // Dirty the magic so the same screenshots aren't imported again
+                io_write(baseReadOffset, 0);
+
                 uint32_t count = io_read(baseReadOffset + 4);
 
                 debugf("[IntroScene] %li Screenshots Found\n", count);
@@ -199,22 +188,46 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
                 auto result = presentPopover<ScreenshotsImportPopover>(screenshotsReader);
 
-                // Dirty the magic so the same screenshots aren't imported again
+                if (result.value == 0) {
+                    // The popover read the first few screenshots to preview them,
+                    // so reset before handing over to `ScreenshotsImportScene`
+                    screenshotsReader->reset();
+
+                    // labelView.setString("Processing Screenshots");
+
+                    ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(*this, *lastLaunchedGame, count, *screenshotsReader);
+                    pushScene(screenshotsImportScene);
+                }
+            }
+            else if (magic == ROM_SPEEDRUN_MAGIC) {
+                // Dirty the magic so the same recording isn't written again
                 io_write(baseReadOffset, 0);
 
-                // The popover read the first few screenshots to preview them,
-                // so reset before handing over to `ScreenshotsImportScene`
-                screenshotsReader->reset();
+                uint32_t count = io_read(baseReadOffset + 4);
 
-                labelView.setString("Processing Screenshots");
+                auto result = presentPopover<SpeedrunImportPopover>();
 
-                ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(this, lastLaunchedGame, count, screenshotsReader);
-                pushScene(screenshotsImportScene);
+                if (result.value == 0) {
+                    debugf("[IntroScene] %li M64 Frames Found\n", count);
+
+                    labelView.setString("Processing Speedrun");
+
+                    gameLibrary->writeRecordedSpeedrun(*lastLaunchedGame, baseReadOffset + 8, count);
+                }
             }
         }
     }
 
-    if (updateInfo.sceneFrameNumber >= 16) {
+    if (updateInfo.sceneFrameNumber == 9) {
+        seconds = measure([&] {
+            gameLibrary->loadM64Files();
+        });
+        totalSeconds += seconds;
+
+        debugf("[IntroScene] Loaded M64 Files: %.3fs\n", seconds);
+    }
+
+    if (updateInfo.sceneFrameNumber >= 10) {
         ListScene* listScene;
 
         seconds = measure([&] {
@@ -231,6 +244,17 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         ListTransitionScene* transitionScene = new ListTransitionScene(this, listScene);
 
         pushScene(transitionScene);
+
+        if (hasWarmResetState) {
+            pushScene(listScene);
+
+            listScene->setCurrentTab(ListScene::TAB_RECENTS);
+            GameLaunchScene* gameLaunchScene = listScene->performSelection(false);
+
+            gameLaunchScene->transition.progress = 1.0f;
+            gameLaunchScene->transition.direction = Transition::BACKWARDS;
+        }
+
         debugf("[IntroScene] Total Load Time: %.3fs\n", totalSeconds);
     }
 }

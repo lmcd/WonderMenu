@@ -16,9 +16,7 @@ ListTransitionScene::ListTransitionScene(IntroScene* introScene, ListScene* list
     introScene(introScene),
     listScene(listScene) {
     
-    transition.progress = 0.0;
     transition.speed = 0.005;
-    transition.direction = Transition::FORWARDS;
 }
 
 void ListTransitionScene::didBeginScene(SceneEntry entry) {

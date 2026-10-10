@@ -5,17 +5,15 @@
 
 #pragma once
 
+#include <ranges>
+
 #include "ui/View.h"
-#include "ui/views/TableView.h"
+#include "ui/views/BaseRowView.h"
 #include "ui/views/drawables/CheckboxView.h"
 #include "ui/views/drawables/ChevronView.h"
 #include "ui/views/drawables/LabelReferenceView.h"
 #include "ui/views/drawables/LabelView.h"
 
-/**
- * Groups the subviews that make up a single row in the game list:
- * the 2D cart, title/subtitle/count labels, favourite star and region flag.
- */
 struct CheatRowView : public BaseRowView {
     const char* name() const override { return "CheatRowView"; }
 

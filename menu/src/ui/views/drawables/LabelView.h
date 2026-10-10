@@ -5,10 +5,10 @@
 
 #pragma once
 
+#include <libdragon.h>
 #include <algorithm>
 #include <cstring>
 #include <cmath>
-#include <libdragon.h>
 
 #include "ui/View.h"
 #include "ui/views/drawables/LabelReferenceView.h"
@@ -60,6 +60,9 @@ public:
             memcpy(lastString[bufferIndex], string, n + 1);
 
             this->updateParagraphLayout();
+            this->stopAnimating();
         }
+
+        this->updateAnimation(renderInfo);
     }
 };

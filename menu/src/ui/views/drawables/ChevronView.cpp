@@ -32,7 +32,7 @@ void ChevronView::update(const RenderInfo& renderInfo) {
 void ChevronView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -100,8 +100,7 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
     rdpq_mode_pop();
 
     if (hasScissor) {
-        Rect scissorRect = scissorStack.back();
-        rect = rect.intersection(scissorRect);
+        rect = rect.intersection(currentScissor());
     }
 
     drawnBoundingBox[bufferIndex] = rect;

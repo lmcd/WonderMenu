@@ -36,6 +36,8 @@ private:
 
     inline static std::vector<RemovedView> removedViews;
 
+    inline static std::vector<Rect> scissorStack;
+
     void updateRecursive(const RenderInfo& renderInfo);
 
     // Root-only: clear the whole tree (via clearSubtree) plus any detached views
@@ -50,7 +52,7 @@ protected:
     bool lastFinalIsHidden[BUFF_COUNT] = {};
     Rect lastFinalFrame[BUFF_COUNT] = {};
     Color lastFinalBlendColor[BUFF_COUNT] = {};
-    bool lastFinalIsBlendedWithMemory[BUFF_COUNT] = {};
+    bool lastFinalIsOpaque[BUFF_COUNT] = {};
 
     // Final values are computed by walking the view hierachy and accumulating
     // and are used
@@ -59,7 +61,7 @@ protected:
     bool finalIsHidden = false;
     Rect finalFrame = {};
     Color finalBlendColor = Color::BLACK;
-    bool finalIsBlendedWithMemory = false;
+    bool finalIsOpaque = false;
 
     bool isPendingFullRender = false;
     bool needsClear = false;
@@ -68,14 +70,13 @@ protected:
     // TODO: Not yet used
     bool needsLayout = true;
 
-
     /**
      * Recursively clear every subview in the subtree, visiting subviews in
      * reverse (front-to-back, since subviews are stored back-to-front).
      */
     void clearSubtree(const RenderInfo& renderInfo, bool force = false);
 
-    void updateSubtree(const RenderInfo& renderInfo, float finalOpacity = 1.0f, bool finalIsHidden = false, Vec2 finalPosition = Vec2::ZERO, Color finalBlendColor = Color::BLACK, bool finalIsBlendedWithMemory = false);
+    void updateSubtree(const RenderInfo& renderInfo, float finalOpacity = 1.0f, bool finalIsHidden = false, Vec2 finalPosition = Vec2::ZERO, Color finalBlendColor = Color::BLACK, bool finalIsOpaque = true);
 
     /**
      * Erase this view's drawn pixels unconditionally
@@ -91,11 +92,13 @@ public:
 
     inline static bool hasScissor = false;
 
-    inline static std::vector<Rect> scissorStack;
-
     static void pushScissor(Rect rect);
 
     static void popScissor();
+
+    static Rect currentScissor() {
+        return scissorStack.back();
+    }
 
     /**
      * The view that contains this one (nullptr for the root)
@@ -193,28 +196,7 @@ protected:
 
     void drawTexturedRect(rdpq_tile_t tile, Rect rect, int s = 0, int t = 0);
 
-    template<size_t N>
-    inline void clearRects(Rect (&rects)[N], Color clearColor = Color::BLACK) {
-        rdpq_mode_push();
-
-        if (clearColor.a != 0) {
-            rdpq_set_mode_fill(clearColor);
-        }
-
-        for (size_t i = 0; i < N; i++) {
-            if (rects[i].size.width == 0) break;
-
-            drawFilledRect(rects[i]);
-        }
-
-        if (clearColor.a != 0) {
-            rdpq_set_mode_fill({0, 0, 0, 255});
-        }
-
-        rdpq_mode_pop();
-    }
-
-    void clearRects(const Rect& rect, Color clearColor = Color::BLACK);
+    void clearRect(const Rect& rect, Color clearColor = Color::BLACK);
 
 public:
     /**

@@ -15,14 +15,12 @@
 #include "ui/View.h"
 #include "ui/views/BaseRowView.h"
 #include "ui/views/SelectedRowView.h"
-#include "ui/views/drawables/BottomShadowView.h"
 #include "ui/views/drawables/RectView.h"
 
 template <std::derived_from<BaseRowView> RV>
 struct TableView : public View {
     const char* name() const override { return "TableView"; }
 
-    static constexpr int TABLE_TOP_INSET    = 84;
     static constexpr int TABLE_Y_PADDING    = 8;
     static constexpr int DEFAULT_ROW_HEIGHT = 34;
     static constexpr int ROW_SPACING        = 2;

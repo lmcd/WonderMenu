@@ -49,8 +49,7 @@ void BottomShadowView::renderRect(const RenderInfo& renderInfo, Rect currentRect
     rightRect.origin.x = insetRect.maxX();
 
     if (needsScissor) {
-        Rect r = scissorRect.intersection(renderInfo.screenRect);
-        pushScissor(r);
+        pushScissor(scissorRect);
     }
 
     rdpq_mode_push();
@@ -94,7 +93,7 @@ void BottomShadowView::update(const RenderInfo& renderInfo) {
 
         lastFinalOpacity[bufferIndex] = finalOpacity;
 
-        if (finalIsBlendedWithMemory) {
+        if (!finalIsOpaque) {
             needsClear = true;
         }
     }
@@ -127,17 +126,13 @@ void BottomShadowView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
     if (!needsPartialClear) {
-        clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+        clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
     }
     else {
         for (int i = 0; i < 4; i++) {
             Rect rect = rectsToClear[i];
 
-            if (rect.size.width == 0) {
-                continue;
-            }
-
-            clearRects(rect, finalBlendColor);
+            clearRect(rect, finalBlendColor);
         }
 
         rectsToClear[0].size.width = 0;

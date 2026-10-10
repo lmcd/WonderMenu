@@ -8,10 +8,9 @@
 #include <algorithm>
 
 #include "GameDatabase.h"
-#include "LabelLoader.h"
 #include "M64File.h"
 #include "ROMFile.h"
-#include "flashcart/flashcart.h"
+#include "general/Speedrun.h"
 
 class CartLabel;
 
@@ -84,16 +83,20 @@ public:
         }
     }
 
+    int id() {
+        return romFile.id();
+    }
+
     int version() {
         return romFile.version;
     }
 
-    bool supportsSpeedruns() {
+    bool hasSpeedrunDatabase() {
         if (databaseEntry == nullptr) {
             return false;
         }
         else {
-            return databaseEntry->supportsSpeedruns;
+            return databaseEntry->hasSpeedrunDatabase();
         }
     }
 

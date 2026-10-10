@@ -5,12 +5,10 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cmath>
 #include <string>
 
 #include "animation/Transition.h"
-#include "general/InputRepeater.h"
 #include "general/Result.h"
 #include "ui/Scene.h"
 #include "ui/SceneRenderer.h"
@@ -177,8 +175,6 @@ public:
     }
 
     void updateViews(const RenderInfo& renderInfo) {
-        Rect sceneRect = baseScene->view.frame;
-
         Color backgroundColor = Color(17);
         Color titleColor = Color(252, 204, 007);
 
@@ -193,14 +189,8 @@ public:
 
         int height = tableView.heightForRowCount() + tableY + bottomPadding;
 
-        Size size(260, height);
-        Rect rect(
-            Vec2(
-                (sceneRect.size.width  - size.width ) / 2,
-                (sceneRect.size.height - size.height) / 2
-            ),
-            size
-        );
+        Size size = Size(260, height);
+        Rect rect = size.centeredIn(baseScene->view.frame);
 
         Vec2 titlePosition = rect.origin;
         titlePosition.y += topPadding;

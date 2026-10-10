@@ -346,11 +346,9 @@ static bool sc64_has_feature (flashcart_features_t feature) {
     }
 }
 
-sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
-    FIL fil;
-    UINT br;
 
-    int32_t t0 = get_ticks();
+flashcart_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
+    FIL fil;
 
     // Opening from a locator captured when the directory was enumerated costs
     // no disk access, where opening by path has to walk and scan every
@@ -370,7 +368,7 @@ sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJ
     }
 
     if (open_result != FR_OK) {
-        return (sc64_load_rom_session_t) {};
+        return (flashcart_load_rom_session_t) {};
     }
 
     fatfs_fix_file_size(&fil);
@@ -379,7 +377,7 @@ sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJ
 
     if (rom_size > MiB(78)) {
         f_close(&fil);
-        return (sc64_load_rom_session_t) {};
+        return (flashcart_load_rom_session_t) {};
     }
 
     size_t chunk_size = KiB(128);
@@ -392,13 +390,7 @@ sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJ
 
     f_lseek(&fil, offset);
 
-	uint32_t t1 = get_ticks();
-
-	debugf("[SC64] ROM opened: %.2fs\n", (float)TICKS_TO_MS(t1 - t0) / 1000.0f);
-
-    // debugf("[SC64] Starting load session: %i\n", (int)f_tell(&fil)    );
-
-    return (sc64_load_rom_session_t) {
+    return (flashcart_load_rom_session_t) {
         fil,
         chunk_size,
         sdram_size,
@@ -411,7 +403,7 @@ sc64_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJ
     };
 }
 
-flashcart_err_t sc64_finish_load_rom_session(sc64_load_rom_session_t* session, flashcart_progress_callback_t *progress) {
+flashcart_err_t sc64_finish_load_rom_session(flashcart_load_rom_session_t* session, flashcart_progress_callback_t *progress) {
     debugf("[SC64] Ending load rom session\n");
     
     FIL *fil = &session->fil;
@@ -438,8 +430,8 @@ flashcart_err_t sc64_finish_load_rom_session(sc64_load_rom_session_t* session, f
                 return FLASHCART_ERR_LOAD;
             }
 
-            session->loadedBytes += br;
-            session->progress = fmin(1.0f, (session->loadedBytes / (float) (session->rom_size)));
+            session->loaded_bytes += br;
+            session->progress = fmin(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
 
             if (progress) {
                 progress(session->progress);
@@ -504,8 +496,8 @@ flashcart_err_t sc64_finish_load_rom_session(sc64_load_rom_session_t* session, f
             return FLASHCART_ERR_LOAD;
         }
 
-        session->loadedBytes += br;
-        session->progress = fmin(1.0f, (session->loadedBytes / (float) (session->rom_size)));
+        session->loaded_bytes += br;
+        session->progress = fmin(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
 
         if (progress) {
             progress(session->progress);
@@ -523,10 +515,9 @@ flashcart_err_t sc64_finish_load_rom_session(sc64_load_rom_session_t* session, f
     return FLASHCART_OK;
 }
 
-flashcart_err_t sc64_load_next_rom_chunk (sc64_load_rom_session_t* session, bool load_beginning_chunks) {
+flashcart_err_t sc64_load_next_rom_chunk (flashcart_load_rom_session_t* session, bool load_beginning_chunks) {
     FIL *fil = &session->fil;
     UINT br;
-    size_t rom_size = session->rom_size;
     size_t sdram_size = session->sdram_size;
 
     unsigned int offset = session->chunk_size * session->current_chunk;
@@ -556,106 +547,14 @@ flashcart_err_t sc64_load_next_rom_chunk (sc64_load_rom_session_t* session, bool
         return FLASHCART_ERR_LOAD;
     }
 
-    session->loadedBytes += br;
-    session->progress = fmin(1.0f, (session->loadedBytes / (float) (session->rom_size)));
+    session->loaded_bytes += br;
+    session->progress = fmin(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
 
-    // debugf("[SC64] Loaded chunk (1) %i\n", session->current_chunk);
+    debugf("[SC64] Loaded chunk (1) %i\n", session->current_chunk);
 
     session->current_chunk++;
 
     return FLASHCART_OK;
-}
-
-/**
- * @brief Load a ROM into the SummerCart64.
- * 
- * @param rom_path Path to the ROM file.
- * @param progress Progress callback function.
- * @return flashcart_err_t Error code.
- */
-flashcart_err_t sc64_load_rom_to_address (char *rom_path, flashcart_progress_callback_t *progress, uint32_t rom_address) {
-    FIL fil;
-    UINT br;
-
-    if (f_open(&fil, strip_fs_prefix(rom_path), FA_READ) != FR_OK) {
-        return FLASHCART_ERR_LOAD;
-    }
-
-    fatfs_fix_file_size(&fil);
-
-    size_t rom_size = f_size(&fil);
-
-    if (rom_size > MiB(78)) {
-        f_close(&fil);
-        return FLASHCART_ERR_LOAD;
-    }
-
-    bool shadow_enabled = (rom_size > (MiB(64) - KiB(128)));
-    bool extended_enabled = (rom_size > MiB(64));
-
-    size_t sdram_size = shadow_enabled ? (MiB(64) - KiB(128)) : rom_size;
-    size_t shadow_size = shadow_enabled ? MIN(rom_size - sdram_size, KiB(128)) : 0;
-    size_t extended_size = extended_enabled ? rom_size - MiB(64) : 0;
-
-    size_t chunk_size = KiB(128);
-    for (unsigned int offset = 0; offset < sdram_size; offset += chunk_size) {
-        size_t block_size = MIN(sdram_size - offset, chunk_size);
-        if (f_read(&fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
-            f_close(&fil);
-            return FLASHCART_ERR_LOAD;
-        }
-        if (progress) {
-            progress(f_tell(&fil) / (float) (f_size(&fil)));
-        }
-    }
-    if (f_tell(&fil) != sdram_size) {
-        f_close(&fil);
-        return FLASHCART_ERR_LOAD;
-    }
-
-    if (sc64_ll_set_config(CFG_ID_ROM_SHADOW_ENABLE, shadow_enabled) != SC64_OK) {
-        f_close(&fil);
-        return FLASHCART_ERR_INT;
-    }
-
-    if (shadow_enabled) {
-        flashcart_err_t err = load_to_flash(&fil, (void *) (SHADOW_ADDRESS), shadow_size, &br, progress);
-        if (err != FLASHCART_OK) {
-            f_close(&fil);
-            return err;
-        }
-        if (br != shadow_size) {
-            f_close(&fil);
-            return FLASHCART_ERR_LOAD;
-        }
-    }
-
-    if (sc64_ll_set_config(CFG_ID_ROM_EXTENDED_ENABLE, extended_enabled) != SC64_OK) {
-        f_close(&fil);
-        return FLASHCART_ERR_INT;
-    }
-
-    if (extended_enabled) {
-        flashcart_err_t err = load_to_flash(&fil, (void *) (EXTENDED_ADDRESS), extended_size, &br, progress);
-        if (err != FLASHCART_OK) {
-            f_close(&fil);
-            return err;
-        }
-        if (br != extended_size) {
-            f_close(&fil);
-            return FLASHCART_ERR_LOAD;
-        }
-    }
-
-    if (f_close(&fil) != FR_OK) {
-        return FLASHCART_ERR_LOAD;
-    }
-
-    return FLASHCART_OK;
-}
-
-static flashcart_err_t sc64_load_rom (char *rom_path, flashcart_progress_callback_t *progress) {
-    return sc64_load_rom_to_address(rom_path, progress, ROM_ADDRESS);
 }
 
 /**
@@ -892,7 +791,6 @@ static flashcart_err_t sc64_set_save_writeback (char *save_path) {
 }
 
 static flashcart_err_t sc64_set_bootmode (flashcart_reboot_mode_t boot_mode) {
-
     sc64_boot_mode_t type = BOOT_MODE_MENU;
 
     switch (boot_mode) {
@@ -903,6 +801,7 @@ static flashcart_err_t sc64_set_bootmode (flashcart_reboot_mode_t boot_mode) {
             type = BOOT_MODE_MENU;
             break;
     }
+
     if (sc64_ll_set_config(CFG_ID_BOOT_MODE, type) != SC64_OK) {
         return FLASHCART_ERR_INT;
     }
@@ -916,7 +815,9 @@ static flashcart_t flashcart_sc64 = {
     .deinit = sc64_deinit,
     .has_feature = sc64_has_feature,
     .get_firmware_version = sc64_get_firmware_version,
-    .load_rom = sc64_load_rom,
+    .begin_load_rom_session = sc64_begin_load_rom_session,
+    .load_next_rom_chunk = sc64_load_next_rom_chunk,
+    .finish_load_rom_session = sc64_finish_load_rom_session,
     .load_file = sc64_load_file,
     .load_save = sc64_load_save,
     .load_64dd_ipl = sc64_load_64dd_ipl,

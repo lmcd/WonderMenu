@@ -4,7 +4,6 @@
 */
 
 #include "GameInfoScene.h"
-
 #include "ui/scenes/CheatsScene.h"
 #include "ui/scenes/ScreenshotsScene.h"
 #include "ui/scenes/SettingsScene.h"
@@ -12,11 +11,12 @@
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 
-GameInfoScene::GameInfoScene(Game* game, GameDatabase* database)
+GameInfoScene::GameInfoScene(GameInfoState& state, Game& game, GameDatabase& database)
     : Scene(),
+      state(state),
       game(game),
-      database(database) {
-    
+      database(database),
+      currentTab(state.currentTab) {
     view.addSubview(&tabContainerView);
     view.addSubview(&tabControlView);
     view.addSubview(&scrollbarView);
@@ -32,7 +32,9 @@ GameInfoScene::GameInfoScene(Game* game, GameDatabase* database)
 }
 
 void GameInfoScene::didBeginScene(SceneEntry) {
-    setCurrentTab(TAB_CHEATS);
+    if (currentTabScene == nullptr) {
+        loadCurrentTab();
+    }
 }
 
 void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
@@ -69,10 +71,12 @@ void GameInfoScene::update(const UpdateInfo& updateInfo) {
     }
 }
 
-void GameInfoScene::setCurrentTab(Tab _currentTab) {
-    if (currentTab == _currentTab) {
+void GameInfoScene::setCurrentTab(Tab _currentTab, bool force) {
+    if (currentTab == _currentTab && !force) {
         return;
     }
+    
+    tabControlView.selectedSegment = (int)_currentTab;
     
     currentTab = _currentTab;
 
@@ -85,39 +89,36 @@ void GameInfoScene::setCurrentTab(Tab _currentTab) {
 
     switch (currentTab) {
         case TAB_CHEATS: {
-            CheatsScene* newScene = new CheatsScene(database->loadCheatDatabase(game->databaseEntry));
+            CheatsScene* newScene = new CheatsScene(state.cheatsState, database.loadCheatDatabase(game.databaseEntry));
             currentTabScene = newScene;
             break;
         }
 
         case TAB_SCREENSHOTS: {
-            ScreenshotsScene* newScene = new ScreenshotsScene(game);
+            ScreenshotsScene* newScene = new ScreenshotsScene(&game);
             currentTabScene = newScene;
             break;
         }
 
         case TAB_SPEEDRUNS: {
-            SpeedrunsScene* newScene = new SpeedrunsScene(game);
+            SpeedrunsScene* newScene = new SpeedrunsScene(state.speedrunsState, database.loadSpeedrunDatabase(game.databaseEntry), &game);
             currentTabScene = newScene;
             break;
         }
 
         case TAB_SETTINGS: {
-            SettingsScene* newScene = new SettingsScene(game);
+            SettingsScene* newScene = new SettingsScene(&game);
             currentTabScene = newScene;
             break;
         }
     }
 
-    if (currentTabScene != nullptr) {
-        currentTabScene->view.frame = view.frame;
-        currentTabScene->scrollbarView = &scrollbarView;
+    currentTabScene->view.frame = view.frame;
+    currentTabScene->scrollbarView = &scrollbarView;
 
-        mainContentView = currentTabScene->mainContentView;
+    mainContentView = currentTabScene->mainContentView;
 
-        addChildScene(currentTabScene);
-        
-        view.insertView(&currentTabScene->view, 0);
-        currentTabScene->didBeginScene(SCENE_PUSH);
-    }
+    view.insertView(&currentTabScene->view, 0);
+
+    addChildScene(currentTabScene);
 }

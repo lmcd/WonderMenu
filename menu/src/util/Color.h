@@ -61,6 +61,19 @@ struct Color {
         );
     }
 
+    // True if this colour survives a round trip through RGBA16 (5551) unchanged:
+    // each channel is one of the 32 values a 5-bit channel expands back to (as in
+    // libdragon's color_from_packed16), and alpha is fully opaque or fully clear.
+    constexpr bool isExactInRGBA16() const {
+        auto isExact5Bit = [](uint8_t channel) {
+            uint8_t channel5 = channel >> 3;
+
+            return channel == (uint8_t)((channel5 << 3) | (channel5 >> 2));
+        };
+
+        return isExact5Bit(r) && isExact5Bit(g) && isExact5Bit(b) && (a == 0 || a == 255);
+    }
+
     // Assign from libdragon's color_t. Kept as an operator (not a constructor)
     // so Color stays an aggregate and the static members below still brace-init.
     Color& operator=(const color_t& c) {

@@ -7,6 +7,8 @@
 
 #include <libdragon.h>
 
+#include "main.h"
+
 #include "ui/scenes/GameInfoTabScene.h"
 #include "ui/views/drawables/ImageView.h"
 #include "ui/views/drawables/LabelView.h"
@@ -21,7 +23,7 @@ class ScreenshotsScene : public GameInfoTabScene {
 private:
     static constexpr int SCREENSHOT_COUNT = 4;
     static constexpr int SCREENSHOT_WIDTH = 135;
-    static constexpr int SCREENSHOT_HEIGHT = 101;
+    static constexpr int SCREENSHOT_HEIGHT = 95;
     static constexpr int SCREENSHOT_SPACING = 20;
 
     static constexpr int BAR_X_PADDING = 9;

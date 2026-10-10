@@ -5,12 +5,10 @@
 
 #pragma once
 
-#include "ui/View.h"
 #include "ui/views/BaseView.h"
 #include "ui/views/drawables/BorderView.h"
-#include "ui/views/drawables/Imageview.h"
+#include "ui/views/drawables/ImageView.h"
 #include "ui/views/drawables/MaskedImageView.h"
-#include "ui/views/drawables/RectView.h"
 
 struct ScreenshotThumbnailView : public MaskedImageView {
 private:
@@ -26,7 +24,9 @@ private:
 public:
     const char* name() const override { return "ScreenshotThumbnailView"; }
 
+    // Screenshot scaled to 160px.
     ImageView imageView1;
+    // Screenshot scaled to 80px.
     ImageView imageView2;
 
     ScreenshotThumbnailView();

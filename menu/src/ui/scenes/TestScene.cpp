@@ -21,18 +21,22 @@ TestScene::TestScene()
 
     imageView2.opacity = 0;
 
+    Fonts::loadAll();
+
     view.addSubview(&rectView);
-    view.addSubview(&imageView3);
-    view.addSubview(&imageView2);
-    view.addSubview(&imageView1);
 
-    mario1Sprite = sprite_load("rom:/ui/mario1.RGBA16.sprite");
-    mario2Sprite = sprite_load("rom:/ui/mario2.RGBA16.sprite");
-    mario3Sprite = sprite_load("rom:/ui/mario3.RGBA16.sprite");
+    view.addSubview(&labelView);
+    // view.addSubview(&imageView3);
+    // view.addSubview(&imageView2);
+    // view.addSubview(&imageView1);
 
-    imageView1.setFullSizeScreenshotSurface(sprite_get_pixels(mario1Sprite));
-    imageView2.setFullSizeScreenshotSurface(sprite_get_pixels(mario2Sprite));
-    imageView3.setFullSizeScreenshotSurface(sprite_get_pixels(mario3Sprite));
+    // mario1Sprite = sprite_load("rom:/ui/mario1.RGBA16.sprite");
+    // mario2Sprite = sprite_load("rom:/ui/mario2.RGBA16.sprite");
+    // mario3Sprite = sprite_load("rom:/ui/mario3.RGBA16.sprite");
+
+    // imageView1.setFullSizeScreenshotSurface(sprite_get_pixels(mario1Sprite));
+    // imageView2.setFullSizeScreenshotSurface(sprite_get_pixels(mario2Sprite));
+    // imageView3.setFullSizeScreenshotSurface(sprite_get_pixels(mario3Sprite));
 }
 
 TestScene::~TestScene() {
@@ -40,7 +44,22 @@ TestScene::~TestScene() {
 }
 
 void TestScene::updateViews(const RenderInfo&) {
-    rectView.fillColor = Color::RED;
+    Color titleColor = Color::WHITE;
+    titleColor.a *= 0.85f;
+
+    Color titleColor2 = Color::WHITE;
+    titleColor2.a *= 0.65f;
+
+    labelView.frame = Rect(20, 20, 100, 40);
+    labelView.setString("^0100^00:23:45.$06000 sdifhs dfhsd uifshdf usdh fiushfsiud");
+    labelView.textColor = titleColor;
+    labelView.maxWidth = 150;
+    labelView.alternateColor = titleColor2;
+    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
+    labelView.backgroundColor = Color::BLACK;
+    labelView.setNeedsDisplay();
+
+    rectView.fillColor = Color::BLACK;
     rectView.frame = view.frame;
 
     Vec2 imagePosition = Vec2(100, 150);
@@ -72,9 +91,20 @@ void TestScene::updateViews(const RenderInfo&) {
     imageView3.radius = 8;
 }
 
-void TestScene::update(const UpdateInfo&) {
+void TestScene::update(const UpdateInfo& updateInfo) {
     // transitionProgress += (transitionSpeed * transitionDirection);
     transitionProgress = std::clamp(transitionProgress, 0.0f, 1.0f);
+
+    joypad_buttons_t btn = updateInfo.btn;
+
+    if (btn.a) {
+        if (labelView.isAnimating) {
+            labelView.stopAnimating();
+        }
+        else {
+            labelView.startAnimating();
+        }
+    }
 
     // if (transitionProgress == 1.0f) {
     //     transitionDirection = -1;

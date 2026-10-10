@@ -51,17 +51,16 @@ void CheatRowView::update(const RenderInfo& renderInfo) {
     );
     
     chevronView.expandProgress = expandProgress;
+    chevronView.frame.origin = checkboxPosition;
+    chevronView.isHidden = !isGroup;
+
+    checkboxView.frame.origin = checkboxPosition;
+    checkboxView.isOn = isChecked;
+    checkboxView.isHidden = isGroup;
 
     titleView.frame.origin = titlePosition;
     titleView.textColor = isSelected ? selectedTitleColor : titleColor;
 
     subtitleView.frame.origin = subtitlePosition;
     subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor;
-
-    checkboxView.frame.origin = checkboxPosition;
-    checkboxView.isOn = isChecked;
-    checkboxView.isHidden = isGroup;
-
-    chevronView.frame.origin = checkboxPosition;
-    chevronView.isHidden = !isGroup;
 }

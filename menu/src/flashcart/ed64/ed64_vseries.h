@@ -4,6 +4,8 @@
  * @ingroup flashcart 
  */
 
+#pragma once
+
 #ifndef FLASHCART_ED64_VSERIES_H__
 #define FLASHCART_ED64_VSERIES_H__
 

@@ -31,22 +31,27 @@ void ImageView::update(const RenderInfo& renderInfo) {
 }
 
 Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
+    Size spriteSize = Size(
+        sprite->width,
+        sprite->height
+    );
+
+    // Size is integral, so scale ratios must be computed in float.
     float spriteWidth  = sprite->width;
     float spriteHeight = sprite->height;
 
-    // SCALE_NONE: natural size at the finalFrame's origin.
-    Rect rect(finalFrame.origin, Size(spriteWidth, spriteHeight));
-
     switch (scaleMode) {
         case SCALE_NONE:
-            break;
+            return Rect(
+                finalFrame.origin,
+                spriteSize
+            );
 
         case SCALE_TO_FILL: {
             params.scale_x = finalFrame.size.width  / spriteWidth;
             params.scale_y = finalFrame.size.height / spriteHeight;
 
-            rect.size = finalFrame.size;
-            break;
+            return finalFrame;
         }
 
         case ASPECT_FIT: {
@@ -59,15 +64,16 @@ Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
             params.scale_x = scale;
             params.scale_y = scale;
 
-            rect.size = Size(
-                spriteWidth * scale,
-                spriteHeight * scale
+            Size scaledSize = spriteSize * scale;
+            Vec2 origin = finalFrame.origin + Vec2(
+                (finalFrame.size.width  - scaledSize.width)  / 2.0f,
+                (finalFrame.size.height - scaledSize.height) / 2.0f
             );
-            rect.origin = finalFrame.origin + Vec2(
-                (finalFrame.size.width  - rect.size.width)  / 2.0f,
-                (finalFrame.size.height - rect.size.height) / 2.0f
+
+            return Rect(
+                origin,
+                scaledSize
             );
-            break;
         }
 
         case ASPECT_FILL: {
@@ -82,28 +88,27 @@ Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
             // RDP never loads or samples the cropped-out texels. Rounded up so
             // the scaled result always covers the finalFrame (no seam); the fraction
             // of a pixel of overflow is removed by the scissor in render().
-            int sourceWidth  = std::min((int)roundf(finalFrame.size.width  / scale), (int)spriteWidth);
-            int sourceHeight = std::min((int)roundf(finalFrame.size.height / scale), (int)spriteHeight);
+            int sourceWidth  = std::min((int)roundf(finalFrame.size.width  / scale), (int)spriteSize.width);
+            int sourceHeight = std::min((int)roundf(finalFrame.size.height / scale), (int)spriteSize.height);
 
-            params.s0      = ((int)spriteWidth  - sourceWidth)  / 2;
-            params.t0      = ((int)spriteHeight - sourceHeight) / 2;
+            params.s0      = ((int)spriteSize.width  - sourceWidth)  / 2;
+            params.t0      = ((int)spriteSize.height - sourceHeight) / 2;
             params.width   = sourceWidth;
             params.height  = sourceHeight;
             params.scale_x = scale;
             params.scale_y = scale;
 
-            rect = finalFrame;
-            break;
+            return finalFrame;
         }
     }
 
-    return rect;
+    return finalFrame;
 }
 
 void ImageView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex]);
+    clearRect(drawnBoundingBox[bufferIndex]);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -133,7 +138,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
 
     rdpq_mode_begin();
         setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (TEX0, 0, PRIM, 0)));
-        setBlender(WITH_FRAMEBUFFER);
+        setBlender(finalIsOpaque ? WITH_BLEND_COLOR : WITH_FRAMEBUFFER);
     rdpq_mode_end();
 
     setPrimitiveColor(alphaColor);
@@ -144,10 +149,9 @@ void ImageView::render(const RenderInfo& renderInfo) {
     // the view never draws outside its own bounds.
     bool needsScissor = (scaleMode == ASPECT_FILL);
 
-    Rect scissorRect = rect;
-
     if (needsScissor) {
-        pushScissor(scissorRect.intersection(renderInfo.screenRect));
+        Rect scissorRect = rect;
+        pushScissor(scissorRect);
     }
 
     drawSprite(sprite, rect.origin, &params);

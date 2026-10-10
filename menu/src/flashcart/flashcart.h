@@ -8,7 +8,10 @@
 #define FLASHCART_H__
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+
+#include <fatfs/ff.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +81,26 @@ typedef struct {
 /** @brief Flashcart progress callback type */
 typedef void flashcart_progress_callback_t (float progress);
 
+/**
+ * @brief Flashcart chunked ROM load session.
+ *
+ * Holds the state required to load a ROM into the flashcart one chunk at a time,
+ * so that the caller can interleave the transfer with other work (for example
+ * rendering the menu). The load starts at @ref initial_chunk, runs to the end of
+ * the ROM, then wraps around to fill in the chunks before it.
+ */
+typedef struct {
+    FIL fil; /**< Open ROM file object */
+    size_t chunk_size; /**< Size of a single chunk */
+    size_t sdram_size; /**< Number of bytes loaded into the cart SDRAM */
+    unsigned int current_chunk; /**< Chunk which will be loaded by the next call */
+    size_t rom_size; /**< Total ROM size */
+    unsigned int initial_chunk; /**< Chunk the session started at */
+    float progress; /**< Load progress in the range 0.0f - 1.0f */
+    unsigned int loaded_bytes; /**< Number of bytes loaded so far */
+    bool has_loaded_end_chunk; /**< True once the end of the ROM has been reached and the session wrapped around */
+} flashcart_load_rom_session_t;
+
 /** @brief Flashcart Structure */
 typedef struct {
     /** @brief The flashcart initialization function */
@@ -88,8 +111,12 @@ typedef struct {
     bool (*has_feature) (flashcart_features_t feature);
     /** @brief The flashcart firmware version function */
     flashcart_firmware_version_t (*get_firmware_version) (void);
-    /** @brief The flashcart ROM load function */
-    flashcart_err_t (*load_rom) (char *rom_path, flashcart_progress_callback_t *progress);
+    /** @brief The flashcart chunked ROM load session start function */
+    flashcart_load_rom_session_t (*begin_load_rom_session) (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk);
+    /** @brief The flashcart chunked ROM load single chunk function */
+    flashcart_err_t (*load_next_rom_chunk) (flashcart_load_rom_session_t *session, bool load_beginning_chunks);
+    /** @brief The flashcart chunked ROM load session finish function */
+    flashcart_err_t (*finish_load_rom_session) (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress);
     /** @brief The flashcart file load function */
     flashcart_err_t (*load_file) (char *file_path, uint32_t rom_offset, uint32_t file_offset);
     /** @brief The flashcart save file load function */
@@ -98,6 +125,8 @@ typedef struct {
     flashcart_err_t (*load_64dd_ipl) (char *ipl_path, flashcart_progress_callback_t *progress);
     /** @brief The flashcart disk load function */
     flashcart_err_t (*load_64dd_disk) (char *disk_path, flashcart_disk_parameters_t *disk_parameters);
+    /** @brief The flashcart disks load function */
+    flashcart_err_t (*load_64dd_disks) (char *disk_path, flashcart_disk_parameters_t *disk_parameters, char **swap_disk_paths, int swap_disk_count);
     /** @brief The flashcart set save type function */
     flashcart_err_t (*set_save_type) (flashcart_save_type_t save_type);
     /** @brief The flashcart set save writeback function */
@@ -155,6 +184,46 @@ flashcart_firmware_version_t flashcart_get_firmware_version (void);
 flashcart_err_t flashcart_load_rom (char *rom_path, bool byte_swap, flashcart_progress_callback_t *progress);
 
 /**
+ * @brief Start a chunked ROM load session.
+ *
+ * The returned session must be advanced with @ref flashcart_load_next_rom_chunk and
+ * completed with @ref flashcart_finish_load_rom_session (which also closes the file).
+ *
+ * @param rom_path The path to the ROM file.
+ * @param rom_object Optional file locator captured while enumerating the directory (may be NULL).
+ * @param byte_swap Whether to byte swap the ROM.
+ * @param initial_chunk The chunk to start loading from.
+ * @return flashcart_load_rom_session_t The load session. Use @ref flashcart_load_rom_session_valid to check it.
+ */
+flashcart_load_rom_session_t flashcart_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, bool byte_swap, unsigned int initial_chunk);
+
+/**
+ * @brief Check whether a chunked ROM load session was started successfully.
+ *
+ * @param session Pointer to the load session.
+ * @return bool True if the session is usable, false otherwise.
+ */
+bool flashcart_load_rom_session_valid (const flashcart_load_rom_session_t *session);
+
+/**
+ * @brief Load the next chunk of a chunked ROM load session.
+ *
+ * @param session Pointer to the load session.
+ * @param load_beginning_chunks Whether to keep loading the chunks before the initial chunk once the end of the ROM has been reached.
+ * @return flashcart_err_t Error code. FLASHCART_ERR_LOAD is returned once there is nothing left to load.
+ */
+flashcart_err_t flashcart_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks);
+
+/**
+ * @brief Load everything left in a chunked ROM load session and close it.
+ *
+ * @param session Pointer to the load session.
+ * @param progress Callback function for progress updates.
+ * @return flashcart_err_t Error code.
+ */
+flashcart_err_t flashcart_finish_load_rom_session (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress);
+
+/**
  * @brief Load a file onto the flashcart.
  * 
  * @param file_path The path to the file.
@@ -190,6 +259,24 @@ flashcart_err_t flashcart_load_64dd_ipl (char *ipl_path, flashcart_progress_call
  * @return flashcart_err_t Error code.
  */
 flashcart_err_t flashcart_load_64dd_disk (char *disk_path, flashcart_disk_parameters_t *disk_parameters);
+
+/**
+ * @brief Load 64DD disks into the flashcart.
+ *
+ * @param disk_path Path to the primary disk file.
+ * @param disk_parameters Pointer to the disk parameters.
+ * @param swap_disk_paths Array of paths to swap disk files.
+ * @param swap_disk_count Number of swap disks.
+ * @return flashcart_err_t Error code.
+ */
+flashcart_err_t flashcart_load_64dd_disks (char *disk_path, flashcart_disk_parameters_t *disk_parameters, char **swap_disk_paths, int swap_disk_count);
+
+/**
+* @brief Set the next boot mode for the flashcart.
+* 
+* @param boot_mode The boot mode to set.
+* @return flashcart_err_t Error code.
+*/
 flashcart_err_t flashcart_set_next_boot_mode (flashcart_reboot_mode_t boot_mode);
 
 #ifdef __cplusplus

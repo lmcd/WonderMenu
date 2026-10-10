@@ -6,6 +6,10 @@
 #include <cfloat>
 
 #include "CartRenderer.h"
+#include "general/Game.h"
+#include "general/GameDatabase.h"
+#include "ui/RenderInfo.h"
+#include "util/Color.h"
 
 #define MATRIX_COUNT 10
 
@@ -300,10 +304,10 @@ int CartRenderer::preloadLabelDataForGame(Game* game, bool preferHighRes, int ti
     LoadResult result;
 
     if (preferHighRes) {
-        result = labelLoader.getLargeLabelDataForGame(game, true);
+        result = labelLoader.loadLargeLabelDataForGame(game, tileCount);
     }
     else {
-        result = labelLoader.getSmallLabelDataForGame(game, tileCount, true);
+        result = labelLoader.loadSmallLabelDataForGame(game, tileCount, true);
     }
 
     return result.tilesLoaded;
@@ -314,7 +318,7 @@ CartLabelType CartRenderer::loadLabelDataForGame(Game* game, bool preferHighRes)
 
     if (game) {
         if (preferHighRes) {
-            LoadResult result = labelLoader.getLargeLabelDataForGame(game, false);
+            LoadResult result = labelLoader.loadLargeLabelDataForGame(game);
             spriteData = result.data;
 
             if (spriteData) {
@@ -334,7 +338,7 @@ CartLabelType CartRenderer::loadLabelDataForGame(Game* game, bool preferHighRes)
         }
 
         if (spriteData == nullptr) {
-            LoadResult result = labelLoader.getSmallLabelDataForGame(game, 4);
+            LoadResult result = labelLoader.loadSmallLabelDataForGame(game, 4);
             spriteData = result.data;
 
             if (spriteData) {
@@ -355,7 +359,6 @@ Size CartRenderer::sizeForScale(float scale) const {
 }
 
 void CartRenderer::finishPreload() {
-    // debugf("dma_busy %i\n", dma_busy());
     if (pendingCartPreload.cacheIndex == -1) {
         // Nothing to preload
         return;
@@ -391,16 +394,21 @@ void CartRenderer::finishPreload() {
     pendingCartPreload.cacheIndex = -1;
 }
 
-int CartRenderer::prerender2DCart(float scale, Game* game) {
-    int tilesLoaded = preloadLabelDataForGame(game, false, 4);
+int CartRenderer::preloadLabel(float scale, Game* game) {
+    if (game->cartLabel == nullptr || game->cartLabel->status == CartLabel::LABEL_PURGABLE) {
+        int tilesLoaded = preloadLabelDataForGame(game, false, DB_S_LABEL_TILE_COUNT);
 
-    finishPreload();
+        finishPreload();
 
-    if (tilesLoaded > 0) {
-        pendingCartPreload = PendingCartPreload(game->cartLabel->cacheIndex, scale, game);
+        if (tilesLoaded > 0) {
+            pendingCartPreload = PendingCartPreload(game->cartLabel->cacheIndex, scale, game);
+        }
+
+        return tilesLoaded;
     }
-
-    return tilesLoaded;
+    else {
+        return 0;
+    }
 }
 
 Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPosition, float yRelativeToLight, Game* game, float opacity = 1.0f, int cacheIndex = -1) {
@@ -528,4 +536,8 @@ Rect CartRenderer::render3DCart(int frameNumber, float scale, Vec3f position, Ve
 
 void CartRenderer::freeAllLabels() {
     labelLoader.freeAll();
+}
+
+void CartRenderer::freeLabelForGame(Game* game) {
+    labelLoader.freeLabelForGame(game);
 }

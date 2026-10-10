@@ -10,6 +10,8 @@
 #include <vector>
 #include <istream>
 
+#define NO_CHEATS_DATABASE 0xFFFFFFFF
+
 // A cheat's codes can draw from up to three wildcards, written X, Y and Z (with
 // "?" an alias for X). Each option line supplies one value per wildcard.
 static constexpr size_t MAX_CHEAT_WILDCARDS = 3;
@@ -27,9 +29,7 @@ struct __attribute__((packed)) CheatGroup {
 // non-wildcard digits.
 struct __attribute__((packed)) CheatWildcardOption {
     char title[46];
-    uint16_t value1;
-    uint16_t value2;
-    uint16_t value3;
+    uint16_t values[3];
 };
 
 struct __attribute__((packed)) Cheat {

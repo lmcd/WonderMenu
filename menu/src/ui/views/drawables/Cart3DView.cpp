@@ -28,7 +28,7 @@ void Cart3DView::update(const RenderInfo& renderInfo) {
 void Cart3DView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex], finalBlendColor);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -78,7 +78,7 @@ void Cart3DView::render(const RenderInfo& renderInfo) {
 	boundingBox = boundingBox.insetBy(Vec2(-4, -4));
 
     if (hasScissor) {
-        boundingBox = boundingBox.intersection(scissorStack.back());
+        boundingBox = boundingBox.intersection(currentScissor());
     }
 
 	drawnBoundingBox[bufferIndex] = boundingBox;

@@ -26,9 +26,7 @@ bool ROMFile::hasHomebrewGameCode() {
     return false;
 }
 
-bool ROMFile::hasROMExtension(const char* filename) {
-    size_t length = strlen(filename);
-
+bool ROMFile::hasROMExtension(const char* filename, size_t length) {
     if (length < 4) {
         return false;
     }
@@ -38,10 +36,17 @@ bool ROMFile::hasROMExtension(const char* filename) {
     }
 
     const char* ext = filename + length - 4;
-    
-    return strcasecmp(ext, ".z64") == 0 ||
-           strcasecmp(ext, ".n64") == 0 ||
-           strcasecmp(ext, ".v64") == 0;
+
+    if (ext[0] != '.' || ext[2] != '6' || ext[3] != '4') {
+        return false;
+    }
+
+    // Every extension taken here is ".?64", so only one character is ever in
+    // question; ORing in 0x20 folds it to lowercase. Cheaper than strcasecmp,
+    // which runs a ctype table lookup per character, three times over.
+    const char type = ext[1] | 0x20;
+
+    return type == 'z' || type == 'n' || type == 'v';
 }
 
 bool ROMFile::readROMBytes(const char* path, size_t numBytes, unsigned char* buffer) {

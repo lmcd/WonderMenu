@@ -23,7 +23,7 @@ private:
     BaseView rootView;
 
     /*
-     * Scenes waiting to be freed.
+     * Scenes waiting to be freed after being removed from the renderer.
      */
     std::vector<Scene*> garbageScenes;
     
@@ -35,13 +35,13 @@ private:
     int frameNumber;
 
     /*
-     * Incrementing number for the current scene
-     * Starts at zero when a scene is added to the renderer
+     * Incrementing number for the current scene.
+     * Starts at zero when a scene is added to the renderer.
      */
     int sceneFrameNumber = 0;
 
     /*
-     * `sceneFrameNumber` for each scene in `sceneStack`.
+     * Tracks `sceneFrameNumber` for each scene in `sceneStack`.
      * Allows a scene's frame number to pick up from where it left off when
      * returning.
      */
@@ -79,32 +79,32 @@ public:
     void popScene();
 
     /**
-     * Start main render loop
+     * Start the main render loop.
      */
     void begin();
 
     /**
-     * End everything, cleanup and exit the main loop
+     * End everything, cleanup and exit the main render loop.
      */
     void end();
 
     /**
-     * Advance to the next frame and render
+     * Advance to the next frame and render.
      */
     void advance();
 
     /**
-     * Render the current scene
+     * Render the current scene.
      */
     void render(int frameNumber);
 
     /**
-     * Get the display size
+     * Get the display size.
      */
     Size displaySize();
 
     /**
-     * Rect assigned to each scene's `frame`
+     * Rect assigned to each scene's `frame`.
      */
     Rect sceneRect();
 

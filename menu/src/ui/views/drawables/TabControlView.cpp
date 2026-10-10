@@ -196,7 +196,7 @@ void TabControlView::update(const RenderInfo& renderInfo) {
 void TabControlView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRects(drawnBoundingBox[bufferIndex]);
+    clearRect(drawnBoundingBox[bufferIndex]);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -455,10 +455,10 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         setPrimitiveColor(blackColor);
 
         // Draw L button shadow
-        rdpq_sprite_blit(buttonShadowSprite, leftButtonRect.minX(), leftButtonRect.minY(), NULL);
+        drawSprite(buttonShadowSprite, leftButtonRect.origin);
 
         // Draw R button shadow
-        rdpq_sprite_blit(buttonShadowSprite, rightButtonRect.minX(), rightButtonRect.minY(), NULL);
+        drawSprite(buttonShadowSprite, rightButtonRect.origin);
     }
 
     // Draw L/R button fills

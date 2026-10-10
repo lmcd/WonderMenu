@@ -10,6 +10,7 @@
 #include <math.h>
 
 #include "animation/TimingFunctions.h"
+#include "general/GameDatabase.h"
 #include "ui/scenes/GameLaunchScene.h"
 #include "ui/scenes/ListScene.h"
 
@@ -21,9 +22,7 @@ SelectionTransitionScene::SelectionTransitionScene(ListScene* listScene,
 
     ownedByRenderer = true;
 
-    transition.progress = 0.0;
     transition.speed = 0.025;
-    transition.direction = Transition::FORWARDS;
 }
 
 SelectionTransitionScene::~SelectionTransitionScene() {
@@ -47,32 +46,39 @@ void SelectionTransitionScene::didBeginScene(SceneEntry entry) {
 }
 
 void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
-    float halfTransitionProgress = std::clamp(transition.progress * 2.0f, 0.0f, 1.0f);
+    // 0..1 over the first half of the transition, pinned at 1 thereafter
+    float lowerHalfTransitionProgress = std::clamp(transition.progress * 2.0f, 0.0f, 1.0f);
+
+    // 0 until the halfway point, then 0..1 over the second half
+    float upperHalfTransitionProgress = std::clamp(transition.progress * 2.0f - 1.0f, 0.0f, 1.0f);
 
     float value = TimingFunctions::easeInOutQuad(transition.progress);
-    float halfValue = TimingFunctions::easeInOutQuad(halfTransitionProgress);
+    
+    float lowerHalfValue = TimingFunctions::easeInOutQuad(lowerHalfTransitionProgress);
+    float upperHalfValue = TimingFunctions::easeInOutQuad(upperHalfTransitionProgress);
 
     for (int i = 0; i < 7; i++) {
-        float opacity = std::lerp(listScene->opacityForRow(i), 0.0f, halfValue);
+        float opacity = std::lerp(listScene->opacityForRow(i), 0.0f, lowerHalfValue);
         listScene->tableView.rowViews[i].opacity = opacity;
     }
 
     listScene->updateViews(renderInfo);
     gameLaunchScene->updateViews(renderInfo);
     
-    float opacity = std::lerp(1.0f, 0.0f, halfValue);
+    float lowerHalfOpacity = std::lerp(1.0f, 0.0f, lowerHalfValue);
+    float upperHalfOpacity = std::lerp(0.0f, 1.0f, upperHalfValue);
 
     listScene->cart3DView.isHidden = true;
-    listScene->selectionRectView.opacity = opacity;
-    listScene->tabControlView.opacity = opacity;
-    listScene->scrollbarView.opacity = opacity;
+    listScene->selectionRectView.opacity = lowerHalfOpacity;
+    listScene->tabControlView.opacity = lowerHalfOpacity;
+    listScene->scrollbarView.opacity = lowerHalfOpacity;
 
     uint8_t flags = CART_RENDER_DEFAULT;
     Game* gameShown = listScene->cart3DView.game;
 
     if (transition.progress > 0.70f) {
         flags |= CART_RENDER_PREFER_HIGHRES;
-        gameShown = gameLaunchScene->game;
+        gameShown = &gameLaunchScene->game;
     }
 
     float srcScale = listScene->cart3DView.scale;
@@ -93,6 +99,8 @@ void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
     gameLaunchScene->cart3DView.scale = scale;
     gameLaunchScene->cart3DView.frame.origin = screenPosition;
     gameLaunchScene->cart3DView.rotation = rotation;
+
+    gameLaunchScene->labelView.opacity = upperHalfOpacity;
 }
 
 void SelectionTransitionScene::update(const UpdateInfo& updateInfo) {
@@ -131,15 +139,12 @@ void SelectionTransitionScene::update(const UpdateInfo& updateInfo) {
     bool passed50Percent = (transition.progress > 0.50f);
 
     if (transition.direction == Transition::FORWARDS) {
-        // The f_open in this call can be awfully slow (>500ms, >500 disk_reads)
-        gameLaunchScene->beginROMLoadSession();
-
         if (passed70Percent) {
-            gameLaunchScene->loadNextROMChunk();
+            gameLaunchScene->advanceWorkers();
         }
         else if (passed50Percent) {
-            Game* game = gameLaunchScene->game;
-            gameLaunchScene->cartRenderer->preloadLabelDataForGame(game, true); 
+            Game* game = &gameLaunchScene->game;
+            gameLaunchScene->cartRenderer->preloadLabelDataForGame(game, true, DB_LABEL_TILES_PER_CHUNK); 
         }
     }
 }
