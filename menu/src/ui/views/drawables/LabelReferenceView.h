@@ -30,7 +30,7 @@ extern "C" rdpq_paragraph_t* __rdpq_paragraph_build(const rdpq_textparms_t *parm
 template <int MAX_LAYOUT_CHARS = 256>
 struct LabelReferenceView : public Drawable {
 private:
-    const char* lastStringReference[BUFF_COUNT] = {};
+    const char* lastStringReference = nullptr;
 
     uint16_t animationFrame = 0;
 
@@ -119,21 +119,19 @@ protected:
 
     rdpq_paragraph_t* layout = nullptr;
 
-    bool lastIsAnimating[BUFF_COUNT] = {};
+    bool lastIsAnimating = false;
 
-    void updateAnimation(const RenderInfo& renderInfo) {
-        int bufferIndex = renderInfo.bufferIndex;
+    void updateAnimation() {
+        if (isAnimating != lastIsAnimating) {
+            setNeedsClear();
+            setNeedsRender();
 
-        if (isAnimating != lastIsAnimating[bufferIndex]) {
-            needsClear = true;
-            needsRender = true;
-
-            lastIsAnimating[bufferIndex] = isAnimating;
+            lastIsAnimating = isAnimating;
         }
 
         if (isAnimating) {
-            needsClear = true;
-            needsRender = true;
+            setNeedsClear();
+            setNeedsRender();
         }
     }
 
@@ -232,19 +230,17 @@ public:
     void update(const RenderInfo& renderInfo) override {
         Drawable::update(renderInfo);
 
-        int bufferIndex = renderInfo.bufferIndex;
-
-        if (stringReference != lastStringReference[bufferIndex]) {
-            needsClear = true;
-            needsRender = true;
+        if (stringReference != lastStringReference) {
+            setNeedsClear();
+            setNeedsRender();
 
             updateParagraphLayout();
             stopAnimating();
 
-            lastStringReference[bufferIndex] = stringReference;
+            lastStringReference = stringReference;
         }
 
-        updateAnimation(renderInfo);
+        updateAnimation();
     }
 
     void clear(const RenderInfo& renderInfo) {
@@ -264,7 +260,7 @@ public:
             return;
         }
 
-        if (!needsRender) {
+        if (!needsRenderIn(renderInfo.bufferIndex)) {
             return;
         }
 
@@ -274,7 +270,7 @@ public:
 
         if (layout->nchars == 0) {
             drawnBoundingBox[renderInfo.bufferIndex] = Rect();
-            finishRender();
+            finishRender(renderInfo.bufferIndex);
             return;
         }
 
@@ -299,7 +295,7 @@ public:
             if (scissorRect.size.width == 0 || scissorRect.size.height == 0) {
                 drawnBoundingBox[bufferIndex] = Rect();
 
-                finishRender();
+                finishRender(renderInfo.bufferIndex);
 
                 return;
             }
@@ -338,6 +334,6 @@ public:
 
         drawnBoundingBox[bufferIndex] = boundingBox;
 
-        finishRender();
+        finishRender(renderInfo.bufferIndex);
     }
 };

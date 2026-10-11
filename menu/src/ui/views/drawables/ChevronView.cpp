@@ -21,11 +21,9 @@ void ChevronView::uploadSprite() {
 void ChevronView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (expandProgress != lastExpandProgress[bufferIndex]) {
-        needsRender = true;
-        lastExpandProgress[bufferIndex] = expandProgress;
+    if (expandProgress != lastExpandProgress) {
+        setNeedsRender();
+        lastExpandProgress = expandProgress;
     }
 }
 
@@ -38,7 +36,7 @@ void ChevronView::clear(const RenderInfo& renderInfo) {
 }
 
 void ChevronView::renderChevron(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -107,7 +105,7 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
 }
 
 void ChevronView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -118,5 +116,5 @@ void ChevronView::render(const RenderInfo& renderInfo) {
     uploadSprite();
     renderChevron(renderInfo);
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

@@ -19,7 +19,7 @@ private:
     static constexpr Color DEFAULT_FILL_COLOR = Color((uint8_t)(255 * 0.45f));
     static constexpr Color DEFAULT_CHECK_COLOR = Color(255);
 
-    bool lastIsOn[BUFF_COUNT] = {};
+    bool lastIsOn = false;
 
     void renderCheckbox(const RenderInfo& renderInfo);
 
@@ -32,7 +32,10 @@ public:
 
         for (CheckboxView& view : views) {
             view.renderCheckbox(renderInfo);
-            view.finishRender();
+
+            if (!view.finalIsHidden) {
+                view.finishRender(renderInfo.bufferIndex);
+            }
         }
     }
 

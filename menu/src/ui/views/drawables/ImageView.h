@@ -27,9 +27,9 @@ public:
     };
     
 private:
-    sprite_t* lastSprite[BUFF_COUNT] = {};
-    ScaleMode lastScaleMode[BUFF_COUNT] = {};
-    uint32_t lastSpriteVersion[BUFF_COUNT] = {};
+    sprite_t* lastSprite = nullptr;
+    ScaleMode lastScaleMode = {};
+    uint32_t lastSpriteVersion = 0;
 
     // Fills in the blit params for the current scale mode and returns the rect
     // the sprite will actually occupy on screen.

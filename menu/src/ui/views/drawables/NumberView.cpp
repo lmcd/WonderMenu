@@ -21,11 +21,9 @@ void NumberView::uploadSprite() {
 void NumberView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (number != lastNumber[bufferIndex]) {    
-        needsRender = true;
-        lastNumber[bufferIndex] = number;
+    if (number != lastNumber) {    
+        setNeedsRender();
+        lastNumber = number;
     }
 }
 
@@ -38,7 +36,7 @@ void NumberView::clear(const RenderInfo& renderInfo) {
 }
 
 void NumberView::renderIcon(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -85,7 +83,7 @@ void NumberView::renderIcon(const RenderInfo& renderInfo) {
 }
 
 void NumberView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -96,5 +94,5 @@ void NumberView::render(const RenderInfo& renderInfo) {
     uploadSprite();
     renderIcon(renderInfo);
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

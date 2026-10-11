@@ -34,9 +34,7 @@ void SelectedRowView::setNeedsDisplay(Rect dirtyRect) {
     shadowView.setNeedsDisplay(dirtyRect);
 }
 
-void SelectedRowView::update(const RenderInfo& renderInfo) {
-    int bufferIndex = renderInfo.bufferIndex;
-    
+void SelectedRowView::update(const RenderInfo&) {
     leftOutsetRectView.frame = Rect(Vec2::ZERO, frame.size);
     leftOutsetRectView.frame.size.width = -inset.x;
     leftOutsetRectView.frame.size.height += 5;
@@ -54,22 +52,22 @@ void SelectedRowView::update(const RenderInfo& renderInfo) {
     // shadowView.frame.size.height += 5;
     shadowView.isRounded = isRounded;
 
-    if (selectedRowIndex != lastSelectedRowIndex[bufferIndex]) {
+    if (selectedRowIndex != lastSelectedRowIndex) {
         setNeedsDisplay();
         
-        lastSelectedRowIndex[bufferIndex] = selectedRowIndex;
+        lastSelectedRowIndex = selectedRowIndex;
     }
 
-    if (isDown != lastIsDown[bufferIndex]) {
+    if (isDown != lastIsDown) {
         setNeedsDisplay();
 
-        lastIsDown[bufferIndex] = isDown;
+        lastIsDown = isDown;
     }
 
-    if (expandProgress != lastExpandProgress[bufferIndex]) {
+    if (expandProgress != lastExpandProgress) {
         setNeedsDisplay();
 
-        lastExpandProgress[bufferIndex] = expandProgress;
+        lastExpandProgress = expandProgress;
     }
     
     setNeedsDisplay(Rect(finalFrame.origin, leftOutsetRectView.frame.size));

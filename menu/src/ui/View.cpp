@@ -21,9 +21,12 @@ View::~View() {
     }
 }
 
-void View::finishRender() {
-    needsRender = false;
-    isPendingFullRender = false;
+void View::setSubtreeNeedsFullRender() {
+    setNeedsFullRender();
+
+    for (View* subview : subviews) {
+        subview->setSubtreeNeedsFullRender();
+    }
 }
 
 void View::applyScissor(const Rect& rect) {
@@ -96,7 +99,7 @@ void View::printHierarchy(int depth) const {
 void View::clear(const RenderInfo&) {}
 
 void View::clearIfNeeded(const RenderInfo& renderInfo) {
-    if (needsClear) {
+    if (needsClearIn(renderInfo.bufferIndex)) {
         clear(renderInfo);
     }
 }
@@ -192,7 +195,7 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
         subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
         subview->finalFrame.origin = finalPosition + subview->frame.origin;
         subview->finalFrame.size   = subview->frame.size;
-        subview->finalIsOpaque = finalIsOpaque ? true : subview->isOpaque;
+        subview->finalIsOpaque = finalIsOpaque && subview->isOpaque;
 
         subview->update(renderInfo);
 
@@ -240,9 +243,17 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
         return (surface_t){};
     }
 
+    setSubtreeNeedsFullRender();
+
     rdpq_attach(&surface, NULL);
 
-    clearRecursive(renderInfo);
+    rdpq_mode_push();
+    rdpq_set_mode_fill(Color::BLACK);
+
+    clearSubtree(renderInfo);
+
+    rdpq_mode_pop();
+
     render(renderInfo);
 
     rdpq_detach();
@@ -257,17 +268,16 @@ void View::clearSubtree(const RenderInfo& renderInfo, bool force) {
         subview->clearSubtree(renderInfo, force);
 
         if (force) {
-            for (int i = 0; i < BUFF_COUNT; i++) {
-                subview->lastFinalIsHidden[i] = true;
-            }
-			
+            subview->lastFinalIsHidden = true;
+            subview->setNeedsFullRender();
+
             subview->clear(renderInfo);
         }
         else {
             subview->clearIfNeeded(renderInfo);
         }
 
-        subview->needsClear = false;
+        subview->clearMask &= ~bufferBit(renderInfo.bufferIndex);
     }
 }
 
@@ -405,65 +415,89 @@ void Drawable::clearDrawnBoxes() {
     }
 }
 
-void Drawable::setNeedsDisplay() {
-    if (isPendingFullRender) {
+void Drawable::addPendingRenderRect(int bufferIndex, Rect dirtyRect) {
+    uint8_t bit = bufferBit(bufferIndex);
+
+    renderMask |= bit;
+
+    if (fullRenderMask & bit) {
         return;
     }
 
+    std::vector<Rect>& rects = pendingRenderRects[bufferIndex];
+
+    for (const Rect& rect : rects) {
+        if (rect.contains(dirtyRect)) {
+            return;
+        }
+    }
+
+    if ((int)rects.size() >= MAX_PENDING_RENDER_RECTS) {
+        fullRenderMask |= bit;
+        rects.clear();
+        return;
+    }
+
+    rects.push_back(dirtyRect);
+}
+
+void Drawable::finishRender(int bufferIndex) {
+    uint8_t bit = bufferBit(bufferIndex);
+
+    renderMask &= ~bit;
+    fullRenderMask &= ~bit;
+
+    pendingRenderRects[bufferIndex].clear();
+}
+
+void Drawable::setNeedsDisplay() {
     if (finalIsHidden) {
         return;
     }
 
-    needsRender = true;
+    setNeedsFullRender();
 
-    pendingRenderRects.clear();
-    pendingRenderRects.push_back(finalFrame);
-
-    isPendingFullRender = true;
+    for (std::vector<Rect>& rects : pendingRenderRects) {
+        rects.clear();
+    }
 }
 
 void Drawable::setNeedsDisplay(Rect dirtyRect) {
-    if (isPendingFullRender) {
-        return;
-    }
-
     if (finalIsHidden) {
         return;
     }
 
-    needsRender = true;
-
-    pendingRenderRects.push_back(dirtyRect);
+    for (int i = 0; i < BUFF_COUNT; i++) {
+        addPendingRenderRect(i, dirtyRect);
+    }
 }
 
-void Drawable::update(const RenderInfo& renderInfo) {
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (finalBlendColor != lastFinalBlendColor[bufferIndex]) {
-        needsRender = true;
-        lastFinalBlendColor[bufferIndex] = finalBlendColor;
+void Drawable::update(const RenderInfo&) {
+    if (finalBlendColor != lastFinalBlendColor) {
+        setNeedsRender();
+        lastFinalBlendColor = finalBlendColor;
     }
 
-    if (finalOpacity != lastFinalOpacity[bufferIndex]) {
-        needsRender = true;
-        needsClear = true;
-        lastFinalOpacity[bufferIndex] = finalOpacity;
+    if (finalOpacity != lastFinalOpacity) {
+        setNeedsRender();
+        setNeedsClear();
+        lastFinalOpacity = finalOpacity;
     }
 
-    if (finalIsHidden != lastFinalIsHidden[bufferIndex]) {
+    if (finalIsHidden != lastFinalIsHidden) {
         if (!finalIsHidden) {
-            needsRender = true;
+            setNeedsRender();
         }
         else {
-            needsClear = true;
+            setNeedsClear();
         }
 
-        lastFinalIsHidden[bufferIndex] = finalIsHidden;
+        lastFinalIsHidden = finalIsHidden;
     }
 
-    if (finalFrame != lastFinalFrame[bufferIndex]) {
-        needsRender = true;
-        needsClear = true;
-        lastFinalFrame[bufferIndex] = finalFrame;
+    if (finalFrame != lastFinalFrame) {
+        setNeedsRender();
+        setNeedsClear();
+        lastFinalFrame = finalFrame;
     }
 }

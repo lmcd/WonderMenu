@@ -48,11 +48,26 @@ private:
     friend class Scene;
 
 protected:
-    float lastFinalOpacity[BUFF_COUNT] = {};
-    bool lastFinalIsHidden[BUFF_COUNT] = {};
-    Rect lastFinalFrame[BUFF_COUNT] = {};
-    Color lastFinalBlendColor[BUFF_COUNT] = {};
-    bool lastFinalIsOpaque[BUFF_COUNT] = {};
+    static constexpr uint8_t ALL_BUFFERS = (1 << BUFF_COUNT) - 1;
+
+    inline static bool hasScissor = false;
+
+    static uint8_t bufferBit(int bufferIndex) {
+        return (uint8_t)(1 << bufferIndex);
+    }
+
+    static void pushScissor(Rect rect);
+
+    static void popScissor();
+
+    static Rect currentScissor() {
+        return scissorStack.back();
+    }
+
+    float lastFinalOpacity = 0.0f;
+    bool lastFinalIsHidden = false;
+    Rect lastFinalFrame = {};
+    Color lastFinalBlendColor = {};
 
     // Final values are computed by walking the view hierachy and accumulating
     // and are used
@@ -63,9 +78,49 @@ protected:
     Color finalBlendColor = Color::BLACK;
     bool finalIsOpaque = false;
 
-    bool isPendingFullRender = false;
-    bool needsClear = false;
-    bool needsRender = true;
+    uint8_t renderMask = ALL_BUFFERS;
+    uint8_t clearMask = 0;
+    uint8_t fullRenderMask = ALL_BUFFERS;
+
+    bool needsRenderIn(int bufferIndex) const {
+        return renderMask & bufferBit(bufferIndex);
+    }
+
+    bool needsClearIn(int bufferIndex) const {
+        return clearMask & bufferBit(bufferIndex);
+    }
+
+    bool needsFullRenderIn(int bufferIndex) const {
+        return fullRenderMask & bufferBit(bufferIndex);
+    }
+
+    void setNeedsRender() {
+        renderMask = ALL_BUFFERS;
+    }
+
+    void setNeedsRender(int bufferIndex) {
+        renderMask |= bufferBit(bufferIndex);
+    }
+
+    void setNeedsFullRender() {
+        renderMask = ALL_BUFFERS;
+        fullRenderMask = ALL_BUFFERS;
+    }
+
+    void setNeedsFullRender(int bufferIndex) {
+        renderMask |= bufferBit(bufferIndex);
+        fullRenderMask |= bufferBit(bufferIndex);
+    }
+
+    void setNeedsClear() {
+        clearMask = ALL_BUFFERS;
+    }
+
+    void setNeedsClear(int bufferIndex) {
+        clearMask |= bufferBit(bufferIndex);
+    }
+
+    void setSubtreeNeedsFullRender();
 
     // TODO: Not yet used
     bool needsLayout = true;
@@ -85,20 +140,8 @@ protected:
 
     void clearIfNeeded(const RenderInfo& renderInfo);
 
-    void finishRender();
-
 public:
     virtual ~View();
-
-    inline static bool hasScissor = false;
-
-    static void pushScissor(Rect rect);
-
-    static void popScissor();
-
-    static Rect currentScissor() {
-        return scissorStack.back();
-    }
 
     /**
      * The view that contains this one (nullptr for the root)
@@ -174,9 +217,15 @@ protected:
         WITH_BLEND_COLOR
     };
 
+    static constexpr int MAX_PENDING_RENDER_RECTS = 8;
+
     Rect drawnBoundingBox[BUFF_COUNT];
 
-    std::vector<Rect> pendingRenderRects;
+    std::vector<Rect> pendingRenderRects[BUFF_COUNT];
+
+    void addPendingRenderRect(int bufferIndex, Rect dirtyRect);
+
+    void finishRender(int bufferIndex);
 
     void setTileRect(rdpq_tile_t tile, Rect tileRect);
 

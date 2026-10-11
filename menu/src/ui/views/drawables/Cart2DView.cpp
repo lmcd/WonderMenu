@@ -19,31 +19,26 @@ void Cart2DView::uploadSprite(int spriteIndex) {
     rdpq_sprite_upload(TILE0, sprites[spriteIndex], NULL);
 }
 
-void Cart2DView::update(const RenderInfo& renderInfo) {
-    int bufferIndex = renderInfo.bufferIndex;
-
-    needsFullRender = false;
-    needsPartialRender = false;
-
-    if (finalOpacity != lastFinalOpacity[bufferIndex]) {
-        needsFullRender = true;
-        lastFinalOpacity[bufferIndex] = finalOpacity;
+void Cart2DView::update(const RenderInfo&) {
+    if (finalOpacity != lastFinalOpacity) {
+        setNeedsFullRender();
+        lastFinalOpacity = finalOpacity;
     }
 
-    if (finalIsHidden != lastFinalIsHidden[bufferIndex]) {
+    if (finalIsHidden != lastFinalIsHidden) {
         if (!finalIsHidden) {
-            needsFullRender = true;
+            setNeedsFullRender();
         }
         else {
-            needsClear = true;
+            setNeedsClear();
         }
 
-        lastFinalIsHidden[bufferIndex] = finalIsHidden;
+        lastFinalIsHidden = finalIsHidden;
     }
     
-    if (game != lastGame[bufferIndex]) {
-        needsPartialRender = true;
-        lastGame[bufferIndex] = game;
+    if (game != lastGame) {
+        setNeedsRender();
+        lastGame = game;
     }
 }
 
@@ -55,8 +50,8 @@ void Cart2DView::clear(const RenderInfo& renderInfo) {
     drawnBoundingBox[bufferIndex] = Rect();
 }
 
-void Cart2DView::renderCartSide(const RenderInfo&, int spriteIndex) {
-    if (!needsFullRender) {
+void Cart2DView::renderCartSide(const RenderInfo& renderInfo, int spriteIndex) {
+    if (!needsFullRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -97,7 +92,7 @@ void Cart2DView::renderCartSide(const RenderInfo&, int spriteIndex) {
 }
 
 void Cart2DView::renderCartLabel(const RenderInfo& renderInfo) {
-    if (!needsFullRender && !needsPartialRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -136,7 +131,7 @@ void Cart2DView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    if (needsFullRender) {
+    if (needsFullRenderIn(renderInfo.bufferIndex)) {
         uploadSprite(0);
         renderCartSide(renderInfo, 0);
 
@@ -144,11 +139,7 @@ void Cart2DView::render(const RenderInfo& renderInfo) {
         renderCartSide(renderInfo, 1);
     }
 
-    if (needsFullRender || needsPartialRender) {
-        renderCartLabel(renderInfo);
-    }
+    renderCartLabel(renderInfo);
 
-    needsFullRender = false;
-    needsPartialRender = false;
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

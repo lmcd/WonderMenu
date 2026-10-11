@@ -186,8 +186,8 @@ void TabControlView::update(const RenderInfo& renderInfo) {
         setNeedsDisplay();
     }
 
-    if (needsRender) {
-        needsClear = true;
+    if (needsRenderIn(bufferIndex)) {
+        setNeedsClear(bufferIndex);
     }
 
     layoutLabels();
@@ -315,7 +315,7 @@ void TabControlView::renderLabels(const RenderInfo& renderInfo) {
 }
 
 void TabControlView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -522,5 +522,5 @@ void TabControlView::render(const RenderInfo& renderInfo) {
 
     drawnBoundingBox[bufferIndex] = finalFrame.insetBy(Vec2(-3, -3));
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

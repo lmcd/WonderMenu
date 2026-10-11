@@ -16,9 +16,9 @@ private:
     RectView rectView;
     BottomShadowView shadowView;
     
-    int lastSelectedRowIndex[BUFF_COUNT] = {};
-    int lastIsDown[BUFF_COUNT] = {};
-    float lastExpandProgress[BUFF_COUNT] = {};
+    int lastSelectedRowIndex = 0;
+    bool lastIsDown = false;
+    float lastExpandProgress = 0.0f;
 
 public:
     const char* name() const override { return "SelectedRowView"; }

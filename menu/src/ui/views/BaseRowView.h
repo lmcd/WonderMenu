@@ -10,9 +10,9 @@
 
 struct BaseRowView : public View {
 private:
-    bool lastIsSelected[BUFF_COUNT] = {};
-    bool lastIsDown[BUFF_COUNT] = {};
-    float lastExpandProgress[BUFF_COUNT] = {};
+    bool lastIsSelected = false;
+    bool lastIsDown = false;
+    float lastExpandProgress = 0.0f;
 
 public:
     static constexpr int FONT_ID = Fonts::INTERDISPLAY_SEMIBOLD_15;
@@ -26,31 +26,29 @@ public:
     BaseRowView(const BaseRowView&) = delete;
     BaseRowView& operator=(const BaseRowView&) = delete;
 
-    void update(const RenderInfo& renderInfo) {
-        int bufferIndex = renderInfo.bufferIndex;
-
-        if (isSelected != lastIsSelected[bufferIndex]) {
+    void update(const RenderInfo&) {
+        if (isSelected != lastIsSelected) {
             for (View* subview : subviews) {
                 static_cast<Drawable*>(subview)->setNeedsDisplay();
             }
             
-            lastIsSelected[bufferIndex] = isSelected;
+            lastIsSelected = isSelected;
         }
 
-        if (isDown != lastIsDown[bufferIndex]) {
+        if (isDown != lastIsDown) {
             for (View* subview : subviews) {
                 static_cast<Drawable*>(subview)->setNeedsDisplay();
             }
             
-            lastIsDown[bufferIndex] = isDown;
+            lastIsDown = isDown;
         }
 
-        if (expandProgress != lastExpandProgress[bufferIndex]) {
+        if (expandProgress != lastExpandProgress) {
             for (View* subview : subviews) {
                 static_cast<Drawable*>(subview)->setNeedsDisplay();
             }
             
-            lastExpandProgress[bufferIndex] = expandProgress;
+            lastExpandProgress = expandProgress;
         }
     }
 

@@ -15,9 +15,9 @@ private:
     inline static surface_t maskSheets[RectView::MAXIMUM_RADIUS] = {};
     inline static surface_t smoothMaskSheets[RectView::MAXIMUM_RADIUS] = {};
 
-    void* lastImageBuffer[BUFF_COUNT] = {};
-    int lastRadius[BUFF_COUNT] = {};
-    uint32_t lastImageVersion[BUFF_COUNT] = {};
+    void* lastImageBuffer = nullptr;
+    uint8_t lastRadius = 0;
+    uint32_t lastImageVersion = 0;
 
     // We can't flip the corner sprite with the 2-stage combiner (or can we?),
     // so pre-render each corner into a 2x2 sheet, that we can reference when
@@ -34,7 +34,7 @@ public:
     // destruction, and whoever replaces it frees what was there before.
     surface_t imageSurface = {};
 
-    int radius = 0;
+    uint8_t radius = 0;
     bool isSmooth = false;
 
     // Bump this whenever the surface's pixels change without the pointer

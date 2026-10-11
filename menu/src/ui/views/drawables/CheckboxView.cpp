@@ -21,11 +21,9 @@ void CheckboxView::uploadSprite() {
 void CheckboxView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (isOn != lastIsOn[bufferIndex]) {
-        needsRender = true;
-        lastIsOn[bufferIndex] = isOn;
+    if (isOn != lastIsOn) {
+        setNeedsRender();
+        lastIsOn = isOn;
     }
 }
 
@@ -38,7 +36,7 @@ void CheckboxView::clear(const RenderInfo& renderInfo) {
 }
 
 void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -89,7 +87,7 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
 }
 
 void CheckboxView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -100,5 +98,5 @@ void CheckboxView::render(const RenderInfo& renderInfo) {
     uploadSprite();
     renderCheckbox(renderInfo);
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

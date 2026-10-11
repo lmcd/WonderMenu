@@ -11,22 +11,20 @@
 void ImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (sprite != lastSprite[bufferIndex]) {
-        needsRender = true;
-        lastSprite[bufferIndex] = sprite;
+    if (sprite != lastSprite) {
+        setNeedsRender();
+        lastSprite = sprite;
     }
 
-    if (spriteVersion != lastSpriteVersion[bufferIndex]) {
-        needsRender = true;
-        lastSpriteVersion[bufferIndex] = spriteVersion;
+    if (spriteVersion != lastSpriteVersion) {
+        setNeedsRender();
+        lastSpriteVersion = spriteVersion;
     }
 
-    if (scaleMode != lastScaleMode[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastScaleMode[bufferIndex] = scaleMode;
+    if (scaleMode != lastScaleMode) {
+        setNeedsClear();
+        setNeedsRender();
+        lastScaleMode = scaleMode;
     }
 }
 
@@ -114,7 +112,7 @@ void ImageView::clear(const RenderInfo& renderInfo) {
 }
 
 void ImageView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -164,5 +162,5 @@ void ImageView::render(const RenderInfo& renderInfo) {
 
     drawnBoundingBox[bufferIndex] = rect;
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

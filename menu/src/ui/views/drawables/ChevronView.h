@@ -18,7 +18,7 @@ private:
 
     static constexpr Color DEFAULT_FILL_COLOR = Color((uint8_t)(255 * 0.45f));
 
-    float lastExpandProgress[BUFF_COUNT] = {};
+    float lastExpandProgress = 0.0f;
 
     void renderChevron(const RenderInfo& renderInfo);
 
@@ -31,7 +31,10 @@ public:
 
         for (ChevronView& view : views) {
             view.renderChevron(renderInfo);
-            view.finishRender();
+
+            if (!view.finalIsHidden) {
+                view.finishRender(renderInfo.bufferIndex);
+            }
         }
     }
 

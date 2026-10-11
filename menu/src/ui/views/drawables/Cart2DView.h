@@ -18,10 +18,7 @@ private:
 
     inline static sprite_t* sprites[2] = {};
 
-    Game* lastGame[BUFF_COUNT] = {};
-
-    bool needsFullRender = false;
-    bool needsPartialRender = false;
+    Game* lastGame = nullptr;
 
     void renderCartSide(const RenderInfo& renderInfo, int spriteIndex);
     void renderCartLabel(const RenderInfo& renderInfo);
@@ -59,10 +56,10 @@ public:
 
         for (Cart2DView& view : views) {
             view.renderCartLabel(renderInfo);
-            view.finishRender();
-            
-            view.needsFullRender = false;
-            view.needsPartialRender = false;
+
+            if (!view.finalIsHidden) {
+                view.finishRender(renderInfo.bufferIndex);
+            }
         }
     }
 

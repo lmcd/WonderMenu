@@ -15,8 +15,7 @@ private:
 
     static void uploadSprite();
 
-    bool lastIsOn[BUFF_COUNT] = {};
-    int lastNumber[BUFF_COUNT] = {};
+    int lastNumber = 0;
 
     void renderIcon(const RenderInfo& renderInfo);
 
@@ -30,7 +29,10 @@ public:
 
         for (NumberView& view : views) {
             view.renderIcon(renderInfo);
-            view.finishRender();
+
+            if (!view.finalIsHidden) {
+                view.finishRender(renderInfo.bufferIndex);
+            }
         }
     }
 

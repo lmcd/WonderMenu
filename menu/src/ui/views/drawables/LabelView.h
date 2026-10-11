@@ -16,7 +16,7 @@
 template <int MAX_LAYOUT_CHARS = 256>
 struct LabelView : public LabelReferenceView<MAX_LAYOUT_CHARS> {
 private:
-    char lastString[BUFF_COUNT][MAX_LAYOUT_CHARS] = {};
+    char lastString[MAX_LAYOUT_CHARS] = {};
 
     int n = 0;
     char string[MAX_LAYOUT_CHARS] = {};
@@ -51,18 +51,16 @@ public:
     void update(const RenderInfo& renderInfo) override {
         Drawable::update(renderInfo);
 
-        int bufferIndex = renderInfo.bufferIndex;
+        if (strcmp(string, lastString) != 0) {
+            this->setNeedsClear();
+            this->setNeedsRender();
 
-        if (strcmp(string, lastString[bufferIndex]) != 0) {
-            this->needsClear = true;
-            this->needsRender = true;
-
-            memcpy(lastString[bufferIndex], string, n + 1);
+            memcpy(lastString, string, n + 1);
 
             this->updateParagraphLayout();
             this->stopAnimating();
         }
 
-        this->updateAnimation(renderInfo);
+        this->updateAnimation();
     }
 };

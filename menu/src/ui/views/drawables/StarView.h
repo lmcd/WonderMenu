@@ -15,7 +15,7 @@ private:
 
     inline static sprite_t* sprite = nullptr;
 
-    bool lastIsOn[BUFF_COUNT] = {};
+    bool lastIsOn = false;
 
     void renderIcon(const RenderInfo& renderInfo);
 
@@ -29,7 +29,10 @@ public:
 
         for (StarView& view : views) {
             view.renderIcon(renderInfo);
-            view.finishRender();
+
+            if (!view.finalIsHidden) {
+                view.finishRender(renderInfo.bufferIndex);
+            }
         }
     }
 

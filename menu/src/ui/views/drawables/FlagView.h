@@ -21,7 +21,7 @@ private:
     inline static sprite_t* sprites[2] = {};
 	inline static sprite_t* maskSprite = nullptr;
 
-    RegionCode lastRegionCode[BUFF_COUNT] = {};
+    RegionCode lastRegionCode = {};
 
     int spriteIndex();
     void renderIcon(const RenderInfo& renderInfo);
@@ -36,7 +36,10 @@ public:
 
         for (FlagView& view : views) {
             view.renderIcon(renderInfo);
-            view.finishRender();
+
+            if (!view.finalIsHidden) {
+                view.finishRender(renderInfo.bufferIndex);
+            }
         }
     }
 

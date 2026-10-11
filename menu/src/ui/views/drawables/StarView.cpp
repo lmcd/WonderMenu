@@ -21,11 +21,9 @@ void StarView::uploadSprite() {
 void StarView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-    
-    if (isOn != lastIsOn[bufferIndex]) {    
-        needsRender = true;
-        lastIsOn[bufferIndex] = isOn;
+    if (isOn != lastIsOn) {    
+        setNeedsRender();
+        lastIsOn = isOn;
     }
 }
 
@@ -38,7 +36,7 @@ void StarView::clear(const RenderInfo& renderInfo) {
 }
 
 void StarView::renderIcon(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -71,7 +69,7 @@ void StarView::renderIcon(const RenderInfo& renderInfo) {
 }
 
 void StarView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 

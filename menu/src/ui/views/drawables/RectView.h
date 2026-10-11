@@ -17,8 +17,10 @@ private:
     inline static sprite_t* cornerSprites[MAXIMUM_RADIUS] = {};
     inline static sprite_t* smoothCornerSprites[MAXIMUM_RADIUS] = {};
 
-    Color lastFillColor[BUFF_COUNT] = {};
-    int lastRadius[BUFF_COUNT] = {};
+    Color lastFillColor = {};
+    uint8_t lastRadius = 0;
+
+    Rect frameInBuffer[BUFF_COUNT] = {};
 
     Rect rectsToClear[4] = {};
 	bool needsPartialClear = false;
@@ -53,7 +55,7 @@ public:
     }
 
     Color fillColor = Color::WHITE;
-    int radius = 0;
+    uint8_t radius = 0;
     bool isSmooth = false;
     bool isInverted = false;
 

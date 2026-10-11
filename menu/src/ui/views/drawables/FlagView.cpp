@@ -46,7 +46,7 @@ int FlagView::spriteIndex() {
 }
 
 void FlagView::renderIcon(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -152,11 +152,9 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
 void FlagView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-    
-    if (regionCode != lastRegionCode[bufferIndex]) {
-        needsRender = true;
-        lastRegionCode[bufferIndex] = regionCode;
+    if (regionCode != lastRegionCode) {
+        setNeedsRender();
+        lastRegionCode = regionCode;
     }
 }
 
@@ -169,7 +167,7 @@ void FlagView::clear(const RenderInfo& renderInfo) {
 }
 
 void FlagView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -180,5 +178,5 @@ void FlagView::render(const RenderInfo& renderInfo) {
     uploadSprite(spriteIndex());
     renderIcon(renderInfo);
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

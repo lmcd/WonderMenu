@@ -17,22 +17,20 @@ MaskedImageView::~MaskedImageView() {
 void MaskedImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (imageSurface.buffer != lastImageBuffer[bufferIndex]) {
-        needsRender = true;
-        lastImageBuffer[bufferIndex] = imageSurface.buffer;
+    if (imageSurface.buffer != lastImageBuffer) {
+        setNeedsRender();
+        lastImageBuffer = imageSurface.buffer;
     }
 
-    if (imageVersion != lastImageVersion[bufferIndex]) {
-        needsRender = true;
-        lastImageVersion[bufferIndex] = imageVersion;
+    if (imageVersion != lastImageVersion) {
+        setNeedsRender();
+        lastImageVersion = imageVersion;
     }
 
-    if (radius != lastRadius[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastRadius[bufferIndex] = radius;
+    if (radius != lastRadius) {
+        setNeedsClear();
+        setNeedsRender();
+        lastRadius = radius;
     }
 }
 
@@ -150,7 +148,7 @@ void MaskedImageView::clear(const RenderInfo& renderInfo) {
 }
 
 void MaskedImageView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -264,5 +262,5 @@ void MaskedImageView::render(const RenderInfo& renderInfo) {
 
     drawnBoundingBox[bufferIndex] = rect;
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

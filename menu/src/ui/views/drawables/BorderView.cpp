@@ -16,7 +16,7 @@ void BorderView::clear(const RenderInfo& renderInfo) {
 }
 
 void BorderView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -107,5 +107,5 @@ void BorderView::render(const RenderInfo& renderInfo) {
 
     drawnBoundingBox[bufferIndex] = boundingBox;
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

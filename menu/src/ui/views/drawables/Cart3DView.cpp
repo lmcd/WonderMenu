@@ -10,18 +10,16 @@
 void Cart3DView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    int bufferIndex = renderInfo.bufferIndex;
-    
-    if (game != lastGame[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastGame[bufferIndex] = game;
+    if (game != lastGame) {
+        setNeedsClear();
+        setNeedsRender();
+        lastGame = game;
     }
 
-    if (rotation != lastRotation[bufferIndex]) {
-        needsClear = true;
-        needsRender = true;
-        lastRotation[bufferIndex] = rotation;
+    if (rotation != lastRotation) {
+        setNeedsClear();
+        setNeedsRender();
+        lastRotation = rotation;
     }
 }
 
@@ -54,7 +52,7 @@ void Cart3DView::renderOverlay(const RenderInfo& renderInfo) {
 }
 
 void Cart3DView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -87,5 +85,5 @@ void Cart3DView::render(const RenderInfo& renderInfo) {
         renderOverlay(renderInfo);
     }
 
-    finishRender();
+    finishRender(renderInfo.bufferIndex);
 }

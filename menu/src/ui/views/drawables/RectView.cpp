@@ -9,7 +9,7 @@
 #include "RectView.h"
 
 void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
-    if (!needsRender) {
+    if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
 
@@ -18,7 +18,7 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
     }
 
     Color color = fillColor;
-    
+
     if (finalIsOpaque)  {
         color.rgb *= finalOpacity;
     }
@@ -26,7 +26,7 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
         color.a *= finalOpacity;
     }
 
-    bool needsScissor = !isPendingFullRender;
+    bool needsScissor = !needsFullRenderIn(renderInfo.bufferIndex);
     Rect scissorRect = currentRect;
 
     if (needsScissor) {
@@ -132,49 +132,51 @@ void RectView::update(const RenderInfo& renderInfo) {
 
     needsPartialClear = false;
 
-    if (finalOpacity != lastFinalOpacity[bufferIndex]) {
+    if (finalOpacity != lastFinalOpacity) {
         setNeedsDisplay();
 
-        lastFinalOpacity[bufferIndex] = finalOpacity;
+        lastFinalOpacity = finalOpacity;
 
         if (!finalIsOpaque) {
-            needsClear = true;
+            setNeedsClear();
         }
     }
 
-    if (finalIsHidden != lastFinalIsHidden[bufferIndex]) {
+    if (finalIsHidden != lastFinalIsHidden) {
         if (!finalIsHidden) {
             setNeedsDisplay();
         }
         else {
-            needsClear = true;
+            setNeedsClear();
         }
 
-        lastFinalIsHidden[bufferIndex] = finalIsHidden;
+        lastFinalIsHidden = finalIsHidden;
     }
 
-    if (radius != lastRadius[bufferIndex]) {
+    if (radius != lastRadius) {
         setNeedsDisplay();
 
-        lastRadius[bufferIndex] = radius;
+        lastRadius = radius;
     }
 
-    if (fillColor != lastFillColor[bufferIndex]) {
+    if (fillColor != lastFillColor) {
         setNeedsDisplay();
 
-        lastFillColor[bufferIndex] = fillColor;
+        lastFillColor = fillColor;
     }
-    
-    if (finalFrame != lastFinalFrame[bufferIndex]) {
-        needsClear = true;
+
+    Rect& bufferFrame = frameInBuffer[bufferIndex];
+
+    if (finalFrame != bufferFrame) {
+        setNeedsClear(bufferIndex);
 
         if (isInverted || !finalIsOpaque) {
-            setNeedsDisplay();
+            setNeedsFullRender(bufferIndex);
         }
         else {
             needsPartialClear = true;
-            
-            Rect _lastFrame = lastFinalFrame[bufferIndex];
+
+            Rect _lastFrame = bufferFrame;
 
             if (finalFrame.size.width != _lastFrame.size.width) {
                 _lastFrame.size.width = std::min(finalFrame.size.width, _lastFrame.size.width) - radius;
@@ -188,7 +190,7 @@ void RectView::update(const RenderInfo& renderInfo) {
             // given up as well as the leading ones.
             if (finalFrame.origin.x != _lastFrame.origin.x) {
                 int originX = std::max(finalFrame.origin.x, _lastFrame.origin.x) + radius;
-                int maxX = std::min(finalFrame.maxX(), lastFinalFrame[bufferIndex].maxX()) - radius;
+                int maxX = std::min(finalFrame.maxX(), bufferFrame.maxX()) - radius;
 
                 _lastFrame.origin.x = originX;
                 _lastFrame.size.width = std::max(0, maxX - originX);
@@ -196,36 +198,41 @@ void RectView::update(const RenderInfo& renderInfo) {
 
             if (finalFrame.origin.y != _lastFrame.origin.y) {
                 int originY = std::max(finalFrame.origin.y, _lastFrame.origin.y) + radius;
-                int maxY = std::min(finalFrame.maxY(), lastFinalFrame[bufferIndex].maxY()) - radius;
+                int maxY = std::min(finalFrame.maxY(), bufferFrame.maxY()) - radius;
 
                 _lastFrame.origin.y = originY;
                 _lastFrame.size.height = std::max(0, maxY - originY);
             }
 
-            lastFinalFrame[bufferIndex].subtract(finalFrame, rectsToClear);
+            bufferFrame.subtract(finalFrame, rectsToClear);
 
             Rect rectsToRender[4];
             int count = finalFrame.subtract(_lastFrame, rectsToRender);
 
             for (int i = 0; i < count; i++) {
-                Rect rect = rectsToRender[i];
-
-                setNeedsDisplay(rect);
+                addPendingRenderRect(bufferIndex, rectsToRender[i]);
             }
         }
 
-        lastFinalFrame[bufferIndex] = finalFrame;
+        bufferFrame = finalFrame;
     }
-    else if (needsRender && !finalIsOpaque) {
-        needsClear = true;
+    else if (needsRenderIn(bufferIndex) && !finalIsOpaque) {
+        setNeedsClear(bufferIndex);
 
-        if (!isPendingFullRender) {
-            int i = 0;
-            
-            for (const Rect& renderRect : pendingRenderRects) {
-                rectsToClear[i++] = renderRect.intersection(finalFrame);
+        if (!needsFullRenderIn(bufferIndex)) {
+            const std::vector<Rect>& renderRects = pendingRenderRects[bufferIndex];
 
-                needsPartialClear = true;
+            if (renderRects.size() > 4) {
+                setNeedsFullRender(bufferIndex);
+            }
+            else {
+                int i = 0;
+
+                for (const Rect& renderRect : renderRects) {
+                    rectsToClear[i++] = renderRect.intersection(finalFrame);
+
+                    needsPartialClear = true;
+                }
             }
         }
     }
@@ -256,7 +263,9 @@ void RectView::clear(const RenderInfo& renderInfo) {
 }
 
 void RectView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    int bufferIndex = renderInfo.bufferIndex;
+
+    if (!needsRenderIn(bufferIndex)) {
         return;
     }
 
@@ -264,19 +273,16 @@ void RectView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    if (isPendingFullRender) {
+    if (needsFullRenderIn(bufferIndex)) {
         this->renderRect(renderInfo, finalFrame);
     }
     else {
-        for (const Rect& renderRect : pendingRenderRects) {
+        for (const Rect& renderRect : pendingRenderRects[bufferIndex]) {
             this->renderRect(renderInfo, renderRect);
         }
     }
 
-    pendingRenderRects.clear();
     drawnBoundingBox[bufferIndex] = finalFrame;
 
-    finishRender();
+    finishRender(bufferIndex);
 }

@@ -30,8 +30,6 @@ struct TableView : public View {
     static constexpr Color DEFAULT_HIGHLIGHT_COLOR = Color{50};
     static constexpr Color DEFAULT_BACKGROUND_COLOR = Color{17};
 
-    int lastSelectedRowIndex[BUFF_COUNT] = {};
-
     bool isADown = false;
     
     bool rowChangeAmount = 0;

@@ -16,7 +16,9 @@ void BottomShadowView::uploadSprite() {
 }
 
 void BottomShadowView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
-    if (!needsRender) {
+    int bufferIndex = renderInfo.bufferIndex;
+
+    if (!needsRenderIn(bufferIndex)) {
         return;
     }
 
@@ -24,9 +26,7 @@ void BottomShadowView::renderRect(const RenderInfo& renderInfo, Rect currentRect
         return;
     }
 
-    int bufferIndex = renderInfo.bufferIndex;
-
-    bool needsScissor = !isPendingFullRender;
+    bool needsScissor = !needsFullRenderIn(bufferIndex);
     Rect scissorRect = currentRect;
 
     uploadSprite();
@@ -82,34 +82,35 @@ void BottomShadowView::renderRect(const RenderInfo& renderInfo, Rect currentRect
 }
 
 void BottomShadowView::update(const RenderInfo& renderInfo) {
-    // Drawable::update(renderInfo);
-
     int bufferIndex = renderInfo.bufferIndex;
 
     needsPartialClear = false;
 
-    if (finalOpacity != lastFinalOpacity[bufferIndex]) {
+    if (finalOpacity != lastFinalOpacity) {
         setNeedsDisplay();
 
-        lastFinalOpacity[bufferIndex] = finalOpacity;
+        lastFinalOpacity = finalOpacity;
 
         if (!finalIsOpaque) {
-            needsClear = true;
+            setNeedsClear();
         }
     }
 
-    if (finalFrame != lastFinalFrame[bufferIndex]) {
-        needsClear = true;
+    if (finalFrame != lastFinalFrame) {
+        setNeedsClear();
         setNeedsDisplay();
-        lastFinalFrame[bufferIndex] = finalFrame;
+        lastFinalFrame = finalFrame;
     }
-    else if (needsRender) {
-        needsClear = true;
+    else if (needsRenderIn(bufferIndex) && !needsFullRenderIn(bufferIndex)) {
+        const std::vector<Rect>& renderRects = pendingRenderRects[bufferIndex];
 
-        if (!isPendingFullRender) {
+        if (renderRects.size() > 4) {
+            setNeedsFullRender(bufferIndex);
+        }
+        else {
             int i = 0;
 
-            for (const Rect& renderRect : pendingRenderRects) {
+            for (const Rect& renderRect : renderRects) {
                 rectsToClear[i++] = renderRect.intersection(finalFrame);
 
                 needsPartialClear = true;
@@ -117,9 +118,9 @@ void BottomShadowView::update(const RenderInfo& renderInfo) {
         }
     }
 
-	if (needsRender) {
-		needsClear = true;
-	}
+    if (needsRenderIn(bufferIndex)) {
+        setNeedsClear(bufferIndex);
+    }
 }
 
 void BottomShadowView::clear(const RenderInfo& renderInfo) {
@@ -145,7 +146,9 @@ void BottomShadowView::clear(const RenderInfo& renderInfo) {
 }
 
 void BottomShadowView::render(const RenderInfo& renderInfo) {
-    if (!needsRender) {
+    int bufferIndex = renderInfo.bufferIndex;
+
+    if (!needsRenderIn(bufferIndex)) {
         return;
     }
 
@@ -153,16 +156,14 @@ void BottomShadowView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    if (isPendingFullRender) {
+    if (needsFullRenderIn(bufferIndex)) {
         this->renderRect(renderInfo, finalFrame);
     }
     else {
-        for (const Rect& renderRect : pendingRenderRects) {
+        for (const Rect& renderRect : pendingRenderRects[bufferIndex]) {
             this->renderRect(renderInfo, renderRect);
         }
     }
 
-    pendingRenderRects.clear();
-
-    finishRender();
+    finishRender(bufferIndex);
 }

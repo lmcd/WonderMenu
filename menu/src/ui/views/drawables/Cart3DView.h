@@ -14,8 +14,8 @@ class Game;
 
 struct Cart3DView : public Drawable {
 private:
-    Game* lastGame[BUFF_COUNT] = {};
-    Vec3f lastRotation[BUFF_COUNT] = {};
+    Game* lastGame = nullptr;
+    Vec3f lastRotation = {};
 
     void renderOverlay(const RenderInfo& renderInfo);
 
