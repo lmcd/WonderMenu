@@ -12,6 +12,7 @@ ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<s
 
     sdCardSprite = sprite_load("rom:/ui/SD-128.RGBA16.sprite");
 
+    imageView.isOpaque = false;
     imageView.sprite = sdCardSprite;
 
     messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
