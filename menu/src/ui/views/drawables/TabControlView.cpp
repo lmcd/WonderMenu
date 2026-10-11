@@ -276,8 +276,6 @@ void TabControlView::layoutLabels() {
         }
 
         labelView.frame.origin = Vec2(x, 22);
-        labelView.maxWidth = 200;
-        labelView.setString("%s", tabs[i].label);
         labelView.isHidden = false;
     }
 }
@@ -454,11 +452,21 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         // Set button shadow colour
         setPrimitiveColor(blackColor);
 
-        // Draw L button shadow
-        drawSprite(buttonShadowSprite, leftButtonRect.origin);
+        surface_t shadowSurface = sprite_get_pixels(buttonShadowSprite);
+        int shadowSliceHeight = (shadowSurface.height + 1) / 2;
 
-        // Draw R button shadow
-        drawSprite(buttonShadowSprite, rightButtonRect.origin);
+        for (int t = 0; t < shadowSurface.height; t += shadowSliceHeight) {
+            int sliceHeight = std::min(shadowSliceHeight, shadowSurface.height - t);
+
+            rdpq_sync_tile();
+            rdpq_tex_upload_sub(TILE0, &shadowSurface, NULL, 0, t, shadowSurface.width, t + sliceHeight);
+
+            Rect sliceRect(leftButtonRect.minX(), leftButtonRect.minY() + t, shadowSurface.width, sliceHeight);
+            drawTexturedRect(TILE0, sliceRect, 0, t);
+
+            sliceRect.origin.x = rightButtonRect.minX();
+            drawTexturedRect(TILE0, sliceRect, 0, t);
+        }
     }
 
     // Draw L/R button fills
