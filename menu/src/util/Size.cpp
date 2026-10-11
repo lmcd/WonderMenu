@@ -6,6 +6,16 @@
 #include "Rect.h"
 #include "util/Vec2.h"
 
+Rect Size::centeredIn(const Rect& rect) const {
+    return Rect(
+        Vec2(
+            (rect.size.width  - width)  / 2,
+            (rect.size.height - height) / 2
+        ),
+        Size(width, height)
+    );
+}
+
 Size Size::operator*(float scalar) const {
     return Size(width * scalar, height * scalar);
 }
@@ -16,14 +26,4 @@ Size Size::operator+(const Size& other) const {
 
 Size Size::operator-(const Size& other) const {
     return Size(width - other.width, height - other.height);
-}
-
-Rect Size::centeredIn(const Rect& rect) const {
-    return Rect(
-        Vec2(
-            (rect.size.width  - width)  / 2,
-            (rect.size.height - height) / 2
-        ),
-        Size(width, height)
-    );
 }

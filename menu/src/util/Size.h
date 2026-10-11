@@ -19,7 +19,7 @@ struct Size {
 
     int midX() const { return width / 2; }
     int midY() const { return height / 2; }
-    Vec2 mid() const { return Vec2(width / 2, height / 2); }
+    Vec2 mid() const { return Vec2(midX(), midY()); }
 
     Size even() const {
         return Size(
