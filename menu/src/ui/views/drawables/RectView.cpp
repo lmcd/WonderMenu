@@ -17,70 +17,47 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
         return;
     }
 
-    Color color = fillColor;
-
-    if (finalIsOpaque)  {
-        color.rgb *= finalOpacity;
-    }
-    else {
-        color.a *= finalOpacity;
-    }
-
     bool needsScissor = !needsFullRenderIn(renderInfo.bufferIndex);
-    Rect scissorRect = currentRect;
 
     if (needsScissor) {
-        pushScissor(scissorRect);
+        pushScissor(currentRect);
     }
 
-    sprite_t* sprite = nullptr;
     int spriteRadius = 0;
-
-    if (radius > 0) {
-        sprite = spriteForRadius(radius, isSmooth);
-        spriteRadius = sprite->width;
-    }
-
-    Rect topLeftRect(
-        finalFrame.minX(),
-        finalFrame.minY(),
-        spriteRadius,
-        spriteRadius
-    );
-    Rect topRightRect(
-        finalFrame.maxX() - spriteRadius,
-        finalFrame.minY(),
-        spriteRadius,
-        spriteRadius
-    );
-    Rect bottomRightRect(
-        finalFrame.maxX() - spriteRadius,
-        finalFrame.maxY() - spriteRadius,
-        spriteRadius,
-        spriteRadius
-    );
-    Rect bottomLeftRect(
-        finalFrame.minX(),
-        finalFrame.maxY() - spriteRadius,
-        spriteRadius,
-        spriteRadius
-    );
-    Rect middleRect = finalFrame.insetBy(Vec2(spriteRadius, 0));
-
-    Rect leftRect = finalFrame.insetBy(Vec2(0, spriteRadius));
-    leftRect.size.width = spriteRadius;
-
-    Rect rightRect = leftRect;
-    rightRect.origin.x = finalFrame.maxX() - spriteRadius;
 
     rdpq_mode_push();
 
     setBlender(finalIsOpaque ? WITH_BLEND_COLOR : WITH_FRAMEBUFFER);
 
-    setPrimitiveColor(color);
-    setBlendColor(finalBlendColor);
-
     if (radius > 0) {
+        sprite_t* sprite = spriteForRadius(radius, isSmooth);
+        spriteRadius = sprite->width;
+
+        Rect topLeftRect(
+            finalFrame.minX(),
+            finalFrame.minY(),
+            spriteRadius,
+            spriteRadius
+        );
+        Rect topRightRect(
+            finalFrame.maxX() - spriteRadius,
+            finalFrame.minY(),
+            spriteRadius,
+            spriteRadius
+        );
+        Rect bottomRightRect(
+            finalFrame.maxX() - spriteRadius,
+            finalFrame.maxY() - spriteRadius,
+            spriteRadius,
+            spriteRadius
+        );
+        Rect bottomLeftRect(
+            finalFrame.minX(),
+            finalFrame.maxY() - spriteRadius,
+            spriteRadius,
+            spriteRadius
+        );
+
         if (isInverted) {
             setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (1, TEX0, PRIM, 0)));
         }
@@ -96,9 +73,6 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
             }
         }
 
-        rdpq_sync_tile();
-        rdpq_sprite_upload(TILE0, sprite, NULL);
-
         // TOP LEFT
         drawTexturedRect(TILE0, topLeftRect);
 
@@ -113,6 +87,14 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
     }
 
     if (!isInverted) {
+        Rect middleRect = finalFrame.insetBy(Vec2(spriteRadius, 0));
+
+        Rect leftRect = finalFrame.insetBy(Vec2(0, spriteRadius));
+        leftRect.size.width = spriteRadius;
+
+        Rect rightRect = leftRect;
+        rightRect.origin.x = finalFrame.maxX() - spriteRadius;
+
         setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, PRIM)));
 
         drawFilledRect(leftRect);
@@ -271,6 +253,25 @@ void RectView::render(const RenderInfo& renderInfo) {
 
     if (finalIsHidden) {
         return;
+    }
+
+    Color color = fillColor;
+
+    if (finalIsOpaque)  {
+        color.rgb *= finalOpacity;
+    }
+    else {
+        color.a *= finalOpacity;
+    }
+
+    setPrimitiveColor(color);
+    setBlendColor(finalBlendColor);
+
+    if (radius > 0) {
+        sprite_t* sprite = spriteForRadius(radius, isSmooth);
+
+        rdpq_sync_tile();
+        rdpq_sprite_upload(TILE0, sprite, NULL);
     }
 
     if (needsFullRenderIn(bufferIndex)) {
