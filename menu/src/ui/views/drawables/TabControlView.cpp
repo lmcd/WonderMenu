@@ -22,8 +22,6 @@ TabControlView::TabControlView() {
         labelView.fontID = Fonts::UNBOUNDED_BLACK_14;
         labelView.align = ALIGN_LEFT;
         labelView.maxWidth = 200;
-
-        labelsView.addSubview(&labelView);
     }
 
     addSubview(&labelsView);
@@ -207,10 +205,6 @@ void TabControlView::layoutLabels() {
         selectedColor = Color(119);
     }
 
-    for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
-        labelView.isHidden = true;
-    }
-
     if (numberOfSegments <= 0) {
         return;
     }
@@ -272,7 +266,6 @@ void TabControlView::layoutLabels() {
         }
 
         labelView.frame.origin = Vec2(x, 22);
-        labelView.isHidden = false;
     }
 }
 

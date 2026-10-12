@@ -77,6 +77,8 @@ public:
 			labelView.setString("%s", titles);
 			labelView.sizeToFit();
 
+			labelsView.addSubview(&labelView);
+
 			snprintf(tabs[index].label, MAX_TAB_LABEL_CHARS, "%s", titles);
 			tabs[index].width = labelView.frame.size.width;
 
