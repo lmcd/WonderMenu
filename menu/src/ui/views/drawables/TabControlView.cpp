@@ -460,13 +460,16 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         // Set button shadow colour
         setPrimitiveColor(blackColor);
 
-        drawMirroredSlice(leftButtonRect, 16, 20);
-        drawMirroredSlice(rightButtonRect, 16, 20);
+        Rect shadowRect(leftButtonRect.minX(), leftButtonRect.minY(), 59, 36);
+        drawMirroredSlice(shadowRect, 16, 20);
+
+        shadowRect.origin.x = rightButtonRect.minX();
+        drawMirroredSlice(shadowRect, 16, 20);
     }
 
     // Draw L/R button fills
     {
-        Rect rect(leftButtonRect.minX() + 2, leftButtonRect.minY() + 1, 56, 32);
+        Rect rect(leftButtonRect.minX() + 2, leftButtonRect.minY() + 1, 55, 32);
 
         // Set button fill colour
         setPrimitiveColor(lButtonColor);
