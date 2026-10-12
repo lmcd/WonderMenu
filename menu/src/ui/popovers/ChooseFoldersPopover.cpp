@@ -27,6 +27,10 @@ ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<s
     }
 }
 
+ChooseFoldersPopover::~ChooseFoldersPopover() {
+    sprite_free(sdCardSprite);
+}
+
 void ChooseFoldersPopover::didBeginScene(SceneEntry entry) {
     Base::didBeginScene(entry);
 

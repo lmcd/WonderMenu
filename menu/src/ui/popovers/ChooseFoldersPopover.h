@@ -38,6 +38,7 @@ public:
     LabelView<64> messageLabel;
 
     ChooseFoldersPopover(Scene* baseScene, const std::vector<std::string>& paths);
+    ~ChooseFoldersPopover();
 
     void didBeginScene(SceneEntry entry) override;
     void update(const UpdateInfo& updateInfo) override;
