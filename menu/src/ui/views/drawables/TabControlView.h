@@ -23,10 +23,8 @@ struct TabInfo {
 
 struct TabControlView : public Drawable {
 private:
-	inline static sprite_t* buttonFillSprite = nullptr;
-	inline static sprite_t* buttonShadowSprite = nullptr;
+	inline static sprite_t* tabsSprite = nullptr;
 	inline static sprite_t* fadeSprite = nullptr;
-	inline static sprite_t* lrSprite = nullptr;
 
 	bool isLDown = false;
 	bool isRDown = false;
@@ -37,8 +35,6 @@ private:
 	Animation<float>* lLabelAnimation = nullptr;
 	Animation<float>* rLabelAnimation = nullptr;
 
-	surface_t lrSheet;
-
 	BaseView labelsView;
 
 	LabelView<MAX_TAB_LABEL_CHARS> labelViews[MAX_TAB_SEGMENTS];
@@ -48,6 +44,7 @@ private:
 	void freeLabelsBlock();
 	void layoutLabels();
 	void renderLabels(const RenderInfo& renderInfo);
+	void drawMirroredSlice(Rect rect, int s, int capWidth);
 
 public:
 	const char* name() const override { return "TabControlView"; }

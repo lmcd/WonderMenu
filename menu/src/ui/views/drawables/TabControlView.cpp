@@ -13,14 +13,10 @@ TabControlView::TabControlView() {
     buttonRepeater.type = InputRepeater::L_R;
     buttonRepeater.repeatInterval = 10;
 
-    if (buttonFillSprite == nullptr) {
-        buttonFillSprite = sprite_load("rom:/ui/TabButtonFill.IA16.sprite");
-        buttonShadowSprite = sprite_load("rom:/ui/TabButtonShadow.IA16.sprite");
+    if (tabsSprite == nullptr) {
+        tabsSprite = sprite_load("rom:/ui/Tabs.IA16.sprite");
         fadeSprite = sprite_load("rom:/ui/TabSideShadow.IA16.sprite");
-        lrSprite = sprite_load("rom:/ui/LR.IA16.sprite");
     }
-
-    lrSheet = sprite_get_pixels(lrSprite);
 
     for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
         labelView.fontID = Fonts::UNBOUNDED_BLACK_14;
@@ -312,6 +308,17 @@ void TabControlView::renderLabels(const RenderInfo& renderInfo) {
     popScissor();
 }
 
+void TabControlView::drawMirroredSlice(Rect rect, int s, int capWidth) {
+    Rect leftRect(rect.minX(), rect.minY(), capWidth, rect.size.height);
+    drawTexturedRect(TILE0, leftRect, s, 0);
+
+    Rect middleRect(rect.minX() + capWidth, rect.minY(), rect.size.width - capWidth * 2, rect.size.height);
+    drawTexturedRect(TILE0, middleRect, Rect(s + capWidth - 1, 0, 1, rect.size.height));
+
+    Rect rightRect(rect.maxX() - capWidth, rect.minY(), capWidth, rect.size.height);
+    drawTexturedRect(TILE0, rightRect.flipX(), s, 0);
+}
+
 void TabControlView::render(const RenderInfo& renderInfo) {
     if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
@@ -437,7 +444,6 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     {
         setPrimitiveColor(barColor);
 
-        rdpq_sync_tile();
         rdpq_sprite_upload(TILE0, fadeSprite, NULL);
 
         // Left fade
@@ -447,63 +453,40 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         drawTexturedRect(TILE0, rightFadeRect.flipX());
     }
 
+    rdpq_sprite_upload(TILE0, tabsSprite, NULL);
+
     // Draw L/R button shadows
     {
         // Set button shadow colour
         setPrimitiveColor(blackColor);
 
-        surface_t shadowSurface = sprite_get_pixels(buttonShadowSprite);
-        int shadowSliceHeight = (shadowSurface.height + 1) / 2;
-
-        for (int t = 0; t < shadowSurface.height; t += shadowSliceHeight) {
-            int sliceHeight = std::min(shadowSliceHeight, shadowSurface.height - t);
-
-            rdpq_sync_tile();
-            rdpq_tex_upload_sub(TILE0, &shadowSurface, NULL, 0, t, shadowSurface.width, t + sliceHeight);
-
-            Rect sliceRect(leftButtonRect.minX(), leftButtonRect.minY() + t, shadowSurface.width, sliceHeight);
-            drawTexturedRect(TILE0, sliceRect, 0, t);
-
-            sliceRect.origin.x = rightButtonRect.minX();
-            drawTexturedRect(TILE0, sliceRect, 0, t);
-        }
+        drawMirroredSlice(leftButtonRect, 16, 20);
+        drawMirroredSlice(rightButtonRect, 16, 20);
     }
 
     // Draw L/R button fills
     {
-        rdpq_sync_tile();
-        rdpq_sprite_upload(TILE0, buttonFillSprite, NULL);
-
-        Rect rect;
-
-        rect = leftButtonRect;
-        rect.origin.x += 2;
-        rect.origin.y += 1;
+        Rect rect(leftButtonRect.minX() + 2, leftButtonRect.minY() + 1, 56, 32);
 
         // Set button fill colour
         setPrimitiveColor(lButtonColor);
 
         // Draw L button fill
-        drawTexturedRect(TILE0, rect);
+        drawMirroredSlice(rect, 0, 16);
 
-        rect = rightButtonRect;
-        rect.origin.x += 2;
-        rect.origin.y += 1;
+        rect.origin.x = rightButtonRect.minX() + 2;
 
         // Set button fill colour
         setPrimitiveColor(rButtonColor);
         
         // Draw R button fill
-        drawTexturedRect(TILE0, rect);
+        drawMirroredSlice(rect, 0, 16);
     }
 
     setBlender(WITH_BLEND_COLOR);
 
     // Draw L/R button text
     {
-        rdpq_sync_tile();
-        rdpq_sprite_upload(TILE0, lrSprite, NULL);
-
         setPrimitiveColor(lLabelColor);
         setBlendColor(lButtonColor);
 
@@ -514,7 +497,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         lLetterRect.size.height = 16;
 
         // Draw L button text
-        drawTexturedRect(TILE0, lLetterRect);
+        drawTexturedRect(TILE0, lLetterRect, 36, 0);
 
         setPrimitiveColor(rLabelColor);
         setBlendColor(rButtonColor);
@@ -523,7 +506,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         rLetterRect.origin.x = rightButtonRect.minX() + 24;
 
         // Draw R button text
-        drawTexturedRect(TILE0, rLetterRect, 12);
+        drawTexturedRect(TILE0, rLetterRect, 36, 16);
     }
 
     rdpq_mode_pop();
