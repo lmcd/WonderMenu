@@ -45,8 +45,6 @@ WonderMenu is in BETA and mileage may vary!
 
 <img width="860" height="640" alt="image" src="https://github.com/user-attachments/assets/8f0a51c0-6760-4e29-83a5-7dc74ed12938" />
 
-
-
 ## Building ##
 
 WonderMenu depends on custom versions of `tiny3d` and `libdragon`.
@@ -56,3 +54,7 @@ https://github.com/lmcd/libdragon/tree/fat_updates
 https://github.com/lmcd/tiny3d/tree/viewport_attach_no_scissor
 
 With these two libraries installed into `N64_INST`, you should be able to `make` WonderMenu.
+
+### Emulator ###
+
+WonderMenu depends on @meeq's branch of Ares, with SummerCart64/SD card emulation: https://github.com/meeq/ares/tree/sc64
