@@ -41,6 +41,11 @@ WonderMenu is in BETA and mileage may vary!
 
 <img width="860" height="640" alt="image" src="https://github.com/user-attachments/assets/9646946d-77e7-4811-b6c2-e046f395a37c" />
 
+### Screenshot Capture ###
+
+<img width="860" height="640" alt="image" src="https://github.com/user-attachments/assets/8f0a51c0-6760-4e29-83a5-7dc74ed12938" />
+
+
 
 ## Building ##
 
