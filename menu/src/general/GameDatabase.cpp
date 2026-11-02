@@ -14,33 +14,12 @@
 #include "utils/utils.h"
 
 #ifdef N64
-#define ROM_ADDRESS_HEADER   (ROM_ADDRESS + rom_scratch_offset())
+#include "CartScratch.h"
+
+// Database reads are staged in cart SDRAM (see CartScratch.h)
+#define ROM_ADDRESS_HEADER   CART_SCRATCH_ADDRESS
 #define ROM_ADDRESS_TILES_A  (ROM_ADDRESS_HEADER  + KiB(256))
 #define ROM_ADDRESS_TILES_B  (ROM_ADDRESS_TILES_A + DB_L_LABEL_SIZE)
-// Scratch cart SDRAM used to stage database reads before they're DMA'd into RDRAM.
-// This has to sit past the end of our own ROM image: the DragonFS every menu asset
-// is loaded from (fonts, sprites, models) lives in that same SDRAM, so staging over
-// it silently corrupts the filesystem and `rom:/` opens start failing with ENOENT.
-// The ROM size is patched into header offset 0x18 by the `rom-with-size` make
-// target; round it up to the next MiB, with a 2 MiB floor so an unpatched or
-// implausible header can't drop the scratch back inside the ROM.
-static uint32_t rom_scratch_offset(void) {
-    static uint32_t offset = 0;
-
-    if (offset == 0) {
-        uint32_t romSize = io_read(ROM_ADDRESS + 0x18);
-
-        offset = (romSize > 0 && romSize <= MiB(16))
-            ? ((romSize + MiB(1) - 1) & ~(uint32_t)(MiB(1) - 1))
-            : MiB(2);
-
-        if (offset < MiB(2)) {
-            offset = MiB(2);
-        }
-    }
-
-    return offset;
-}
 #endif
 
 static unsigned char headerBuffer[DB_ENTRIES_START_OFFSET];
@@ -123,7 +102,7 @@ bool GameDatabase::loadEntriesIntoMemory() {
     // PI DMA moves whole 8 byte words, so round the destination up rather than
     // let it write past the end of the block. The overread lands in the padding
     // before the labels section, which is still inside the staged chunk.
-    size_t allocationSize = (size + 7) & ~(size_t)7;
+    size_t allocationSize = ALIGN(size, 8);
 
     // Aligned for the DMA below; plain malloc everywhere else, where the
     // alignment buys nothing
@@ -300,12 +279,18 @@ GameDatabase::Entry* GameDatabase::entryForROMFile(ROMFile* romFile) {
 #ifdef N64
 void GameDatabase::warmClusterOffsets(const std::vector<GameDatabase::Entry*>& entries) {
     for (GameDatabase::Entry* entry : entries) {
-        uint16_t tileIndex = entry->smallLabelTileIndex;
-        int tileOffset = getLabelTileOffset(tileIndex);
+        int smallTileOffset = getLabelTileOffset(entry->smallLabelTileIndex);
 
         // Cache FAT cluster offsets of each label in the database
-        f_lseek(&file, tileOffset);
+        f_lseek(&file, smallTileOffset);
         entry->labelTileCluster = file.clust;
+
+        if (entry->largeLabelTileIndex != 0) {
+            int largeTileOffset = getLabelTileOffset(entry->largeLabelTileIndex);
+
+            f_lseek(&file, largeTileOffset);
+            entry->largeLabelTileCluster = file.clust;
+        }
     }
 
     for (GameDatabase::Entry* entry : entries) {
@@ -333,9 +318,10 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
         return false;
     }
 
-    uint16_t tileIndex = highRes ? entry->largeLabelTileIndex : entry->smallLabelTileIndex;
-    
-    tileIndex += chunkOffset;
+    uint16_t firstTileIndex = highRes ? entry->largeLabelTileIndex : entry->smallLabelTileIndex;
+    uint32_t firstTileCluster = highRes ? entry->largeLabelTileCluster : entry->labelTileCluster;
+
+    uint16_t tileIndex = firstTileIndex + chunkOffset;
 
     size_t size = DB_LABEL_TILE_SIZE * chunkCount;
 
@@ -343,15 +329,34 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 
     int bufferOffset = DB_LABEL_TILE_SIZE * chunkOffset;
 
-    if (entry->labelTileCluster != 0 && !highRes) {
-        file.clust = entry->labelTileCluster;
-        file.fptr = tileByteOffset;
-    }
-    else {
-        f_lseek(&file, tileByteOffset);
+    bool needsSeek = true;
+
+    if (firstTileCluster != 0) {
+        file.clust = firstTileCluster;
+        file.fptr = getLabelTileOffset(firstTileIndex);
 
         if (!highRes) {
-            entry->labelTileCluster = file.clust;
+            needsSeek = false;
+        }
+    }
+
+    if (needsSeek) {
+        FRESULT seekResult = f_lseek(&file, tileByteOffset);
+
+        if (seekResult != FR_OK) {
+            debugf("[GameDatabase] Failed to seek to label tile %i (error %i)\n", (int)tileIndex, (int)seekResult);
+            return false;
+        }
+
+        // The cached cluster is paired with the first tile's offset above, so
+        // only the first chunk's cluster can be stored, never a later one's
+        if (firstTileCluster == 0 && chunkOffset == 0) {
+            if (!highRes) {
+                entry->labelTileCluster = file.clust;
+            }
+            else {
+                entry->largeLabelTileCluster = file.clust;
+            }
         }
     }
 
@@ -360,7 +365,17 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
     size_t chunk = size;
     chunk += (DB_LABEL_PADDING_PER_CHUNK * (chunkCount / DB_LABEL_TILES_PER_CHUNK));
 
-    f_read(&file, (void *)(useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), chunk, &bytesRead);
+    FRESULT readResult = f_read(&file, (void *)(useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), chunk, &bytesRead);
+
+    // Otherwise the DMA below would copy whatever was left in the cart SDRAM
+    // into the label. Only the tiles have to be there: the file can end before
+    // the last chunk's padding.
+    if (readResult != FR_OK || bytesRead < size) {
+        debugf("[GameDatabase] Failed to read label tile %i (error %i, %u of %u bytes)\n",
+            (int)tileIndex, (int)readResult, (unsigned)bytesRead, (unsigned)size);
+        return false;
+    }
+
     data_cache_hit_writeback_invalidate(buffer + bufferOffset, size);
     dma_read_raw_async(buffer + bufferOffset, (useBSpace ? ROM_ADDRESS_TILES_B : ROM_ADDRESS_TILES_A), size);
     // dma_wait();
@@ -395,7 +410,7 @@ SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
         return nullptr;
     }
 
-    uint32_t addresses[4] = {};
+    uint32_t addresses[5] = {};
 
     // TODO: Read straight into database header instead
     if (!readBytes(addresses, sizeof(addresses))) {
@@ -410,17 +425,12 @@ SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
         return nullptr;
     }
 
-    int8_t frameDelayOffset = (int8_t)counts[0];
     uint8_t groupCount = counts[1];
     uint8_t speedrunCount = counts[2];
 
     SpeedrunDatabase* speedrunDatabase = new SpeedrunDatabase();
 
     speedrunDatabase->gameCRC1 = addresses[0];
-    speedrunDatabase->currentFrameAddress = addresses[1];
-    speedrunDatabase->controllerWriteAddress = addresses[2];
-    speedrunDatabase->controllerReadAddress = addresses[3];
-    speedrunDatabase->frameDelayOffset = frameDelayOffset;
 
     speedrunDatabase->groups.resize(groupCount);
     speedrunDatabase->entries.resize(speedrunCount);

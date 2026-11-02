@@ -7,6 +7,8 @@
 
 #include "TabControlView.h"
 
+#include "ui/Theme.h"
+
 TabControlView::TabControlView() {
     frame.size = Size(332, 36);
     
@@ -32,8 +34,12 @@ void TabControlView::freeLabelsBlock() {
         return;
     }
 
-    rspq_wait();
-    rspq_block_free(labelsBlock);
+    // Freed once the RDP has finished with it, rather than stalling the CPU
+    // until it has
+    rdpq_call_deferred([](void* block) {
+        rspq_block_free((rspq_block_t*)block);
+    }, labelsBlock);
+
     labelsBlock = nullptr;
 }
 
@@ -58,7 +64,7 @@ TabControlView::~TabControlView() {
     }
 }
 
-void TabControlView::setSelectedSegment(int index, bool animated) {
+void TabControlView::setSelectedSegment(int index, bool) {
     if (index < 0 || index > (numberOfSegments - 1)) {
         return;
     }
@@ -190,7 +196,7 @@ void TabControlView::update(const RenderInfo& renderInfo) {
 void TabControlView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRect(drawnBoundingBox[bufferIndex]);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -199,7 +205,7 @@ void TabControlView::layoutLabels() {
     Color textColor = Color::WHITE;
     textColor.a *= 0.45f;
 
-    Color selectedColor = Color(252, 204, 007);
+    Color selectedColor = Theme::accentColor;
 
     if (!isEnabled) {
         selectedColor = Color(119);
@@ -249,8 +255,11 @@ void TabControlView::layoutLabels() {
 
         float x = centerX + centers[i] - anchor - tabs[i].width / 2.0f;
 
-        // Skip segments that fall entirely outside the clipping rect
-        if (x + tabs[i].width < stripMinX || x > stripMaxX) {
+        // Hide segments that fall entirely outside the clipping rect, so they
+        // aren't rendered
+        labelView.isHidden = (x + tabs[i].width < stripMinX || x > stripMaxX);
+
+        if (labelView.isHidden) {
             continue;
         }
 
@@ -289,6 +298,10 @@ void TabControlView::renderLabels(const RenderInfo& renderInfo) {
     pushScissor(barRect);
 
     for (LabelView<MAX_TAB_LABEL_CHARS>& labelView : labelViews) {
+        if (labelView.isHidden) {
+            continue;
+        }
+
         // Force the label to render even when it thinks it's clean
         labelView.setNeedsDisplay();
         // Render the label
@@ -346,25 +359,23 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     }
 
     Color lLabelColor = Color::WHITE;
-    lLabelColor.rgb *= lLabelOpacity;
+    lLabelColor.rgb = lLabelColor.rgb.lerpTo(finalBlendColor.rgb, 1.0f - lLabelOpacity);
     
     Color rLabelColor = Color::WHITE;
-    rLabelColor.rgb *= rLabelOpacity;
+    rLabelColor.rgb = rLabelColor.rgb.lerpTo(finalBlendColor.rgb, 1.0f - rLabelOpacity);
 
     uint8_t lButtonGrey = (isLDown && !lIsDisabled) ? 50 : 35;
     uint8_t rButtonGrey = (isRDown && !rIsDisabled) ? 50 : 35;
 
     Color lButtonColor = Color(lButtonGrey);
-    lButtonColor.rgb *= finalOpacity;
+    lButtonColor.rgb = lButtonColor.rgb.lerpTo(finalBlendColor.rgb, 1.0f - finalOpacity);
 
     Color rButtonColor = Color(rButtonGrey);
-    rButtonColor.rgb *= finalOpacity;
+    rButtonColor.rgb = rButtonColor.rgb.lerpTo(finalBlendColor.rgb, 1.0f - finalOpacity);
 
     Color barColor = Color(17);
-    barColor.rgb *= finalOpacity;
+    barColor.rgb = barColor.rgb.lerpTo(finalBlendColor.rgb, 1.0f - finalOpacity);
     
-    Color blackColor = Color::BLACK;
-
     int buttonWidth = 60;
 
     Rect leftButtonRect(
@@ -410,7 +421,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     rdpq_mode_end();
 
     setPrimitiveColor(barColor);
-    setBlendColor(blackColor);
+    setBlendColor(finalBlendColor);
 
     // Draw the main bar area
     drawFilledRect(barRect);
@@ -429,7 +440,7 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     }
 
     rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (0, 0, 0, TEX0)));
+        setCombiner(RDPQ_COMBINER1((PRIM, 0, TEX0, 0), (TEX0, 0, PRIM, 0)));
         setBlender(WITH_FRAMEBUFFER);
     rdpq_mode_end();
 
@@ -450,8 +461,10 @@ void TabControlView::render(const RenderInfo& renderInfo) {
 
     // Draw L/R button shadows
     {
-        // Set button shadow colour
-        setPrimitiveColor(blackColor);
+        // Set button shadow colour. Unlike the other colours here, it can't be
+        // faded by lerping, as it's blended with the framebuffer: so it's
+        // faded with its alpha instead.
+        setPrimitiveColor(finalBlendColor.withAlphaComponent(finalOpacity));
 
         Rect shadowRect(leftButtonRect.minX(), leftButtonRect.minY(), 59, 36);
         drawMirroredSlice(shadowRect, 16, 20);

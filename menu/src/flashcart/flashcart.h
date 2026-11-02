@@ -215,6 +215,18 @@ bool flashcart_load_rom_session_valid (const flashcart_load_rom_session_t *sessi
 flashcart_err_t flashcart_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks);
 
 /**
+ * @brief Mark a chunked ROM load session's chunks from the initial chunk to the end of the SDRAM portion as loaded, without loading them.
+ *
+ * For when the ROM is already in the cart SDRAM, e.g. after a warm reset. Only
+ * the chunks before the initial chunk, which the menu overwrote, are still
+ * loaded. Anything outside the SDRAM portion (the SC64's shadow and extended
+ * regions) is still loaded by @ref flashcart_finish_load_rom_session.
+ *
+ * @param session Pointer to the load session. Must not have loaded any chunks yet.
+ */
+void flashcart_mark_end_rom_chunks_loaded (flashcart_load_rom_session_t *session);
+
+/**
  * @brief Load everything left in a chunked ROM load session and close it.
  *
  * @param session Pointer to the load session.

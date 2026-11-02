@@ -12,6 +12,7 @@
 #include "general/Result.h"
 #include "ui/Scene.h"
 #include "ui/SceneRenderer.h"
+#include "ui/Theme.h"
 #include "ui/views/drawables/LabelReferenceView.h"
 #include "ui/views/drawables/RectView.h"
 #include "ui/views/ScrollbarView.h"
@@ -175,8 +176,8 @@ public:
     }
 
     void updateViews(const RenderInfo& renderInfo) {
-        Color backgroundColor = Color(17);
-        Color titleColor = Color(252, 204, 007);
+        Color backgroundColor = Theme::popoverBackgroundColor;
+        Color titleColor = Theme::accentColor;
 
         // Parent scene fades out
         float parentSceneOpacity = std::lerp(1.0f, 0.5f, transition.progress);

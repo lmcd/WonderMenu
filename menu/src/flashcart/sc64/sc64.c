@@ -446,8 +446,6 @@ flashcart_err_t sc64_finish_load_rom_session(flashcart_load_rom_session_t* sessi
             return FLASHCART_ERR_LOAD;
         }
 
-        f_lseek(fil, 0);
-
         session->current_chunk = 0;
         start_offset = 0;
     }
@@ -459,6 +457,14 @@ flashcart_err_t sc64_finish_load_rom_session(flashcart_load_rom_session_t* sessi
     }
 
     if (shadow_enabled) {
+        // The shadow holds the tail of the ROM, straight after the SDRAM portion.
+        // The file position is wherever streaming left it, so seek explicitly.
+        // The extended region then follows on from here.
+        if (f_lseek(fil, sdram_size) != FR_OK) {
+            f_close(fil);
+            return FLASHCART_ERR_LOAD;
+        }
+
         flashcart_err_t err = load_to_flash(fil, (void *) (SHADOW_ADDRESS), shadow_size, &br, progress);
         if (err != FLASHCART_OK) {
             f_close(fil);
@@ -488,6 +494,13 @@ flashcart_err_t sc64_finish_load_rom_session(flashcart_load_rom_session_t* sessi
     }
 
     unsigned int end_offset = chunk_size * session->initial_chunk;
+
+    // Back to the first beginning chunk still to load, as reading the SDRAM
+    // tail, shadow, or extended region will have moved the file position on.
+    if (f_lseek(fil, start_offset) != FR_OK) {
+        f_close(fil);
+        return FLASHCART_ERR_LOAD;
+    }
 
     for (unsigned int offset = start_offset; offset < end_offset; offset += chunk_size) {
         size_t block_size = MIN(sdram_size - offset, chunk_size);
@@ -539,6 +552,10 @@ flashcart_err_t sc64_load_next_rom_chunk (flashcart_load_rom_session_t* session,
         offset = 0;
 
         f_lseek(fil, 0);
+
+        if (!load_beginning_chunks || session->initial_chunk == 0) {
+            return FLASHCART_ERR_LOAD;
+        }
     }
 
     size_t block_size = MIN(sdram_size - offset, session->chunk_size);

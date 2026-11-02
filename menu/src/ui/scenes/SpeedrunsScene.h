@@ -89,6 +89,7 @@ public:
     const char* name() override { return "SpeedrunsScene"; }
 
     SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game* game);
+    ~SpeedrunsScene();
 
     void didBeginScene(SceneEntry entry);
     void update(const UpdateInfo& updateInfo) override;

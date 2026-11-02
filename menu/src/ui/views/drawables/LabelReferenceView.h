@@ -10,6 +10,7 @@
 #include <cmath>
 
 #include "../libdragon/rdpq_font_internal.h"
+#include "rdpq_mode.h"
 #include "ui/Fonts.h"
 #include "ui/View.h"
 
@@ -49,16 +50,25 @@ private:
         Color color = textColor;
         color.a *= finalOpacity;
 
-        Color blendColor = finalBlendColor;
-        blendColor.a = 0;
-
         const rdpq_font_t* font = nullptr;
 
         uint8_t currentFontID = 0;
         int currentAtlas = -1;
         int currentStyleID = -1;
 
+        Color blendColor = finalBlendColor;
+        blendColor.a = 0;
+
         rdpq_mode_push();
+
+        rdpq_mode_begin();
+            rdpq_set_mode_standard();
+            setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
+            setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
+            rdpq_mode_alphacompare(1);
+        rdpq_mode_end();
+
+        setBlendColor(blendColor);
 
         const rdpq_paragraph_char_t* character = layout->chars;
 
@@ -81,14 +91,6 @@ private:
 
                 atlas_t* atlas = &font->atlases[currentAtlas];
                 rspq_block_run(atlas->up);
-
-                rdpq_mode_begin();
-                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
-                    setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
-                    rdpq_mode_alphacompare(1);
-                rdpq_mode_end();
-
-                setBlendColor(blendColor);
             }
 
             if (character->style_id != currentStyleID) {

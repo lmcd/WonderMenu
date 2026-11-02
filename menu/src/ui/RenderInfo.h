@@ -13,7 +13,7 @@
 
 // The number of framebuffers that are used to render to screen
 // Typically 2 or 3
-#define BUFF_COUNT 3
+#define FRAMEBUFFER_COUNT 3
 
 struct RenderInfo {
     int frameNumber;

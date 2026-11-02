@@ -16,7 +16,7 @@ SpeedrunImportPopover::SpeedrunImportPopover(Scene* baseScene)
 
     messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
     messageLabel.align = ALIGN_CENTER;
-    messageLabel.textColor = Color(140);
+    messageLabel.textColor = Theme::popoverMessageColor;
     messageLabel.setString("$07Speedrun found!\nWould you like to save it?");
 }
 

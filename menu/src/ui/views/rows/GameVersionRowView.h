@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <ranges>
+
 #include "ui/View.h"
 #include "ui/views/BaseRowView.h"
 #include "ui/views/drawables/FlagView.h"
@@ -15,6 +17,18 @@ class Game;
 
 struct GameVersionRowView : public BaseRowView {
     const char* name() const override { return "GameVersionRowView"; }
+
+    template<typename Range>
+    static void renderGroup(const RenderInfo& renderInfo, Range&& views) {
+        auto flagViews = views | std::views::transform(&GameVersionRowView::flagView);
+
+        FlagView::renderGroup(renderInfo, flagViews);
+
+        for (GameVersionRowView& view : views) {
+            view.titleView.render(renderInfo);
+            view.subtitleView.render(renderInfo);
+        }
+    }
 
     FlagView flagView;
     LabelReferenceView<16> titleView;

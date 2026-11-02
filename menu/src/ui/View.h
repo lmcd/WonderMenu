@@ -9,6 +9,7 @@
 #include <vector>
 #include <algorithm>
 
+#include "ui/Image.h"
 #include "ui/RenderInfo.h"
 #include "util/Color.h"
 #include "util/Rect.h"
@@ -19,7 +20,7 @@ class View;
 struct RemovedView {
     View* view;
 
-    mutable int clearsRemaining = BUFF_COUNT;
+    mutable int clearsRemaining = FRAMEBUFFER_COUNT;
 
     // Ordered and deduplicated by the view pointer.
     bool operator<(const RemovedView& other) const {
@@ -33,6 +34,11 @@ struct RemovedView {
 class View {
 private:
     static void applyScissor(const Rect& rect);
+
+    // The two halves of renderToSurface(): computing the view's final values as
+    // if it were the root, then drawing its subtree into `surface`
+    void prepareOffscreenRender(const RenderInfo& renderInfo);
+    void drawOffscreen(const RenderInfo& renderInfo, const surface_t& surface);
 
     inline static std::vector<RemovedView> removedViews;
 
@@ -48,7 +54,7 @@ private:
     friend class Scene;
 
 protected:
-    static constexpr uint8_t ALL_BUFFERS = (1 << BUFF_COUNT) - 1;
+    static constexpr uint8_t ALL_BUFFERS = (1 << FRAMEBUFFER_COUNT) - 1;
 
     inline static bool hasScissor = false;
 
@@ -180,12 +186,18 @@ public:
     void setNeedsDisplay();
     void setNeedsDisplay(Rect dirtyRect);
 
+    /**
+     * Redraw this view and every view under it, e.g. once something drawn over
+     * them has moved away
+     */
+    void setSubtreeNeedsDisplay() { setSubtreeNeedsFullRender(); }
+
     // TODO: implement
     void layoutSubviews();
 
     // True while `view` is still queued for its deferred per-buffer clears --
     // i.e. it was removed from its superview but hasn't finished retiring across
-    // all BUFF_COUNT buffers. Once this is false, the view's pixels are fully
+    // all FRAMEBUFFER_COUNT buffers. Once this is false, the view's pixels are fully
     // erased and its memory is safe to free.
     static bool isPendingRemoval(const View* view);
 
@@ -204,6 +216,13 @@ public:
     virtual void render(const RenderInfo& renderInfo);
 
     /**
+     * Render a view and all of its subviews into a new `Image` the size of the
+     * view. The caller owns it (and must keep it alive until the RDP has
+     * finished with it). nullptr if the view has no size or the allocation fails.
+     */
+    Image* renderToImage(const RenderInfo& renderInfo);
+
+    /**
      * Render a view and of its subviews directly to an off-screen `surface_t`.
      * This is a new allocation and must later be released with `surface_free`.
      */
@@ -219,9 +238,9 @@ protected:
 
     static constexpr int MAX_PENDING_RENDER_RECTS = 8;
 
-    Rect drawnBoundingBox[BUFF_COUNT];
+    Rect drawnBoundingBox[FRAMEBUFFER_COUNT];
 
-    std::vector<Rect> pendingRenderRects[BUFF_COUNT];
+    std::vector<Rect> pendingRenderRects[FRAMEBUFFER_COUNT];
 
     void addPendingRenderRect(int bufferIndex, Rect dirtyRect);
 
@@ -237,13 +256,38 @@ protected:
 
     void setBlendColor(Color color);
 
+    void setEnvironmentColor(Color color);
+
     void drawFilledRect(Rect rect);
 
     void drawSprite(sprite_t* sprite, Vec2 position, const rdpq_blitparms_t* params = NULL);
 
-    void drawTexturedRect(rdpq_tile_t tile, Rect screenRect, Rect spriteRect);
+    // Defined here so they inline into callers, which draw many of them (one
+    // per glyph for labels)
+    void drawTexturedRect(rdpq_tile_t tile, Rect screenRect, Rect spriteRect) {
+        rdpq_texture_rectangle_scaled(
+            tile,
+            screenRect.minX(),
+            screenRect.minY(),
+            screenRect.maxX(),
+            screenRect.maxY(),
+            spriteRect.minX(),
+            spriteRect.minY(),
+            spriteRect.maxX(),
+            spriteRect.maxY()
+        );
+    }
 
-    void drawTexturedRect(rdpq_tile_t tile, Rect rect, int s = 0, int t = 0);
+    void drawTexturedRect(rdpq_tile_t tile, Rect rect, int s = 0, int t = 0) {
+        rdpq_texture_rectangle(
+            tile,
+            rect.minX(),
+            rect.minY(),
+            rect.maxX(),
+            rect.maxY(),
+            s, t
+        );
+    }
 
     void clearRect(const Rect& rect, Color clearColor = Color::BLACK);
 

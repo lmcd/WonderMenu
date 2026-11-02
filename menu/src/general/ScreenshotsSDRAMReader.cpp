@@ -3,19 +3,18 @@
 * @license AGPLv3
 */
 
+#include <cstring>
 #include <malloc.h>
 
 #include "ScreenshotsSDRAMReader.h"
+#include "utils/utils.h"
 
 ScreenshotsSDRAMReader::ScreenshotsSDRAMReader(uint32_t baseAddress, int count)
     : baseAddress(baseAddress),
       readOffset(baseAddress),
       count(count) {
 
-    int bufferSize = sizeof(sprite_t) + MAXIMUM_PIXEL_BYTES;
-
-    // Allocate the buffer
-    buffer = (uint8_t*)memalign(16, bufferSize);
+    buffer = (uint8_t*)memalign(16, sizeof(sprite_t) + GAME_STATE_BUFFER_SIZE + MAXIMUM_PIXEL_BYTES);
 }
 
 ScreenshotsSDRAMReader::~ScreenshotsSDRAMReader() {
@@ -39,16 +38,13 @@ sprite_t* ScreenshotsSDRAMReader::nextSprite() {
 
     currentIndex++;
 
-    uint8_t* spriteHeaderBuffer = buffer;
-    uint8_t* imageDataBuffer = spriteHeaderBuffer + sizeof(sprite_t);
-
     // Read the sprite header/metadata (width, height, etc)
-    data_cache_hit_writeback_invalidate(spriteHeaderBuffer, sizeof(sprite_t));
-    dma_read_raw_async(spriteHeaderBuffer, readOffset, sizeof(sprite_t));
+    data_cache_hit_writeback_invalidate(buffer, sizeof(sprite_t));
+    dma_read_raw_async(buffer, readOffset, sizeof(sprite_t));
     dma_wait();
 
     // Cast read metadata to a sprite so we can access its attributes
-    sprite_t* sprite = (sprite_t*)spriteHeaderBuffer;
+    sprite_t* sprite = (sprite_t*)buffer;
 
     // Number of bytes the image data occupies
     int imageBytes = sprite->width * sprite->height * 2;
@@ -59,13 +55,15 @@ sprite_t* ScreenshotsSDRAMReader::nextSprite() {
         return nullptr;
     }
 
-    // Read the actual image data
-    data_cache_hit_writeback_invalidate(imageDataBuffer, imageBytes);
-    dma_read_raw_async(imageDataBuffer, readOffset + sizeof(sprite_t), imageBytes);
+    // The game state, then the pixels
+    int bodyBytes = GAME_STATE_BUFFER_SIZE + imageBytes;
+
+    data_cache_hit_writeback_invalidate(buffer + sizeof(sprite_t), bodyBytes);
+    dma_read_raw_async(buffer + sizeof(sprite_t), readOffset + sizeof(sprite_t), bodyBytes);
     dma_wait();
 
     recordOffset = readOffset;
-    recordSize = (sizeof(sprite_t) + imageBytes + 511) & ~511;
+    recordSize = ALIGN(sizeof(sprite_t) + bodyBytes, 512);
 
     readOffset += recordSize;
 
@@ -80,10 +78,10 @@ surface_t ScreenshotsSDRAMReader::surfaceForSprite(sprite_t* sprite) const {
     // TODO: use sprite_get_pixels?
 
     return surface_make(
-        (uint8_t*)sprite + sizeof(sprite_t),
+        (uint8_t*)sprite + sizeof(sprite_t) + GAME_STATE_BUFFER_SIZE,
         FMT_RGBA16,
         sprite->width,
-        (sprite->height + 7) & ~7,
+        ALIGN(sprite->height, 8),
         sprite->width * 2
     );
 }

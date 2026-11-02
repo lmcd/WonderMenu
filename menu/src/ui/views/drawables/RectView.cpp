@@ -152,7 +152,12 @@ void RectView::update(const RenderInfo& renderInfo) {
     if (finalFrame != bufferFrame) {
         setNeedsClear(bufferIndex);
 
-        if (isInverted || !finalIsOpaque) {
+        if (finalIsHidden) {
+            // Only what it last drew is cleared, which is nothing once its
+            // hidden clear is done. The old frame may well have been drawn
+            // over by something else since, so it's left alone.
+        }
+        else if (isInverted || !finalIsOpaque) {
             setNeedsFullRender(bufferIndex);
         }
         else {
@@ -258,7 +263,7 @@ void RectView::render(const RenderInfo& renderInfo) {
     Color color = fillColor;
 
     if (finalIsOpaque)  {
-        color.rgb *= finalOpacity;
+        color.rgb = color.rgb.lerpTo(finalBlendColor.rgb, 1.0f - finalOpacity);
     }
     else {
         color.a *= finalOpacity;

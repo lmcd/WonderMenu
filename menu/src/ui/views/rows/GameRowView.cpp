@@ -6,6 +6,7 @@
 #include "GameRowView.h"
 
 #include "general/Game.h"
+#include "ui/Theme.h"
 
 GameRowView::GameRowView() {
     Color titleColor = Color::WHITE;
@@ -22,8 +23,8 @@ GameRowView::GameRowView() {
     versionNumberView.textColor = subtitleColor;
     versionNumberView.align = ALIGN_RIGHT;
 
-    starView.onColor = STAR_ON_COLOR;
-    starView.offColor = STAR_OFF_COLOR;
+    starView.onColor = Theme::starOnColor;
+    starView.offColor = Theme::starOffColor;
 
     numberView.fillColor = NUMBER_FILL_COLOR;
 
@@ -47,7 +48,7 @@ void GameRowView::update(const RenderInfo&) {
     titleView.frame.origin = labelPosition;
     titleView.maxWidth = maxLabelWidth;
 
-    if (isSelected) {
+    if (isSelected && !popoverIsVisible) {
         titleView.startAnimating();
     }
     else {

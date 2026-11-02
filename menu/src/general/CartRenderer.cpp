@@ -4,16 +4,19 @@
 */
 
 #include <cfloat>
+#include <initializer_list>
 
 #include "CartRenderer.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
+#include "rdpq_mode.h"
 #include "ui/RenderInfo.h"
+#include "ui/Theme.h"
 #include "util/Color.h"
 
 #define MATRIX_COUNT 10
 
-int matIndexes[BUFF_COUNT] = {0};
+int matIndexes[FRAMEBUFFER_COUNT] = {0};
 
 Rect getModelScreenBoundingBox(T3DViewport& viewport, const T3DModel* model, const T3DMat4* modelMatrix) {
     float minX = model->aabbMin[0];
@@ -62,8 +65,20 @@ Rect getModelScreenBoundingBox(T3DViewport& viewport, const T3DModel* model, con
     );
 }
 
-static void dynamicTextureCallback(void* userData, const T3DMaterial* material, rdpq_texparms_t* tileParams, rdpq_tile_t tile) {
-    if(tile != TILE0) {
+// Tiny3D's glTF importer enables depth on every material, regardless of the
+// fast64 setting. The menu renders without a depth buffer, so the per-vertex
+// depth and the Z coefficients sent with every triangle would go unused.
+static void disableDepth(T3DModel* model) {
+    for (uint32_t i = 0; i < model->chunkCount; i++) {
+        if (model->chunkOffsets[i].type == T3D_CHUNK_TYPE_MATERIAL) {
+            T3DMaterial* material = (T3DMaterial*)((char*)model + (model->chunkOffsets[i].offset & 0x00FFFFFF));
+            material->renderFlags &= ~T3D_FLAG_DEPTH;
+        }
+    }
+}
+
+static void dynamicTextureCallback(void* userData, const T3DMaterial* material, rdpq_texparms_t*, rdpq_tile_t tile) {
+    if (tile != TILE0) {
         return;
     }
 
@@ -85,14 +100,19 @@ CartRenderer::CartRenderer(Size displaySize, LabelLoader& labelLoader)
         placeholders[i] = surface_make_placeholder_linear(i + 1, FMT_RGBA16, DB_LABEL_TILE_WIDTH, DB_LABEL_TILE_HEIGHT);
     }
 
-    cartListMatFP = (T3DMat4FP*)malloc_uncached(sizeof(T3DMat4FP) * BUFF_COUNT * MATRIX_COUNT);
+    cartListMatFP = (T3DMat4FP*)malloc_uncached(sizeof(T3DMat4FP) * FRAMEBUFFER_COUNT * MATRIX_COUNT);
 
-    flatCartModel = t3d_model_load("rom:/models/CartridgeFlatNew1.t3dm");
-    fullCartModel = t3d_model_load("rom:/models/CartridgeFullNew1.t3dm");
+    flatCartModel = t3d_model_load("rom:/models/CartridgeFullNew3.t3dm");
+    fullCartModel = t3d_model_load("rom:/models/CartridgeFullNew3.t3dm");
     texturedLabelModel = t3d_model_load("rom:/models/CartridgeLabelsTextured1.t3dm");
     blankLabelModel = t3d_model_load("rom:/models/CartridgeLabelsFlat1.t3dm");
     hdTexturedLabelModel = t3d_model_load("rom:/models/CartridgeLabelsTextured4x41.t3dm");
     hdTexturedLabelCornerModel = t3d_model_load("rom:/models/CartridgeLabelsTextured4x4Corner1.t3dm");
+
+    // Before setupBlocks(), as the blocks record each material's draw flags
+    for (T3DModel* model : { flatCartModel, fullCartModel, texturedLabelModel, blankLabelModel, hdTexturedLabelModel, hdTexturedLabelCornerModel }) {
+        disableDepth(model);
+    }
 
     setupBlocks();
 
@@ -104,8 +124,8 @@ CartRenderer::CartRenderer(Size displaySize, LabelLoader& labelLoader)
     float farPlane = 150.0f;
     float fov = T3D_DEG_TO_RAD(50.0f);
 
-    persViewport = t3d_viewport_create_buffered(BUFF_COUNT);
-    orthViewport = t3d_viewport_create_buffered(BUFF_COUNT);
+    persViewport = t3d_viewport_create_buffered(FRAMEBUFFER_COUNT);
+    orthViewport = t3d_viewport_create_buffered(FRAMEBUFFER_COUNT);
 
     // Setup perspective viewport - used for 3D cartridge render
     t3d_viewport_set_projection(&persViewport, fov, nearPlane, farPlane);
@@ -134,7 +154,7 @@ void CartRenderer::fillSurfaces() {
         // Fill the surface red via the RDP
         rdpq_attach(&labelSurfaces[i], NULL);
         // TODO: Can we use the RGBA16 transparency bit?
-        rdpq_clear(Color(141));
+        rdpq_clear(Color(140));
         rdpq_detach();
     }
 }
@@ -197,8 +217,7 @@ void CartRenderer::setupBlocks() {
     });
 
     flatCartBlock = rspq_make_block([&] {
-        // t3d_model_draw(flatCartModel);
-        t3d_model_draw(fullCartModel);
+        t3d_model_draw(flatCartModel);
     });
 
     fullCartBlock = rspq_make_block([&] {
@@ -206,16 +225,25 @@ void CartRenderer::setupBlocks() {
     });
 }
 
-Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3f rotation, Game* game, float opacity, uint8_t flags) {
+Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3f rotation, Game* game, float, uint8_t flags) {
     rdpq_mode_push();
     
+    bool reducedAA = (flags & CART_RENDER_REDUCED_AA);
+
     rdpq_mode_begin();
         rdpq_set_mode_standard();
-        rdpq_mode_antialias(AA_STANDARD);
         // rdpq_mode_zbuf(true, true);
         rdpq_mode_persp(true);
 
-        rdpq_mode_filter(FILTER_BILINEAR);
+        if (reducedAA) {
+            rdpq_mode_antialias(AA_REDUCED);
+            rdpq_mode_filter(FILTER_POINT);
+        }
+        else {
+            rdpq_mode_antialias(AA_STANDARD);
+            rdpq_mode_filter(FILTER_BILINEAR);
+        }
+
         rdpq_mode_dithering(DITHER_SQUARE_SQUARE);
 
         //rdpq_mode_blender(0);
@@ -225,10 +253,10 @@ Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3
     bool preferHighRes = (flags & CART_RENDER_PREFER_HIGHRES);
     CartLabelType labelType = loadLabelDataForGame(game, preferHighRes);
 
-    int bufferIndex = (frameNumber % BUFF_COUNT);
+    int bufferIndex = (frameNumber % FRAMEBUFFER_COUNT);
     matIndexes[bufferIndex] = (matIndexes[bufferIndex] + 1) % MATRIX_COUNT;
 
-    int i = bufferIndex + (matIndexes[bufferIndex] * BUFF_COUNT);
+    int i = bufferIndex + (matIndexes[bufferIndex] * FRAMEBUFFER_COUNT);
 
     T3DMat4 modelMat;
 
@@ -244,7 +272,7 @@ Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3
     
     rspq_block_t* labelBlock;
 
-    if (labelType == CART_LARGE_LABEL) {
+    if (labelType == CART_LABEL_LARGE) {
         labelBlock = highResTexturedLabelBlock;
     }
     else {
@@ -280,7 +308,7 @@ Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3
         }
     }
 
-    if (labelType == CART_LARGE_LABEL) {
+    if (labelType == CART_LABEL_LARGE) {
         t3d_model_draw_custom(hdTexturedLabelCornerModel, (T3DModelDrawConf){
             .userData = &placeholders,
             .dynTextureCb = dynamicTextureCallback
@@ -288,8 +316,6 @@ Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3
     }
 
     t3d_matrix_pop(1);
-
-    rdpq_sync_pipe();
 
     rdpq_mode_pop();
 
@@ -316,38 +342,40 @@ int CartRenderer::preloadLabelDataForGame(Game* game, bool preferHighRes, int ti
 CartLabelType CartRenderer::loadLabelDataForGame(Game* game, bool preferHighRes) {
     char* spriteData = nullptr;
 
-    if (game) {
-        if (preferHighRes) {
-            LoadResult result = labelLoader.loadLargeLabelDataForGame(game);
-            spriteData = result.data;
+    if (!game) {
+        return CART_LABEL_NONE;
+    }
 
-            if (spriteData) {
-                for (int i = 0; i < DB_L_LABEL_TILE_COUNT; i++) {
-                    void* pointer = spriteData + (DB_LABEL_TILE_SIZE * i);
+    if (preferHighRes) {
+        LoadResult result = labelLoader.loadLargeLabelDataForGame(game);
+        spriteData = result.data;
 
-                    if (i == 15) {
-                        placeholders[i] = surface_make((char*)pointer, FMT_RGBA16, DB_LABEL_TILE_WIDTH, DB_LABEL_TILE_HEIGHT, TEX_FORMAT_PIX2BYTES(FMT_RGBA16, DB_LABEL_TILE_WIDTH));
-                    }
-                    else {
-                        rdpq_set_lookup_address(i + 1, pointer);
-                    }
+        if (spriteData) {
+            for (int i = 0; i < DB_L_LABEL_TILE_COUNT; i++) {
+                void* pointer = spriteData + (DB_LABEL_TILE_SIZE * i);
+
+                if (i == 15) {
+                    placeholders[i] = surface_make((char*)pointer, FMT_RGBA16, DB_LABEL_TILE_WIDTH, DB_LABEL_TILE_HEIGHT, TEX_FORMAT_PIX2BYTES(FMT_RGBA16, DB_LABEL_TILE_WIDTH));
                 }
-
-                return CART_LARGE_LABEL;
+                else {
+                    rdpq_set_lookup_address(i + 1, pointer);
+                }
             }
+
+            return CART_LABEL_LARGE;
         }
+    }
 
-        if (spriteData == nullptr) {
-            LoadResult result = labelLoader.loadSmallLabelDataForGame(game, 4);
-            spriteData = result.data;
+    if (spriteData == nullptr) {
+        LoadResult result = labelLoader.loadSmallLabelDataForGame(game, 4);
+        spriteData = result.data;
 
-            if (spriteData) {
-                for (int i = 0; i < DB_S_LABEL_TILE_COUNT; i++) {
-                    rdpq_set_lookup_address(i + 1, spriteData + (DB_LABEL_TILE_SIZE * i));
-                }
-
-                return CART_LABEL_SMALL;
+        if (spriteData) {
+            for (int i = 0; i < DB_S_LABEL_TILE_COUNT; i++) {
+                rdpq_set_lookup_address(i + 1, spriteData + (DB_LABEL_TILE_SIZE * i));
             }
+
+            return CART_LABEL_SMALL;
         }
     }
 
@@ -369,20 +397,17 @@ void CartRenderer::finishPreload() {
     float scale = pendingCartPreload.scale;
 
     Size size = sizeForScale(scale);
-
-    Vec2 sizeMidpoint = size.mid();
-
     Size labelSize(32, 36);
 
-    sizeMidpoint.x -= (size.width  - labelSize.width)  / 2;
-    sizeMidpoint.y -= (size.height - labelSize.height) / 2;
+    // The cart centred over the label surface, so its label lands in the surface
+    Rect cartRect = size.centeredIn(Rect(Vec2::ZERO, labelSize));
 
     rdpq_attach(&labelSurfaces[cacheIndex], nullptr);
 
     render2DCart(
         0,
         scale,
-        sizeMidpoint,
+        cartRect.mid(),
         0,
         game,
         1.0f,
@@ -440,10 +465,12 @@ Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPositio
         rdpq_mode_begin();
             rdpq_set_mode_standard();
             rdpq_mode_blender(0);
-            rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (0, 0, 0, ONE)));
+            // Lerps from the background (ENV) to the label by the opacity (PRIM)
+            rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, ENV, PRIM, ENV), (0, 0, 0, ONE)));
         rdpq_mode_end();
 
         rdpq_set_prim_color(color);
+        rdpq_set_env_color(Theme::backgroundColor);
 
         rdpq_sync_tile();
 
@@ -460,38 +487,11 @@ Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPositio
         float lightIntensity = 40.0f * opacity;
         T3DVec3 pointLightPos = {{0.0f, -1.1f + yRelativeToLight, -32.0f}};
 
+        t3d_light_set_ambient((uint8_t[]){0, 0, 0, 0});
         t3d_light_set_count(1);
         t3d_light_set_point(0, (uint8_t[]){0xFC, 0xFC, 0xFF, 0xFF}, &pointLightPos, lightIntensity, false);
 
-        uint8_t flags = CART_RENDER_SLIM;
-
-        if (true) {
-            // Size size = sizeForScale(scale);
-            // Vec2 sizeMidpoint = size.mid();
-
-            // rdpq_mode_push();
-
-            // if (opacity == 1.0f) {
-            //  rdpq_set_mode_copy(false);
-            // }
-            // else {
-            //  rdpq_mode_begin();
-            //      rdpq_set_mode_standard();
-            //      rdpq_mode_combiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (0, 0, 0, PRIM)));
-            //      rdpq_mode_blender(RDPQ_BLENDER((IN_RGB, IN_ALPHA, BLEND_RGB, INV_MUX_ALPHA)));
-            //  rdpq_mode_end();
-
-            //  rdpq_set_prim_color((color_t){255, 255, 255, (uint8_t)(opacity * 255)});
-            // }
-
-            // rdpq_sync_tile();
-
-            // rdpq_sprite_blit(cartSprite, screenPosition.x - sizeMidpoint.x, screenPosition.y - sizeMidpoint.y, NULL);
-
-            // rdpq_mode_pop();
-
-            flags |= CART_RENDER_LABEL_ONLY;
-        }
+        uint8_t flags = CART_RENDER_SLIM | CART_RENDER_LABEL_ONLY;
 
         renderCart(
             frameNumber,
@@ -504,11 +504,10 @@ Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPositio
         );
     }
 
-    Rect boundingBox = {screenPosition, size};
-    boundingBox.origin.x -= size.midX();
-    boundingBox.origin.y -= size.midY();
-
-    return boundingBox;
+    return Rect(
+        screenPosition - size.mid(),
+        size
+    );
 }
 
 Rect CartRenderer::render3DCart(int frameNumber, float scale, Vec3f position, Vec3f rotation, Vec2 screenPosition, Game* game, float intensity, uint8_t flags) {
@@ -520,6 +519,7 @@ Rect CartRenderer::render3DCart(int frameNumber, float scale, Vec3f position, Ve
     float lightIntensity = 40.0f * intensity;
     T3DVec3 pointLightPos = {{0.0f, -5.1f, -32.0f}};
 
+    t3d_light_set_ambient((uint8_t[]){0, 0, 0, 0});
     t3d_light_set_count(1);
     t3d_light_set_point(0, (uint8_t[]){0xFF, 0xFF, 0xFF, 0xFF}, &pointLightPos, lightIntensity, false);
 

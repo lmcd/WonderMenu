@@ -31,8 +31,22 @@ struct ELFFile {
     bool exists();
 
     /**
-     * DMA the uncompressed ELF payload out of ROM and into RDRAM.
-     * Once staged, the payload is live and can be jumped to for execution.
+     * Read the uncompressed ELF payload out of ROM into a static image, ready
+     * for `placeCode()`. Must be done while the menu's ROM is still in cart SDRAM:
+     * loading a game overwrites it.
      */
-    void stage();
+    void copyCode(uint8_t* image, uint32_t capacity);
+
+    // The payload's lowest load address, and the size of the span from there
+    // to the end of its highest segment. 0 until loaded.
+    uint32_t imageBase = 0;
+    uint32_t imageSize = 0;
+
+    /**
+     * The address just past the payload's highest segment, BSS included. 0
+     * until loaded.
+     */
+    uint32_t imageEnd() const {
+        return (imageSize != 0) ? (imageBase + imageSize) : 0;
+    }
 };

@@ -4,6 +4,8 @@
 */
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <ctype.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -120,15 +122,22 @@ int ScreenshotsImportScene::nextScreenshotIndex() {
 void ScreenshotsImportScene::beginThumbnailWrite() {
     sprite_t* thumbnailSprite = screenshotThumbnailView.imageView1.sprite;
 
-    if (thumbnailSprite == nullptr || thumbnailWriter.hasSession()) {
+    if (thumbnailSprite == nullptr) {
         return;
+    }
+
+    // hasSession() stays true once a writer has been used, so it can't tell
+    // whether the previous thumbnail is still being written. Finish that one
+    // off rather than skipping this thumbnail.
+    if (thumbnailWriter.hasSession() && !thumbnailWriter.isFinished()) {
+        thumbnailWriter.write();
     }
 
     uint32_t thumbnailSize =
         (uint32_t)sizeof(sprite_t) +
         (uint32_t)thumbnailSprite->width * thumbnailSprite->height * 2;
 
-    uint32_t thumbnailRecordSize = (thumbnailSize + 511u) & ~511u;
+    uint32_t thumbnailRecordSize = ALIGN(thumbnailSize, 512);
 
     data_cache_hit_writeback(thumbnailSprite, thumbnailRecordSize);
     dma_write_raw_async(thumbnailSprite, screenshotRecordOffset, thumbnailRecordSize);
@@ -197,17 +206,16 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    // Frame 0 is an import frame too, so the interval lands `count + 1` times
-    // before maxFrameNumber; without this the last one would read a screenshot
-    // that isn't there.
-    if (currentScreenshotIndex >= count) {
-        return;
-    }
-
     int cycleFrameNumber = updateInfo.sceneFrameNumber % screenshotFrameInterval;
 
-    // Proceed to the next screenshot every 10 frames
-    if (cycleFrameNumber != 0) {
+    // Frame 0 is an import frame too, so the interval lands `count + 1` times
+    // before maxFrameNumber; once every screenshot has been started, the
+    // remaining frames just finish writing the last one (and its thumbnail)
+    // rather than reading a screenshot that isn't there.
+    bool startsNextScreenshot = (cycleFrameNumber == 0) && (currentScreenshotIndex < count);
+
+    // Proceed to the next screenshot every `screenshotFrameInterval` frames
+    if (!startsNextScreenshot) {
         if (screenshotWriter.isFinished()) {
             if (thumbnailWriter.hasSession()) {
                 float seconds = measure([&] {
@@ -243,6 +251,7 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
 
     screenshotThumbnailView.setFullSizeScreenshotSurface(reader.surfaceForSprite(screenshotSprite));
 
+    // The record is the .SPR as is, game state included
     screenshotWriter.begin(
         &screenshotDir,
         filenameForScreenshot(currentScreenshotIndex, false),

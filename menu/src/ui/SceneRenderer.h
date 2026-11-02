@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <libdragon.h>
 #include <vector>
 
 #include "util/Size.h"
@@ -58,6 +59,13 @@ private:
     void collectGarbageScenes();
 
 public:
+    /*
+     * The framebuffer most recently rendered into and queued for display.
+     * It only reaches the screen at the next vblank, so it can still be
+     * pending when the frame after it starts.
+     */
+    surface_t* lastSurface = nullptr;
+
     SceneRenderer(Scene* initialScene = nullptr);
     ~SceneRenderer();
 

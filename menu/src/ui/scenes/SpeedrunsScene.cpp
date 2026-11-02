@@ -12,6 +12,7 @@
 #include "general/Game.h"
 #include "general/M64File.h"
 #include "general/SpeedrunDatabase.h"
+#include "ui/Theme.h"
 #include "ui/scenes/GameLaunchScene.h"
 #include "ui/views/ScrollbarView.h"
 
@@ -72,7 +73,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
-    labelView.textColor = Color(128);
+    labelView.textColor = Theme::emptyListLabelColor;
 
     if (is_memory_expanded()) {
         labelView.setString(game->hasSpeedrunDatabase() ? "No Speedruns Found" : "Not Supported for this Game");
@@ -92,6 +93,10 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
     }
 }
 
+SpeedrunsScene::~SpeedrunsScene() {
+    delete speedrunDatabase;
+}
+
 void SpeedrunsScene::rebuildRows() {
     rows.clear();
 
@@ -102,18 +107,16 @@ void SpeedrunsScene::rebuildRows() {
     uint16_t groupCount = speedrunDatabase->groups.size();
     uint16_t entryCount = speedrunDatabase->entries.size();
 
-    if (true) {
-        RowInfo createRow = {
-            false,
-            0,
-            0,
-            0
-        };
+    RowInfo createRow = {
+        false,
+        0,
+        0,
+        0
+    };
 
-        createRow.isCreate = true;
+    createRow.isCreate = true;
 
-        rows.push_back(createRow);
-    }
+    rows.push_back(createRow);
 
     // Speedrun groups don't nest the way cheat groups do -- there is no span to
     // walk, just a flat list -- so this is one level deep and needs no recursion.

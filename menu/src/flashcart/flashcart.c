@@ -4,6 +4,7 @@
  * @ingroup flashcart
  */
 
+#include <math.h>
 #include <stddef.h>
 #include <libcart/cart.h>
 #include <libdragon.h>
@@ -176,6 +177,47 @@ char *flashcart_convert_error_message (flashcart_err_t err) {
  * @param storage_prefix Pointer to the storage prefix.
  * @return flashcart_err_t Error code.
  */
+/**
+ * @brief Switch the PI's domain 1 to the SC64's fast timings.
+ *
+ * Until now the PI runs at the menu ROM header's timings (0x80371240, ~5.4MB/s),
+ * which suit any cart. These are the ones libcart uses for the SC64 (0x802F0C05,
+ * ~7.8MB/s), but it only applies them around its own accesses. Left in place,
+ * every PI access gets them: DragonFS, and DMAs from cart SDRAM. libcart saves
+ * and restores whatever is current around its accesses, so they survive those,
+ * and booting a game programs the game's own timings (see boot.c).
+ */
+static void flashcart_set_fast_pi_timings (void) {
+    volatile uint32_t *dom1 = (volatile uint32_t *) 0xA4600014; // LAT, PWD, PGS, RLS
+
+    // EXPERIMENTAL: faster than the SC64 validates. From reading its FPGA
+    // (fw/rtl/n64/n64_pi.sv), the data reaches the bus ~50ns after /READ falls,
+    // so the pulse (PWD+1 x 16ns) has headroom, but the 4 word read FIFO can run
+    // dry if SDRAM can't keep up -- which returns wrong data, not an error.
+    // Check `sc64deployer info` ("PI FIFO flags") after use, without resetting.
+    const bool useExperimentalTimings = true;
+
+    // The timings can only change while the bus is idle
+    dma_wait();
+
+    if (useExperimentalTimings) {
+        // PWD 0x05 / RLS 0x01 (8 cycles a word, ~15.6MB/s) scrambled PI
+        // writes (debugf output). This is a middle ground: only the pulse is
+        // shortened, keeping the validated release, so a failure here points
+        // at the pulse width.
+        dom1[0] = 0x05; // LAT
+        dom1[1] = 0x05; // PWD: 160ns pulse (validated 0x0C, 208ns)
+        dom1[2] = 0x0F; // PGS
+        dom1[3] = 0x02; // RLS: 48ns release, 13 cycles a word (~9.6MB/s)
+    }
+    else {
+        dom1[0] = 0x05; // LAT
+        dom1[1] = 0x0C; // PWD
+        dom1[2] = 0x0F; // PGS
+        dom1[3] = 0x02; // RLS
+    }
+}
+
 flashcart_err_t flashcart_init (const char **storage_prefix) {
     flashcart_err_t err;
 
@@ -221,6 +263,10 @@ flashcart_err_t flashcart_init (const char **storage_prefix) {
 
     if ((err = flashcart->init()) != FLASHCART_OK) {
         return err;
+    }
+
+    if (cart_type == CART_SC) {
+        flashcart_set_fast_pi_timings();
     }
 
     if ((cart_type != CART_NULL) && (!sd_card_initialized)) {
@@ -354,8 +400,34 @@ flashcart_err_t flashcart_load_next_rom_chunk (flashcart_load_rom_session_t *ses
 }
 
 /**
+ * @brief Mark a chunked ROM load session's end chunks as loaded, without loading them.
+ *
+ * @param session Pointer to the load session.
+ */
+void flashcart_mark_end_rom_chunks_loaded (flashcart_load_rom_session_t *session) {
+    if (!flashcart_load_rom_session_valid(session) || session->has_loaded_end_chunk) {
+        return;
+    }
+
+    size_t start_offset = session->chunk_size * session->current_chunk;
+
+    if (start_offset < session->sdram_size) {
+        session->loaded_bytes += session->sdram_size - start_offset;
+        session->progress = fminf(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
+    }
+
+    /* The same state the carts leave a session in once streaming reaches the
+       end of the SDRAM portion: wrapped around to the beginning chunks, with
+       the file positioned at the first of them. */
+    session->has_loaded_end_chunk = true;
+    session->current_chunk = 0;
+
+    f_lseek(&session->fil, 0);
+}
+
+/**
  * @brief Load everything left in a chunked ROM load session and close it.
- * 
+ *
  * @param session Pointer to the load session.
  * @param progress Progress callback function.
  * @return flashcart_err_t Error code.

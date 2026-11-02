@@ -8,6 +8,7 @@ menu/WonderMenu.z64
 menu/WonderMenu-release.z64
 menu/filesystem
 menu/build
+menu/src/dso
 
 # clangd: the compile database holds absolute paths to this machine's checkout
 # and toolchain, so it's regenerated locally rather than shared. `.cache` is

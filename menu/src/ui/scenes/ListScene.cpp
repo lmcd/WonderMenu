@@ -238,7 +238,7 @@ void ListScene::setupViews() {
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     labelView.setString("No Games Found");
-    labelView.textColor = Color(128);
+    labelView.textColor = Theme::emptyListLabelColor;
 
     selectionRectView.frame = selectedRowRect;
     selectionRectView.fillColor = SELECTED_ROW_COLOR;
@@ -309,16 +309,15 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
         if (isRowSelected) {
             selectionRectView.isHidden = isRowHidden;
             
-            Color selectionBlendColor = SELECTED_ROW_COLOR;
-
-            rowView.backgroundColor = selectionBlendColor;
+            rowView.popoverIsVisible = (popoverTransitionProgress != 0.0f);
+            rowView.backgroundColor = SELECTED_ROW_COLOR;
             selectionRectView.opacity = rowOpacity;
 
             wobbler.speed = std::lerp(1.0f, 0.5f, popoverTransitionProgress);
 
             cart3DView.frame.origin = rowView.cartPosition;
             cart3DView.scale = rowView.cartScale;
-            cart3DView.backgroundColor = selectionBlendColor;
+            cart3DView.backgroundColor = SELECTED_ROW_COLOR;
             cart3DView.rotation = rotationForFrame(frameNumber);
             cart3DView.opacity = rowOpacity;
         }

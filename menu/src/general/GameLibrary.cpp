@@ -328,66 +328,74 @@ void GameLibrary::toggleRetailGroupings() {
     });
 }
 
-std::vector<std::string> GameLibrary::findROMDirectories() {
+std::vector<std::string> GameLibrary::findROMDirectories(int depth) {
     std::vector<std::string> romDirectoryPaths;
-    std::vector<std::string> subdirectoryNames;
 
     if (path == nullptr) {
         return romDirectoryPaths;
     }
 
-    dir_t entry;
+    findROMDirectories("", std::max(depth, 0), romDirectoryPaths);
 
-    if (dir_findfirst(path, &entry) != 0) {
-        debugf("[GameLibrary] No folders found in %s\n", path);
-        return romDirectoryPaths;
+    debugf("[GameLibrary] Found %i ROM folders in %s\n", romDirectoryPaths.size(), path);
+
+    return romDirectoryPaths;
+}
+
+void GameLibrary::findROMDirectories(const std::string& relativePath, int depth, std::vector<std::string>& directoryPaths) {
+    // The cache stores each directory in a fixed size field, so a longer one
+    // couldn't be read back
+    if (relativePath.size() >= MAX_DIRECTORY_LENGTH) {
+        debugf("[GameLibrary] Skipping %s, its path is too long\n", relativePath.c_str());
+        return;
     }
 
-    bool rootHasROMs = false;
+    char directoryPath[512];
 
+    if (relativePath.empty()) {
+        snprintf(directoryPath, sizeof(directoryPath), "%s", path);
+    }
+    else {
+        snprintf(directoryPath, sizeof(directoryPath), "%s%s/", path, relativePath.c_str());
+    }
+
+    dir_t entry;
+
+    if (dir_findfirst(directoryPath, &entry) != 0) {
+        return;
+    }
+
+    bool hasROMs = false;
+    std::vector<std::string> subdirectoryNames;
+
+    // Finished before searching any subdirectory, so only one listing is open
+    // at a time
     do {
         if (entry.d_type == DT_DIR) {
-            if (entry.d_name[0] != '.') {
+            if (depth > 0 && entry.d_name[0] != '.') {
                 subdirectoryNames.push_back(entry.d_name);
             }
         }
-        else if (!rootHasROMs && ROMFile::hasROMExtension(entry.d_name)) {
-            rootHasROMs = true;
+        else if (!hasROMs && ROMFile::hasROMExtension(entry.d_name)) {
+            hasROMs = true;
         }
-    } while (dir_findnext(path, &entry) == 0);
+    } while (dir_findnext(directoryPath, &entry) == 0);
+
+    if (hasROMs) {
+        directoryPaths.push_back(relativePath);
+    }
 
     std::sort(subdirectoryNames.begin(), subdirectoryNames.end(), [](const std::string& a, const std::string& b) {
         return strcasecmp(a.c_str(), b.c_str()) < 0;
     });
 
-    if (rootHasROMs) {
-        romDirectoryPaths.push_back("");
-    }
-
     for (const std::string& subdirectoryName : subdirectoryNames) {
-        char subdirectoryPath[512];
-        snprintf(subdirectoryPath, sizeof(subdirectoryPath), "%s%s/", path, subdirectoryName.c_str());
+        std::string subdirectoryPath = relativePath.empty()
+            ? subdirectoryName
+            : relativePath + "/" + subdirectoryName;
 
-        if (dir_findfirst(subdirectoryPath, &entry) != 0) {
-            continue;
-        }
-
-        bool hasROMs = false;
-
-        do {
-            if (!hasROMs && entry.d_type != DT_DIR && ROMFile::hasROMExtension(entry.d_name)) {
-                hasROMs = true;
-            }
-        } while (dir_findnext(subdirectoryPath, &entry) == 0);
-
-        if (hasROMs) {
-            romDirectoryPaths.push_back(subdirectoryName);
-        }
+        findROMDirectories(subdirectoryPath, depth - 1, directoryPaths);
     }
-
-    debugf("[GameLibrary] Found %i ROM folders in %s\n", romDirectoryPaths.size(), path);
-
-    return romDirectoryPaths;
 }
 
 void GameLibrary::warmClusterOffsets() {
@@ -839,10 +847,14 @@ void GameLibrary::loadM64Files() {
     debugf("[GameLibrary] Loaded %i Speedrun Games\n", speedrunGames.size());
 }
 
-bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint32_t sampleCount) {
+bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint32_t sampleCount, uint32_t controllerCount) {
+    // Each sample is one input word per controller. An M64 holds 1 to 4, and
+    // the payload clamps to the same range, so this only guards a bad readback.
+    controllerCount = std::clamp(controllerCount, (uint32_t)1, (uint32_t)4);
+
     // The payload only ever records into the 0x80600000-0x80700000 table, so
     // clamp a count that would run past it rather than trusting it
-    sampleCount = std::min(sampleCount, (uint32_t)(MiB(1) / sizeof(uint32_t)));
+    sampleCount = std::min(sampleCount, (uint32_t)(MiB(1) / (sizeof(uint32_t) * controllerCount)));
 
     if (sampleCount == 0) {
         return false;
@@ -884,10 +896,12 @@ bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint
     header.version         = __builtin_bswap32(3);
     header.viFrames        = __builtin_bswap32(sampleCount);
     header.fps             = (game.romFile.tvType() == BOOT_TV_TYPE_PAL) ? 50 : 60;
-    header.controllerCount = 1;
+    header.controllerCount = (uint8_t)controllerCount;
     header.inputSamples    = __builtin_bswap32(sampleCount);
     header.startType       = __builtin_bswap16(2);
-    header.controllerFlags = __builtin_bswap32(1);
+    // Bits 0-3: controllers 1-4 present. The payload records ports in order
+    // from the first, so they're the lowest bits.
+    header.controllerFlags = __builtin_bswap32((1u << controllerCount) - 1);
     header.romCRC32        = game.romFile.crc1;
     header.countryCode     = __builtin_bswap16((uint16_t)game.romFile.regionCode);
     header.extAuthorship   = M64File::WONDERMENU;
@@ -901,7 +915,7 @@ bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint
     const uint32_t chunkSize = KiB(16);
     uint8_t* buffer = (uint8_t*)malloc_uncached(chunkSize);
 
-    uint32_t remaining = sampleCount * sizeof(uint32_t);
+    uint32_t remaining = sampleCount * controllerCount * sizeof(uint32_t);
     uint32_t offset = 0;
 
     while (success && remaining > 0) {
@@ -921,7 +935,7 @@ bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint
         success = false;
     }
 
-    debugf("[GameLibrary] %s %s (%lu samples)\n", success ? "Wrote" : "Failed to write", filePath, sampleCount);
+    debugf("[GameLibrary] %s %s (%lu samples, %lu controllers)\n", success ? "Wrote" : "Failed to write", filePath, sampleCount, controllerCount);
 
     return success;
 }

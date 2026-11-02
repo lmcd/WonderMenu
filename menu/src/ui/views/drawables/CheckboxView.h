@@ -7,7 +7,9 @@
 
 #include <libdragon.h>
 #include <algorithm>
+#include <optional>
 
+#include "ui/Theme.h"
 #include "ui/View.h"
 
 struct CheckboxView : public Drawable {
@@ -16,12 +18,9 @@ private:
     
     inline static sprite_t* sprite = nullptr;
 
-    static constexpr Color DEFAULT_FILL_COLOR = Color((uint8_t)(255 * 0.45f));
-    static constexpr Color DEFAULT_CHECK_COLOR = Color(255);
-
     bool lastIsOn = false;
 
-    void renderCheckbox(const RenderInfo& renderInfo);
+    void renderCheckbox(const RenderInfo& renderInfo, std::optional<bool>& modeIsOpaque);
 
 public:
     const char* name() const override { return "CheckboxView"; }
@@ -30,19 +29,25 @@ public:
     static void renderGroup(const RenderInfo& renderInfo, Range&& views) {
         uploadSprite();
 
+        std::optional<bool> modeIsOpaque;
+
         for (CheckboxView& view : views) {
-            view.renderCheckbox(renderInfo);
+            view.renderCheckbox(renderInfo, modeIsOpaque);
 
             if (!view.finalIsHidden) {
                 view.finishRender(renderInfo.bufferIndex);
             }
         }
+
+        if (modeIsOpaque.has_value()) {
+            rdpq_mode_pop();
+        }
     }
 
     bool isOn = false;
-    Color onFillColor = Color(2, 163, 238);
-    Color offFillColor = DEFAULT_FILL_COLOR;
-    Color checkColor = DEFAULT_CHECK_COLOR;
+    Color onFillColor = Theme::checkboxOnFillColor;
+    Color offFillColor = Theme::checkboxOffFillColor;
+    Color checkColor = Theme::checkboxCheckColor;
     bool isRadio = false;
 
     CheckboxView();

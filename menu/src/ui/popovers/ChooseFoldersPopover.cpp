@@ -4,6 +4,8 @@
 */
 
 #include "ChooseFoldersPopover.h"
+#include "ui/Theme.h"
+#include "util/Color.h"
 
 ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<std::string>& paths)
     : Popover<FolderRowView, std::vector<std::string>>(baseScene) {
@@ -17,7 +19,7 @@ ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<s
 
     messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
     messageLabel.align = ALIGN_CENTER;
-    messageLabel.textColor = Color(140);
+    messageLabel.textColor = Theme::popoverMessageColor;
     messageLabel.setString("%i $07ROM folders found!\nWhich would you like to use?", paths.size());
 
     folderEntries.reserve(paths.size());

@@ -8,6 +8,9 @@
 #include "ui/popovers/AlertPopover.h"
 #include "ui/views/drawables/LabelView.h"
 
+/**
+ * Popover to confirm/reject importing a speedrun.
+ */
 class SpeedrunImportPopover : public AlertPopover {
 public:
     const char* name() override { return "SpeedrunImportPopover"; }

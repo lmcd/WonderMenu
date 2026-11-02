@@ -15,6 +15,7 @@
 #include "ui/views/drawables/Cart3DView.h"
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/ProgressBarView.h"
+#include "util/Vec3.h"
 
 #define HOUR_ANGLE(hour) hour * (2.0f * T3D_PI / 12.0f)
 
@@ -74,6 +75,7 @@ public:
     GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database);
 
     Vec3f rotationForFrame(int frameNumber);
+    Vec3f rotationForLaunch();
 
     /**
      * Run one frame's worth of background work: streaming the ROM into the

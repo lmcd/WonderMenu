@@ -125,6 +125,8 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
     setPrimitiveColor(alphaColor);
 	setBlendColor(finalBlendColor);
 
+    // The previous flag in the group may still be drawing with TILE1
+    rdpq_sync_tile();
     setTileRect(TILE1, spriteRect);
 
 	drawTexturedRect(TILE0, drawRect, spriteRect);
@@ -138,6 +140,9 @@ void FlagView::renderIcon(const RenderInfo& renderInfo) {
         // and half Japanese flag.
         if (regionCode == RegionCode::ALL) {
             spriteRect.origin.x = 10;
+
+            // The first half is still drawing with TILE1
+            rdpq_sync_tile();
             setTileRect(TILE1, spriteRect);
         }
 

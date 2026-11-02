@@ -33,4 +33,12 @@ struct Size {
     Size operator*(float scalar) const;
     Size operator+(const Size& other) const;
     Size operator-(const Size& other) const;
+
+    bool operator==(const Size& other) const {
+        return width == other.width && height == other.height;
+    }
+
+    bool operator!=(const Size& other) const {
+        return !(*this == other);
+    }
 };

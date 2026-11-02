@@ -147,13 +147,7 @@ void boot (boot_params_t *params) {
     cpu_io_write(&PI->SR, PI_SR_CLR_INTR | PI_SR_RESET);
     while ((cpu_io_read(&VI->CURR_LINE) & ~(VI_CURR_LINE_FIELD)) != 0);
 
-    /* Blank the DAC before disturbing anything else about the video state. We
-       are at the top of a field here, so the field that starts now is entirely
-       black, rather than showing the menu's framebuffer scanned out through the
-       cleared H_LIMITS below -- which is one visibly corrupt frame. The game
-       programs VI from scratch, so there is nothing here worth preserving. */
     cpu_io_write(&VI->CR, 0);
-
     cpu_io_write(&VI->V_INTR, 0x3FF);
     cpu_io_write(&VI->H_LIMITS, 0);
     cpu_io_write(&VI->CURR_LINE, 0);

@@ -7,17 +7,21 @@
 
 #include <libdragon.h>
 #include <t3d/t3d.h>
+#include <unistd.h>
 
 #include "ui/RenderInfo.h"
 #include "ui/Scene.h"
+#include "ui/Theme.h"
 #include "util/Color.h"
 #include "util/Rect.h"
+#include "utils/utils.h"
 
 SceneRenderer::SceneRenderer(Scene* initialScene) : currentScene(initialScene), hasEnded(false), frameNumber(0) {
     sceneStack.reserve(5);
     sceneFrameNumberStack.reserve(5);
 
     rootView.frame = sceneRect();
+    rootView.backgroundColor = Theme::backgroundColor;
 
     if (currentScene) {
         currentScene->setSceneRenderer(this);
@@ -114,6 +118,7 @@ void SceneRenderer::begin() {
     // Setup the render mode
     // Only set this once, as we're pushing/popping the render mode where needed so it doesn't get corrupted
     rdpq_set_mode_standard();
+    rdpq_mode_antialias(AA_REDUCED);
 
     while (!hasEnded) {
         // Render current scene
@@ -171,12 +176,30 @@ void SceneRenderer::render(int frameNumber) {
     //         heap_stats_t heapStats;
     //         sys_get_heap_stats(&heapStats);
 
-    //         debugf("%s FPS: %i | %.5fMB | %08d | %s\n", dot, fps, heapStats.used / 1000000.0f, frameNumber, currentScene ? currentScene->name() : "(no scene)");
+    //         // How far the heap reaches, used or not: where it ends, and its size
+    //         // from the end of BSS, where it starts
+    //         extern char __bss_end[];
+    //         char* heapEnd = (char*)sbrk(0);
+
+    //         // The most the heap can reach without an Expansion Pak: up to the
+    //         // 64 KiB stack at the top of 4 MiB, as libdragon lays it out
+    //         char* heapLimit4MiB = (char*)0x80000000 + MiB(4) - KiB(64);
+    //         float percentOf4MiB = 100.0f * (heapEnd - __bss_end) / (float)(heapLimit4MiB - __bss_end);
+
+    //         // if (fps < 60) {
+    //             debugf("%s FPS: %i | %.5fMB | heap %.5fMB (%.1f%% of 4MiB max) | %08d | %s\n", dot, fps, heapStats.used / 1000000.0f,
+    //                 (heapEnd - __bss_end) / 1000000.0f, percentOf4MiB,
+    //                 frameNumber, currentScene ? currentScene->name() : "(no scene)");
+    //         // }
     //     }
     // }
     
+    // A nested render loop (e.g. a modal popover) must only start a frame once
+    // the enclosing one has been detached
+    assertf(!rdpq_is_attached(), "Frame started while attached");
+
     if (currentScene) {
-        int bufferIndex = (frameNumber % BUFF_COUNT);
+        int bufferIndex = (frameNumber % FRAMEBUFFER_COUNT);
 
         RenderInfo renderInfo = {
             frameNumber,
@@ -188,7 +211,9 @@ void SceneRenderer::render(int frameNumber) {
         currentScene->updateViews(renderInfo);
         rootView.updateRecursive(renderInfo);
         
-        rdpq_attach(display_get(), NULL);
+        lastSurface = display_get();
+
+        rdpq_attach(lastSurface, NULL);
         rdpq_mode_zbuf(false, false);
 
         rootView.clearRecursive(renderInfo);

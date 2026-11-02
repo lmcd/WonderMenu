@@ -62,18 +62,14 @@ struct __attribute__((packed)) SpeedrunEntry {
 struct SpeedrunDatabase {
     // The fixed-size part that precedes the groups and entries. Read first, so the
     // counts in it say how many of each follow.
-    static constexpr size_t HEADER_SIZE = (sizeof(uint32_t) * 4) + (sizeof(uint8_t) * 4);
+    static constexpr size_t HEADER_SIZE = (sizeof(uint32_t) * 5) + (sizeof(uint8_t) * 4);
 
     // Size: 4
     uint32_t gameCRC1 = 0;
     // Size: 4
-    uint32_t currentFrameAddress = 0;
+    uint32_t reserved1 = 0;
     // Size: 4
-    uint32_t controllerWriteAddress = 0;
-    // Size: 4
-    uint32_t controllerReadAddress = 0;
-    // Size: 1
-    int8_t frameDelayOffset = 0;
+    uint32_t reserved2 = 0;
 
     std::vector<SpeedrunGroup> groups;
     std::vector<SpeedrunEntry> entries;
@@ -82,13 +78,10 @@ struct SpeedrunDatabase {
     // Serializes to a flat byte array in big-endian.
     // Layout:
     //   uint32_t gameCRC1
-    //   uint32_t currentFrameAddress
-    //   uint32_t controllerWriteAddress
-    //   uint32_t controllerReadAddress
-    //   int8_t   frameDelayOffset
+    //   uint32_t reserved1
+    //   uint32_t reserved2
     //   uint8_t  groupCount
     //   uint8_t  speedrunCount
-    //   uint8_t  reserved
     //   SpeedrunGroup[groupCount]    { char title[50] }
     //   SpeedrunEntry[speedrunCount] { u32 m64CRC, u8 groupIndex, u32 timeInMilliseconds, bool isWorldRecord, char authors[222] }
     std::vector<uint8_t> serialize() const;
@@ -105,5 +98,5 @@ struct SpeedrunDatabase {
     #endif
 };
 
-static_assert(SpeedrunDatabase::HEADER_SIZE == 20,
-    "The speedrun database header must be 20 bytes");
+static_assert(SpeedrunDatabase::HEADER_SIZE == 24,
+    "The speedrun database header must be 24 bytes");

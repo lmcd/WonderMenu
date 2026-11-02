@@ -17,6 +17,7 @@
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/rows/CheatRowView.h"
 
+class Game;
 struct CheatDatabase;
 
 /**
@@ -48,6 +49,7 @@ private:
     };
 
     CheatDatabase* cheatsDatabase;
+    Game* game;
 
     // Flat list of currently visible items (re-built on expand/collapse)
     std::vector<RowInfo> rows;
@@ -61,6 +63,22 @@ private:
 
     InputWatcher aButtonWatcher;
 
+    /**
+     * Set when anything the row views display has changed (rows rebuilt, a
+     * cheat toggled, a group expanded/collapsed), so they get re-populated.
+     * Formatting the subtitles is too expensive to repeat every frame.
+     */
+    bool needsRowViewUpdate = true;
+
+    // The table's scroll position and visible row count when the row views were
+    // last populated. A change in either shifts which row maps to which view.
+    int lastScrollPosition = -1;
+    int lastVisibleRowCount = -1;
+
+    /**
+     * Populate the visible row views from `rows`.
+     */
+    void updateRowViews();
     void rebuildRows();
     void buildRowsForGroup(uint16_t baseGroupIndex, uint16_t parentRowIndex, uint8_t indent);
     uint8_t countEnabledCheatsForGroup(uint16_t groupIndex);
@@ -71,7 +89,7 @@ private:
 public:
     const char* name() override { return "CheatsScene"; }
 
-    CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase = nullptr);
+    CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game* game);
     ~CheatsScene();
 
     void updateViews(const RenderInfo& renderInfo) override;

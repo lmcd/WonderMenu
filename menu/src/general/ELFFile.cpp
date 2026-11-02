@@ -5,6 +5,10 @@
 
 #include "ELFFile.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+
 // From loader.c in libdragon
 #define PF_N64_COMPRESSED 0x1000
 
@@ -16,7 +20,10 @@ bool ELFFile::exists() {
     return (romAddress() != 0);
 }
 
-void ELFFile::stage() {
+void ELFFile::copyCode(uint8_t* image, uint32_t capacity) {
+    imageBase = 0;
+    imageSize = 0;
+
     if (!is_memory_expanded()) {
         debugf("[ELFFile] Expansion Pak required to load ELF payloads\n");
         return;
@@ -66,7 +73,12 @@ void ELFFile::stage() {
 
     Elf32_Phdr segment;
 
+    // The image starts at the lowest segment, besides the exception-vectors
+    // placeholder skipped below
+    uint32_t base = UINT32_MAX;
+
     int loadable = 0;
+    
     for (int i = 0; i < phnum; i++) {
         uint32_t ph = elfBase + phoff + i * sizeof(Elf32_Phdr);
 
@@ -79,12 +91,20 @@ void ELFFile::stage() {
         }
 
         loadable++;
+
+        if (segment.p_memsz != 0 && segment.p_vaddr != 0x80000000) {
+            base = std::min(base, (uint32_t)segment.p_vaddr);
+        }
     }
 
     assertf(
         loadable == 3,
         "Should be 3 PT_LOAD segments. %d found.", loadable
     );
+
+    uint32_t end = base;
+
+    memset(image, 0, capacity);
 
     for (int i = 0; i < phnum; i++) {
         uint32_t ph = elfBase + phoff + i * sizeof(Elf32_Phdr);
@@ -128,20 +148,27 @@ void ELFFile::stage() {
             i, vaddr, filesz, memsz
         );
 
-        void* dst = (void *)vaddr;
+        // Into the image, at the segment's offset from the base. Its BSS is
+        // already zero, from the memset above.
+        assertf(
+            vaddr >= base && vaddr + memsz <= base + capacity,
+            "Segment %d (0x%08lx, 0x%lx bytes) is outside the 0x%lx byte image at 0x%08lx",
+            i, vaddr, memsz, capacity, base
+        );
+
+        void* dst = image + (vaddr - base);
         data_cache_hit_writeback_invalidate(dst, memsz);   /* before DMA */
         uint32_t length = (filesz + 1) & ~1u;
-        
+
         if (length) {
             dma_read(dst, elfBase + offset, length);
         }
 
-        if (memsz > filesz) {
-            memset(UncachedAddr((uint8_t *)dst + filesz), 0, memsz - filesz);
-        }
-        
-        inst_cache_hit_invalidate(dst, memsz);
+        end = std::max(end, vaddr + memsz);
     }
 
-    debugf("[ELFFile] Loaded Payload at 0x%08lx\n", entry);
+    imageBase = base;
+    imageSize = end - base;
+
+    debugf("[ELFFile] Loaded payload image (0x%lx bytes for 0x%08lx)\n", imageSize, imageBase);
 }

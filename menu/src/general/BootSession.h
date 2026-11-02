@@ -5,23 +5,28 @@
 
 #pragma once
 
+#include <cstdint>
+#include <libcart/cart.h>
 #include <libdragon.h>
 #include <cstddef>
 #include <vector>
-#include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <string>
 
+#include "../../shared/src/PayloadData.h"
 #include "boot/boot.h"
+#include "dso/game_state_abi.h"
 #include "flashcart/flashcart.h"
 #include "general/CheatDatabase.h"
+#include "general/ELFFile.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
+#include "general/GameDSO.h"
 #include "general/M64File.h"
 #include "general/SceneStates.h"
-#include "general/SpeedrunDatabase.h"
 #include "general/WarmResetState.h"
-#include "../../shared/src/PayloadData.h"
+#include "utils/utils.h"
 
 #define MAX_CHEAT_CODES (64)
 #define MAX_CHEAT_CODE_ARRAYLIST_SIZE (MAX_CHEAT_CODES * 2 + 2)
@@ -30,6 +35,10 @@
 // includes this header, so the declaration there comes too late to be of use.
 extern WarmResetState warmResetState;
 
+// Where the payload's image waits between load() and placeCode(). Static, so it's
+// in the menu's BSS, below anything the heap or the payload can reach.
+#define PAYLOAD_MAX_SIZE KiB(16)
+
 struct BootSession {
     Game* game;
     M64File* m64File;
@@ -37,14 +46,33 @@ struct BootSession {
 
     bool hasStagedFirstMB = false;
 
+    // Held here until launch() stages the payload and writes it into
+    // `PayloadData`, which staging would otherwise overwrite
+    bool isRecording = false;
+
+    // Loaded by IntroScene, and placed by launch()
+    ELFFile payloadFile = ELFFile("payload.elf.stripped");
+
     // `PayloadData` lives at the start of the expansion pak's upper 4 MiB.
     PayloadData* payloadData = (PayloadData*)PAYLOAD_ADDRESS;
     SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
     GameInfo* gameInfo = &payloadData->gameInfo;
 
+    alignas(16) static inline uint8_t payloadImage[PAYLOAD_MAX_SIZE];
+    // The game's state_write and state_frame_delay, copied out of its DSO by
+    // loadDSO() and placed after the payload by launch(). Static for the same
+    // reason as makeCheatList()'s list. 0 bytes when the game has no DSO, or
+    // (state_frame_delay only) when it doesn't define one.
+    alignas(16) static inline uint8_t stateWriteImage[GAME_STATE_WRITE_MAX_SIZE] = {};
+    uint32_t stateWriteSize = 0;
+    alignas(16) static inline uint8_t stateFrameDelayImage[GAME_STATE_FRAME_DELAY_MAX_SIZE] = {};
+    uint32_t stateFrameDelaySize = 0;
+
+    // Static rather than on the heap: the heap reaches into the Expansion Pak,
+    // where staging the payload in launch() could overwrite it
     uint32_t* makeCheatList() {
-        uint32_t tempCheatItems[MAX_CHEAT_CODE_ARRAYLIST_SIZE];
+        static uint32_t tempCheatItems[MAX_CHEAT_CODE_ARRAYLIST_SIZE];
         size_t itemCount = 0;
 
         debugf("[BootSession] Loading %i user cheats\n", cheatCodes.size());
@@ -53,7 +81,12 @@ struct BootSession {
             tempCheatItems[itemCount++] = cheatCode.address;
             tempCheatItems[itemCount++] = (uint32_t)cheatCode.value;
 
-            if (itemCount == MAX_CHEAT_CODES) {
+            // Two words a code, so the list holds MAX_CHEAT_CODES codes, plus
+            // the terminating pair
+            if (itemCount >= MAX_CHEAT_CODES * 2) {
+                debugf("[BootSession] Cheat limit reached: %u codes dropped\n",
+                    (unsigned)(cheatCodes.size() - (itemCount / 2)));
+
                 goto cheatLimitReached;
             }
         }
@@ -64,21 +97,9 @@ cheatLimitReached:
             tempCheatItems[itemCount++] = 0;
             tempCheatItems[itemCount++] = 0;
 
-            // Allocate memory for the cheats array.
-            uint32_t* cheats = (uint32_t*)malloc(itemCount * sizeof(uint32_t));
+            debugf("Cheats enabled, %u cheats found\n", itemCount / 2);
 
-            if (cheats) {
-                memcpy(cheats, tempCheatItems, itemCount * sizeof(uint32_t));
-
-                debugf("Cheats enabled, %u cheats found\n", itemCount / 2);
-
-                return cheats;
-            }
-            else {
-                debugf("Failed to allocate memory for cheat list\n");
-
-                return nullptr;
-            }
+            return tempCheatItems;
         }
         else {
             debugf("Cheats enabled, but no cheats found\n");
@@ -92,14 +113,74 @@ cheatLimitReached:
         CheatsState& cheatsState = gameInfoState.cheatsState;
 
         m64File = nullptr;
+        isRecording = false;
         cheatCodes.clear();
 
-        if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
-            SpeedrunDatabase* speedrunDatabase = database.loadSpeedrunDatabase(game->databaseEntry);
+        CheatDatabase* cheatsDatabase = database.loadCheatDatabase(game->databaseEntry);
 
+        // Adds a cheat's codes. For multiple choice cheats, every wildcard
+        // code's value comes from the chosen option (the codes themselves
+        // only hold the wildcard zeroed out); -1 when there's no choice.
+        // valueOverride, when not -1, replaces every code's value instead --
+        // e.g. a hook ID for the JAL hook codes in an osViSwapBuffer group.
+        auto addCheatCodes = [&](uint16_t cheatIndex, int16_t multipleChoiceIndex = -1, int32_t valueOverride = -1) {
+            const Cheat& cheat = cheatsDatabase->cheats[cheatIndex];
+
+            uint16_t codesEnd = cheat.codesStartIndex + cheat.codesCount;
+
+            for (uint16_t codeIndex = cheat.codesStartIndex; codeIndex < codesEnd; codeIndex++) {
+                const CheatCode& code = cheatsDatabase->codes[codeIndex];
+
+                uint16_t value = code.value;
+
+                if (valueOverride != -1) {
+                    value = (uint16_t)valueOverride;
+                }
+                else if (multipleChoiceIndex != -1 && code.wildcardIndex > 0) {
+                    const CheatWildcardOption& wildcardOption =
+                        cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + multipleChoiceIndex];
+
+                    value = wildcardOption.values[code.wildcardIndex - 1];
+                }
+
+                debugf("[BootSession] Added cheat code: %08lX %04X\n", (unsigned long)code.address, value);
+
+                cheatCodes.push_back({code.address, value});
+            }
+        };
+
+        // Adds the codes of every cheat in groups of the given type, with
+        // valueOverride as above. Nothing when the game has no cheat database.
+        auto addCheatGroup = [&](CheatGroupType type, int32_t valueOverride = -1) {
+            if (cheatsDatabase == nullptr) {
+                return;
+            }
+
+            for (uint16_t cheatIndex : cheatsDatabase->cheatIndexesForGroupType(type)) {
+                addCheatCodes(cheatIndex, -1, valueOverride);
+            }
+        };
+
+        // The game's REQUIRED cheats (e.g. an enabler code) go first, as the
+        // selected cheats don't work without them
+        addCheatGroup(CHEAT_GROUP_REQUIRED);
+
+        CheatCode nmiHandlerCheatCode = {0xBE400240, 0x0000};
+        CheatCode jalHandlerCheatCode = {0xBB400260, 0x0000};
+
+        if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
             if (speedrunsState.isRecording) {
-                cheatCodes.push_back({0xBE400240, 0x0000}); // NMI-reset handler
-                cheatCodes.push_back({0xBD400250, 0x0000}); // M64-write
+                // NMI-reset handler
+                cheatCodes.push_back(nmiHandlerCheatCode);
+
+                // Show record icon
+                addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_RECORD_ICON);
+
+                // Increment frame number
+                addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
+
+                // Write controller state to expansion pak
+                addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_WRITE_M64_INPUTS);
             }
             else {
                 for (M64File* candidate : game->m64Files) {
@@ -110,47 +191,36 @@ cheatLimitReached:
                 }
 
                 if (m64File != nullptr) {
-                    cheatCodes.push_back({0xBD400248, 0x0000}); // M64-read
+                    // Show play icon
+                    addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_PLAY_ICON);
+
+                    // Increment frame number
+                    addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
+
+                    // Read controller state from expansion pak
+                    addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_READ_M64_INPUTS);
                 }
             }
 
-            speedrunSettings->controllerWriteAddress = speedrunDatabase->controllerWriteAddress;
-            speedrunSettings->controllerReadAddress = speedrunDatabase->controllerReadAddress;
-            speedrunSettings->currentFrameAddress = speedrunDatabase->currentFrameAddress;
-            speedrunSettings->frameDelayOffset = speedrunDatabase->frameDelayOffset;
-            speedrunSettings->isRecording = speedrunsState.isRecording;
+            isRecording = speedrunsState.isRecording;
         }
-        else {
-            CheatDatabase* cheatsDatabase = database.loadCheatDatabase(game->databaseEntry);
-
+        else if (cheatsDatabase != nullptr && cheatsState.enabledCheatIndexes.size() > 0) {
             for (int cheatIndex : cheatsState.enabledCheatIndexes) {
-                const Cheat& cheat = cheatsDatabase->cheats[cheatIndex];
-
-                uint16_t codesEnd = cheat.codesStartIndex + cheat.codesCount;
-
                 const uint16_t* option = cheatsState.multipleChoiceIndexes.find(cheatIndex);
 
-                // For multiple choice cheats, every wildcard code's value comes from the
-                // chosen option (the codes themselves only hold the wildcard zeroed out).
-                int16_t multipleChoiceIndex = option ? (int16_t)*option : -1;
-
-                for (uint16_t codeIndex = cheat.codesStartIndex; codeIndex < codesEnd; codeIndex++) {
-                    const CheatCode& code = cheatsDatabase->codes[codeIndex];
-
-                    uint16_t value = code.value;
-
-                    if (multipleChoiceIndex != -1 && code.wildcardIndex > 0) {
-                        const CheatWildcardOption& wildcardOption =
-                            cheatsDatabase->wildcardOptions[cheat.wildcardStartIndex + multipleChoiceIndex];
-
-                        value = wildcardOption.values[code.wildcardIndex - 1];
-                    }
-
-                    debugf("[BootSession] Added cheat code: %08lX %04X\n", (unsigned long)code.address, value);
-
-                    cheatCodes.push_back({code.address, value});
-                }
+                addCheatCodes(cheatIndex, option ? (int16_t)*option : -1);
             }
+        }
+
+        // JAL hooks (e.g. the REQUIRED group's screenshot hooks) go through
+        // the payload's jal_hook_entry slot, and are skipped without it
+        bool hasJALHooks = std::any_of(cheatCodes.begin(), cheatCodes.end(), [](const CheatCode& code) {
+            return (code.address >> 24) == 0xBC;
+        });
+
+        if (hasJALHooks) {
+            // First, so it survives makeCheatList() dropping codes past its limit
+            cheatCodes.insert(cheatCodes.begin(), jalHandlerCheatCode);
         }
     }
 
@@ -169,7 +239,11 @@ cheatLimitReached:
             return;
         }
 
-        if (speedrunSettings->isRecording) {
+        if (isRecording) {
+            return;
+        }
+
+        if (game->databaseEntry == nullptr) {
             return;
         }
 
@@ -185,40 +259,123 @@ cheatLimitReached:
         flashcart_load_save(saveFilePath.data(), saveType);
     }
 
+    void loadPayload() {
+        payloadFile.copyCode(payloadImage, sizeof(payloadImage));
+    }
+
+    /**
+     * Copies state_write and state_frame_delay out of the game's state DSO
+     * (rom:/state/<code>.dso, <code> being the cart ID in lowercase, e.g. "sm"
+     * for NSME), for launch() to place after the payload.
+     */
+    void loadDSO() {
+        stateWriteSize = 0;
+        stateFrameDelaySize = 0;
+
+        // Closed on return: only the copy is needed from here on
+        GameDSO dso;
+
+        if (!dso.open(game->romFile.uniqueID)) {
+            return;
+        }
+
+        stateWriteSize = dso.copyCode(GAME_STATE_WRITE_SYMBOL, stateWriteImage, sizeof(stateWriteImage));
+
+        if (stateWriteSize == 0) {
+            debugf("[BootSession] State DSO has no usable state_write\n");
+            return;
+        }
+
+        // Optional: most games show the frame they've just drawn
+        stateFrameDelaySize = dso.copyCode(GAME_STATE_FRAME_DELAY_SYMBOL, stateFrameDelayImage, sizeof(stateFrameDelayImage));
+
+        debugf("[BootSession] Loaded state_write (%lu bytes) and state_frame_delay (%lu bytes)\n",
+            (unsigned long)stateWriteSize, (unsigned long)stateFrameDelaySize);
+    }
+
+    /**
+     * Copies `size` bytes of code to `address`, so it can be run from there.
+     */
+    static void placeCode(uint32_t address, const uint8_t* image, uint32_t size) {
+        void* dst = (void*)address;
+
+        // Through the cache, as ELFFile::place() does, then out to RDRAM and
+        // out of the I-cache, since it's run as code
+        memcpy(dst, image, size);
+
+        data_cache_hit_writeback_invalidate(dst, size);
+        inst_cache_hit_invalidate(dst, size);
+    }
+
+    void placePayload() {
+        placeCode(payloadFile.imageBase, payloadImage, payloadFile.imageSize);
+    }
+
+    /**
+     * Copies loadDSO()'s state_write to just past the payload's image, and its
+     * state_frame_delay just past that, and returns where, for
+     * `PayloadData::dsoSymbols`. 0 for each there's nothing to place. Call
+     * after the payload is placed.
+     */
+    DSOSymbols placeDSOSymbols() {
+        DSOSymbols symbols;
+
+        uint32_t payloadEnd = payloadFile.imageEnd();
+
+        if (payloadEnd == 0) {
+            return symbols;
+        }
+
+        uint32_t currentSymbolAddress = ALIGN(payloadEnd, 16);
+
+        if (stateWriteSize != 0) {
+            placeCode(currentSymbolAddress, stateWriteImage, stateWriteSize);
+            symbols.state_write = currentSymbolAddress;
+
+            debugf("[BootSession] Placed state_write at 0x%08lx\n", (unsigned long)currentSymbolAddress);
+        }
+
+        currentSymbolAddress = ALIGN(currentSymbolAddress + stateWriteSize, 16);
+
+        if (stateFrameDelaySize != 0) {
+            placeCode(currentSymbolAddress, stateFrameDelayImage, stateFrameDelaySize);
+            symbols.state_frame_delay = currentSymbolAddress;
+
+            debugf("[BootSession] Placed state_frame_delay at 0x%08lx\n", (unsigned long)currentSymbolAddress);
+        }
+
+        return symbols;
+    }
+
+    void commitToLaunch() {
+        if (!is_memory_expanded()) {
+            return;
+        }
+
+        // Load payload.
+        // Requires DFS to still be intact.
+        loadPayload();
+        
+        // Load game DSO.
+        // Requires DFS to still be intact.
+        loadDSO();
+    }
+
     void launch() {
         uint32_t* cheatList = nullptr;
 
-        warmResetState.write();
-
-        if (is_memory_expanded()) {
-            // Boot params the resident payload needs. Written through the uncached
-            // PayloadData pointer so they land in RDRAM and survive the game boot's
-            // cache invalidation. osInfo layout matches the cheat engine's O_OSINFO.
-            payloadData->memSize = __boot_memsize;
-            payloadData->osInfo  = ((__boot_tvtype      & 0xff) << 16)
-                                 | ((sys_reset_type()   & 0xff) <<  8)
-                                 | ((__boot_consoletype & 0xff) <<  0);
-            
-            gameInfo->romSize     = game->romFile.size;
-            gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
-            gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
-            gameInfo->region      = (uint8_t)game->romFile.regionCode;
-            gameInfo->version     = game->romFile.version;
-
-            screenshotSettings->nextNumber   = 0;
-            screenshotSettings->showOverlay  = true;
-            screenshotSettings->overlayDelay = 32;
-            screenshotSettings->writeOffset  = 0;
-
-            cheatList = makeCheatList();
+        // Make sure we're not writing into an area occupied by game code.
+        if (game->romFile.size < MiB(64)) {
+            // Write state that can be retrieved again after a 'warm' reset,
+            // via the RESET button.
+            warmResetState.write();
         }
 
-        boot_params.cheat_list = cheatList;
         boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
         boot_params.tv_type = game->romFile.tvType();
         boot_params.detect_cic_seed = true;
         boot_params.rom_staged_in_memory = hasStagedFirstMB;
-        
+
         if (game->databaseEntry != nullptr) {
             boot_params.detect_cic_type = false;
             boot_params.cic_type = (cic_type_t)game->databaseEntry->cicType;
@@ -227,9 +384,71 @@ cheatLimitReached:
             boot_params.detect_cic_type = true;
         }
 
+        bool canUseExpansionPak = (is_memory_expanded() && !game->requiresExpansionPak());
+
+        if (canUseExpansionPak) {
+            // Construct `GameInfo` here, before the payload is written into
+            // memory, which may erase things on the heap, such as `game`.
+            GameInfo stagedGameInfo = {};
+            stagedGameInfo.romSize     = game->romFile.size;
+            stagedGameInfo.uniqueID[0] = game->romFile.uniqueID[0];
+            stagedGameInfo.uniqueID[1] = game->romFile.uniqueID[1];
+            stagedGameInfo.region      = (uint8_t)game->romFile.regionCode;
+            stagedGameInfo.version     = game->romFile.version;
+
+            // The M64 file is on the heap too
+            uint8_t controllerCount = (m64File != nullptr) ? m64File->controllerCount : 1;
+
+            // A recording takes every port up to the last controller plugged in,
+            // as an M64's samples hold ports in order from the first
+            if (isRecording) {
+                for (int port = 0; port < JOYPAD_PORT_COUNT; port++) {
+                    if (joypad_is_connected((joypad_port_t)port)) {
+                        controllerCount = (uint8_t)(port + 1);
+                    }
+                }
+            }
+            uint32_t sampleCount = (m64File != nullptr) ? m64File->sampleCount : 0;
+
+            if (m64File != nullptr) {
+                debugf("[BootSession] M64 %s: %lu bytes, %u controllers, %lu samples\n",
+                    m64File->filename.c_str(), (unsigned long)m64File->size,
+                    (unsigned)controllerCount, (unsigned long)sampleCount);
+            }
+
+            cheatList = makeCheatList();
+
+            // Place payload into Expansion Pak memory.
+            placePayload();
+
+            // Place game DSO into Expansio Pak memory. 
+            DSOSymbols dsoSymbols = placeDSOSymbols();
+
+            // Boot params the resident payload needs, written after staging,
+            // which zeroes them. Written through the uncached PayloadData
+            // pointer so they land in RDRAM and survive the game boot's cache
+            // invalidation. memSize places the payload's stack (resume.S).
+            payloadData->memSize = __boot_memsize;
+            payloadData->cardType = cart_type;
+            payloadData->dsoSymbols = dsoSymbols;
+
+            *gameInfo = stagedGameInfo;
+
+            screenshotSettings->nextNumber   = 0;
+            screenshotSettings->showOverlay  = true;
+            screenshotSettings->overlayDelay = 32;
+            screenshotSettings->writeOffset  = 0;
+
+            speedrunSettings->isRecording = isRecording;
+            speedrunSettings->controllerCount = controllerCount;
+            speedrunSettings->sampleCount = sampleCount;
+        }
+
+        boot_params.cheat_list = cheatList;
+
         // Boot into the selected game.
-        // At this point, the game has already been loaded elsewhere from the
-        // SD card and is already sitting in cart SDRAM.
+        // At this point, the ROM has already been fully loaded into cart,
+        // SDRAM, and is ready to boot.
         boot(&boot_params);
     }
 };

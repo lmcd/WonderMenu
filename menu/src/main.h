@@ -8,10 +8,9 @@
 #include <cstdint>
 
 #include "general/BootSession.h"
+#include "general/CartAllocator.h"
 #include "general/WarmResetState.h"
 
-uint32_t get_rom_size(void);
-uint32_t get_entry_point(void);
-
 extern BootSession bootSession;
+extern CartAllocator cartAllocator;
 extern WarmResetState warmResetState;

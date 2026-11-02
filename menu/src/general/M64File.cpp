@@ -92,6 +92,14 @@ bool M64File::loadHeader() {
     romCRC = headerBuffer.romCRC32;
     countryCode = headerBuffer.countryCode;
     authoringProgram = headerBuffer.extAuthorship;
+    controllerCount = headerBuffer.controllerCount;
+
+    // After the header, each sample is one 4-byte input per controller
+    int dataSize = (int)size - (int)sizeof(headerBuffer);
+    int bytesPerSample = 4 * std::max<int>(controllerCount, 1);
+
+    sampleCount = (dataSize > 0) ? (uint32_t)(dataSize / bytesPerSample) : 0;
+
     memcpy(author, &headerBuffer.author, sizeof(headerBuffer.author));
     author[sizeof(author) - 1] = '\0';
 

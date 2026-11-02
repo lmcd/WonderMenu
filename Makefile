@@ -59,24 +59,24 @@ menu: $(MENU_PAYLOAD_DEP)
 .PHONY: menu
 
 # Pass-throughs to menu/, but gated on a current payload asset first, so a
-# release ROM can never embed a stale payload.elf.stripped. `deploy` picks
+# release ROM can never embed a stale payload.elf.stripped. `console` picks
 # this up transitively via its `release` prerequisite.
 release release-bundle sc64: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu $@
 .PHONY: release release-bundle sc64
 
-# --- hardware --------------------------------------------------------------
+# --- console ---------------------------------------------------------------
 
 SC64DEPLOYER     ?= sc64deployer
 MENU_RELEASE_ROM  = menu/WonderMenu-release.z64
 
 # Build the release ROM, then push it to a connected SummerCart64.
-deploy: release
-	@command -v $(SC64DEPLOYER) >/dev/null || { echo "deploy: $(SC64DEPLOYER) not found in PATH"; exit 1; }
+console: release
+	@command -v $(SC64DEPLOYER) >/dev/null || { echo "console: $(SC64DEPLOYER) not found in PATH"; exit 1; }
 	@echo "    [SC64] upload $(MENU_RELEASE_ROM)"
 	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_RELEASE_ROM)" --direct
 	$(SC64DEPLOYER) debug
-.PHONY: deploy
+.PHONY: console
 
 # --- emulator --------------------------------------------------------------
 
@@ -86,11 +86,11 @@ MENU_ROM = menu/WonderMenu.z64
 # Build the ROM, then boot it in ares. Invoked via the binary inside the bundle
 # rather than `open -a` so that ares takes the ROM path as an argument and its
 # stdout/stderr stay attached to this terminal.
-launch-emu: all
-	@test -x "$(ARES)" || { echo "launch-emu: ares not found at $(ARES)"; exit 1; }
+emu: all
+	@test -x "$(ARES)" || { echo "emu: ares not found at $(ARES)"; exit 1; }
 	@echo "    [ARES] $(MENU_ROM)"
 	"$(ARES)" "$(CURDIR)/$(MENU_ROM)"
-.PHONY: launch-emu
+.PHONY: emu
 
 # --- housekeeping ----------------------------------------------------------
 

@@ -13,11 +13,11 @@
 
 #include "animation/Transition.h"
 #include "general/BootSession.h"
-#include "general/ELFFile.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 #include "general/GameLibrary.h"
 #include "ui/Fonts.h"
+#include "ui/Theme.h"
 #include "ui/popovers/ChooseFoldersPopover.h"
 #include "ui/popovers/ScreenshotsImportPopover.h"
 #include "ui/popovers/SpeedrunImportPopover.h"
@@ -55,7 +55,7 @@ void IntroScene::didBeginScene(SceneEntry) {
 }
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
-    rectView.fillColor = Color::BLACK;
+    rectView.fillColor = Theme::backgroundColor;
     rectView.frame = renderInfo.screenRect;
     rectView.usesMultipliedOpacity = false;
 
@@ -63,6 +63,7 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 
     imageView.sprite = logoSprite;
     imageView.frame = imageSize.centeredIn(view.frame);
+    imageView.isHidden = (popoverTransitionProgress > 0);
 
     labelView.frame.origin = Vec2(0, 458);
     labelView.maxWidth = view.frame.size.width;
@@ -79,7 +80,13 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
     bool hasWarmResetState = warmResetState.didRestore;
     Game* lastLaunchedGame = gameLibrary->lastLaunchedGame;
 
-    if (updateInfo.sceneFrameNumber == 2 && !hasWarmResetState) {
+    bool showsWelcomeText = !hasWarmResetState;
+
+    #ifdef NDEBUG
+    showsWelcomeText = false;
+    #endif
+
+    if (updateInfo.sceneFrameNumber == 2 && showsWelcomeText) {
         seconds = measure([&] {
             FILE* introFile = fopen("rom:/WonderMenu.txt", "rb");
 
@@ -120,7 +127,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         // If no cache existed, present the user with a choice of folders to
         // load ROMs from
         if (!gameLibrary->loadCache()) {
-            std::vector<std::string> folderPaths = gameLibrary->findROMDirectories();
+            std::vector<std::string> folderPaths = gameLibrary->findROMDirectories(2);
 
             labelView.setString("Press Start to Continue");
             auto chosenFolders = presentPopover<ChooseFoldersPopover>(folderPaths);
@@ -150,18 +157,6 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
     }
 
     if (updateInfo.sceneFrameNumber == 7) {
-        seconds = measure([&] {
-            ELFFile payloadFile("payload.elf.stripped");
-
-            // We have to do this here for now
-            payloadFile.stage();
-        });
-        totalSeconds += seconds;
-
-        debugf("[IntroScene] Loaded Payload: %.3fs\n", seconds);
-    }
-
-    if (updateInfo.sceneFrameNumber == 8) {
         // The import below hands the game to `ScreenshotsImportScene`, so both
         // halves have to be there before any of it runs.
         if (hasWarmResetState && lastLaunchedGame != nullptr) {
@@ -198,27 +193,31 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                     ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(*this, *lastLaunchedGame, count, *screenshotsReader);
                     pushScene(screenshotsImportScene);
                 }
+                else {
+                    delete screenshotsReader;
+                }
             }
             else if (magic == ROM_SPEEDRUN_MAGIC) {
                 // Dirty the magic so the same recording isn't written again
                 io_write(baseReadOffset, 0);
 
-                uint32_t count = io_read(baseReadOffset + 4);
+                uint32_t count = io_read(baseReadOffset + ROM_SPEEDRUN_FRAME_COUNT_OFFSET);
+                uint32_t controllerCount = io_read(baseReadOffset + ROM_SPEEDRUN_CONTROLLER_COUNT_OFFSET);
 
                 auto result = presentPopover<SpeedrunImportPopover>();
 
                 if (result.value == 0) {
-                    debugf("[IntroScene] %li M64 Frames Found\n", count);
+                    debugf("[IntroScene] %li M64 Frames Found (%lu controllers)\n", count, controllerCount);
 
                     labelView.setString("Processing Speedrun");
 
-                    gameLibrary->writeRecordedSpeedrun(*lastLaunchedGame, baseReadOffset + 8, count);
+                    gameLibrary->writeRecordedSpeedrun(*lastLaunchedGame, baseReadOffset + ROM_SPEEDRUN_INPUTS_OFFSET, count, controllerCount);
                 }
             }
         }
     }
 
-    if (updateInfo.sceneFrameNumber == 9) {
+    if (updateInfo.sceneFrameNumber == 8) {
         seconds = measure([&] {
             gameLibrary->loadM64Files();
         });
@@ -227,7 +226,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         debugf("[IntroScene] Loaded M64 Files: %.3fs\n", seconds);
     }
 
-    if (updateInfo.sceneFrameNumber >= 10) {
+    if (updateInfo.sceneFrameNumber >= 9) {
         ListScene* listScene;
 
         seconds = measure([&] {

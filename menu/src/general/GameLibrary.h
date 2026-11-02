@@ -67,6 +67,11 @@ private:
         return (uint8_t)std::min(romDirectoryPaths.size(), (size_t)MAX_NUMBER_OF_DIRECTORIES);
     }
 
+    // Adds `relativePath` (relative to `path`, empty for the root) to
+    // `directoryPaths` if it holds ROMs, then searches its subdirectories down
+    // to `depth` more levels
+    void findROMDirectories(const std::string& relativePath, int depth, std::vector<std::string>& directoryPaths);
+
 public:
     GameDatabase& database;
 
@@ -131,13 +136,20 @@ public:
      * Write the inputs the payload recorded into cart SDRAM out to a new .m64
      * file in the speedruns directory.
      */
-    bool writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint32_t sampleCount);
+    bool writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint32_t sampleCount, uint32_t controllerCount);
 
     /**
      * Traverse the filesystem looking for directories that contain at least
-     * one file with a valid ROM file extension, starting in `path`
+     * one file with a valid ROM file extension, starting in `path`.
+     *
+     * @param depth How many levels of subdirectories below `path` to search.
+     *              0 searches only `path` itself, 1 also its immediate
+     *              subdirectories, and so on.
+     * @return The directories relative to `path`, with no trailing slash
+     *         ("" for `path` itself, "A/B" for a nested one). Each directory
+     *         comes before its subdirectories, and siblings are sorted.
      */
-    std::vector<std::string> findROMDirectories();
+    std::vector<std::string> findROMDirectories(int depth = 1);
 
     void addToRecents(GameGroup gameGroup);
 

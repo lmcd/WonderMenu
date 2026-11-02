@@ -8,10 +8,12 @@
 #include <algorithm>
 #include <concepts>
 #include <ranges>
+#include <span>
 
 #include "animation/TimingFunctions.h"
 #include "animation/Transition.h"
 #include "general/InputRepeater.h"
+#include "ui/Theme.h"
 #include "ui/View.h"
 #include "ui/views/BaseRowView.h"
 #include "ui/views/SelectedRowView.h"
@@ -26,9 +28,9 @@ struct TableView : public View {
     static constexpr int ROW_SPACING        = 2;
     static constexpr int MAXIMUM_LOADED_ROW_VIEWS = 20;
 
-    static constexpr Color DEFAULT_SELECTION_COLOR = Color{35};
-    static constexpr Color DEFAULT_HIGHLIGHT_COLOR = Color{50};
-    static constexpr Color DEFAULT_BACKGROUND_COLOR = Color{17};
+    static constexpr Color DEFAULT_SELECTION_COLOR = Color(35);
+    static constexpr Color DEFAULT_HIGHLIGHT_COLOR = Color(50);
+    static constexpr Color DEFAULT_BACKGROUND_COLOR = Color(17);
 
     bool isADown = false;
     
@@ -167,7 +169,7 @@ struct TableView : public View {
 
         // TODO: this is a hack for now to address compositing issues
         if (isHidden) {
-            selectedRowView.backgroundColor = Color::BLACK;
+            selectedRowView.backgroundColor = Color::CLEAR;
         }
         else {
             selectedRowView.backgroundColor = drawsBackground ? DEFAULT_BACKGROUND_COLOR : Color::CLEAR;
@@ -223,19 +225,30 @@ struct TableView : public View {
             scissorBottom - scissorTop
         );
 
-        for (int i = 0; i < visibleRowCount(); i++) {
-            bool needsScissor = rowIsInExpandingGroup(i);
+        // Rows are rendered in up to three runs: before, inside, and after the
+        // expanding group. Only the group needs scissoring, and each run is
+        // rendered as one group so shared sprites are uploaded once per run
+        // rather than once per row.
+        int visibleCount = visibleRowCount();
+        int groupStart = std::clamp(expandStartIndex, 0, visibleCount);
+        int groupEnd   = std::clamp(expandStartIndex + expandRowCount, groupStart, visibleCount);
 
-            if (needsScissor) {
-                pushScissor(groupScissorRect);
-            }
+        renderRows(renderInfo, 0, groupStart);
 
-            rowViews[i].render(renderInfo);
-
-            if (needsScissor) {
-                popScissor();
-            }
+        if (groupEnd > groupStart) {
+            pushScissor(groupScissorRect);
+            renderRows(renderInfo, groupStart, groupEnd);
+            popScissor();
         }
+
+        renderRows(renderInfo, groupEnd, visibleCount);
+    }
+
+    void renderRows(const RenderInfo& renderInfo, int startIndex, int endIndex) {
+        auto rows = std::span(rowViews).subspan(startIndex, endIndex - startIndex)
+            | std::views::filter([&](RV& rowView) { return rowView.isVisible(renderInfo); });
+
+        RV::renderGroup(renderInfo, rows);
     }
 
     auto visibleIndexRange() {

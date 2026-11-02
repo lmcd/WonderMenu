@@ -30,6 +30,9 @@ N64_CFLAGS += -MP
 N64_CXXFLAGS += -MP
 N64_ASFLAGS += -MP
 
+# N64_CFLAGS   += -DNDEBUG
+# N64_CXXFLAGS += -DNDEBUG
+
 MKSPRITE_FLAGS=
 
 PROJECT_NAME=WonderMenu
@@ -56,7 +59,8 @@ src = $(wildcard src/*.cpp) \
 	  $(wildcard src/ui/views/drawables/*.cpp) \
 	  $(wildcard src/ui/views/rows/*.cpp) \
       $(wildcard src/util/*.cpp) \
-      $(wildcard src/utils/*.c)
+      $(wildcard src/utils/*.c) \
+      $(wildcard libdragon/*.c)
 
 assets_png =. $(wildcard assets/ui/*.png) \
 			  $(wildcard assets/ui/tab-control/*.png) \
@@ -168,11 +172,22 @@ objs = $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(src))) \
        $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(src))) \
        $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(src)))
 
-$(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv)
-$(BUILD_DIR)/$(PROJECT_NAME).elf: $(objs)
+# Per-game state DSOs (filesystem/state/<code>.dso), packed into the DFS
+include src/dso/dso.mk
+
+$(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv) $(GAME_STATE_DSOS)
+$(BUILD_DIR)/$(PROJECT_NAME).elf: $(objs) $(BUILD_DIR)/$(PROJECT_NAME).externs
+
+# The symbols DSOs import from the menu (e.g. a memset the compiler emitted).
+# n64.mk links the ELF with this so they're kept, and limits the msym to them;
+# without it the msym holds every global symbol in the menu (~100 KB).
+$(BUILD_DIR)/$(PROJECT_NAME).externs: $(GAME_STATE_DSOS)
+
+# The menu's symbol table, so dlopen can resolve those imports
+$(BUILD_DIR)/$(PROJECT_NAME).msym: $(BUILD_DIR)/$(PROJECT_NAME).elf $(BUILD_DIR)/$(PROJECT_NAME).externs
 
 $(PROJECT_NAME).z64: N64_ROM_TITLE="WonderMenu"
-$(PROJECT_NAME).z64: $(BUILD_DIR)/$(PROJECT_NAME).dfs
+$(PROJECT_NAME).z64: $(BUILD_DIR)/$(PROJECT_NAME).dfs $(BUILD_DIR)/$(PROJECT_NAME).msym
 
 rom-with-size: $(PROJECT_NAME).z64
 	@python3 -c "import os,struct; p='$<'; s=os.path.getsize(p); \

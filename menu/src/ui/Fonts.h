@@ -8,6 +8,8 @@
 #include <libdragon.h>
 #include <cstdio>
 
+#include "../libdragon/rdpq_font_load.h"
+
 namespace Fonts {
     constexpr int INTERDISPLAY_MEDIUM_14          = 7;
     constexpr int INTERDISPLAY_BOLD_14            = 8;
@@ -27,7 +29,7 @@ namespace Fonts {
 
         snprintf(path, sizeof(path), "rom:/fonts/%s-%i.font64", filename, pointSize);
 
-        rdpq_text_register_font(index, rdpq_font_load(path));
+        rdpq_text_register_font(index, rdpq_font_load2(path));
     }
 
     /**

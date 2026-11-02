@@ -84,6 +84,8 @@ struct M64File {
     uint32_t crc;
     uint16_t countryCode;
     AuthoringProgram authoringProgram;
+    uint8_t controllerCount;
+    uint32_t sampleCount;
 
     char author[222];
 

@@ -11,6 +11,9 @@
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/ScreenshotThumbnailView.h"
 
+/**
+ * Popover to confirm/reject importing screenshots.
+ */
 class ScreenshotsImportPopover : public AlertPopover {
 public:
     const char* name() override { return "ScreenshotsImportPopover"; }

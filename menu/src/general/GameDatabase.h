@@ -6,6 +6,7 @@
 #pragma once
 
 #include "utils/utils.h"
+#include <cstdint>
 #ifdef N64
 #include <libdragon.h>
 #include <fatfs/ff.h>
@@ -13,6 +14,7 @@ extern "C" {
 #include "utils/fs.h"
 }
 #endif
+#include <cstddef>
 #include <cstring>
 #include <vector>
 #include <unordered_map>
@@ -84,18 +86,7 @@ constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
 /**
  * Spare bytes padded to the end of every entry.
  */
-constexpr size_t DB_ENTRY_RESERVED_LENGTH = 6;
-
-/**
- * Size in bytes of each game entry in the database
- */
-constexpr size_t DB_ENTRY_SIZE = DB_ENTRY_TITLE_LENGTH + DB_ENTRY_DEVELOPER_LENGTH + 4 + 1 + 1 + 2 + 2 + 4 + 4
-                               + DB_ENTRY_RESERVED_LENGTH;
-
-static_assert(DB_ENTRY_SIZE == 120, "DB_ENTRY_SIZE must stay at 120 bytes");
-
-// Every entry must begin on a 2-byte boundary, which single-entry PI DMA requires
-static_assert(DB_ENTRY_SIZE % 2 == 0, "DB_ENTRY_SIZE must stay even for PI DMA");
+constexpr size_t DB_ENTRY_RESERVED_LENGTH = 5;
 
 // TODO: don't hardcode
 constexpr int DB_ENTRIES_START_OFFSET = 5224;
@@ -141,12 +132,15 @@ public:
         // 0xFFFFFFFF = no speedruns
         uint32_t speedrunsByteOffset;
 
+        bool requiresExpansionPak;
+
         // Spare room for fields added later
         uint8_t reserved[DB_ENTRY_RESERVED_LENGTH];
 
-        // Not imported from .db file:
+        // Not imported from .db file (DB_ENTRY_SIZE ends here):
 
         uint32_t labelTileCluster = 0;
+        uint32_t largeLabelTileCluster = 0;
         uint32_t cheatsCluster = 0;
         uint16_t entryIndex;
 
@@ -280,3 +274,14 @@ public:
      */
     SpeedrunDatabase* loadSpeedrunDatabase(Entry* entry);
 };
+
+/**
+ * Size in bytes of each game entry in the database: the fields of `Entry` that
+ * are imported from the .db file
+ */
+constexpr size_t DB_ENTRY_SIZE = offsetof(GameDatabase::Entry, labelTileCluster);
+
+static_assert(DB_ENTRY_SIZE == 120, "DB_ENTRY_SIZE must stay at 120 bytes");
+
+// Every entry must begin on a 2-byte boundary, which single-entry PI DMA requires
+static_assert(DB_ENTRY_SIZE % 2 == 0, "DB_ENTRY_SIZE must stay even for PI DMA");

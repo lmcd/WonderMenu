@@ -78,13 +78,14 @@ enum GameInfoTab : uint8_t {
 
 struct GameInfoState {
     uint16_t gameID;
+    bool romIsLoaded = false;
     GameInfoTab currentTab = TAB_CHEATS;
 
     CheatsState cheatsState;
     SpeedrunsState speedrunsState;
 
-
     void clear() {
+        romIsLoaded = false;
         currentTab = TAB_CHEATS;
         cheatsState.clear();
         speedrunsState.clear();

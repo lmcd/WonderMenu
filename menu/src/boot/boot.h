@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "cic.h"
+#include "../utils/utils.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,8 +25,8 @@ extern "C" {
  * game wants at its entry point. Anything staging the game on IPL3's behalf has
  * to skip them, so both sides of that contract read the offset from here.
  */
-#define GAME_LOAD_ROM_OFFSET (0x1000)
-#define GAME_LOAD_SIZE       (0x100000)
+#define GAME_LOAD_ROM_OFFSET KiB(4)
+#define GAME_LOAD_SIZE       MiB(1)
 
 /**
  * @brief Where the game's first MiB is staged in RDRAM ahead of an HLE boot.

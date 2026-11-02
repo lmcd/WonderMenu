@@ -5,6 +5,8 @@
 
 #include "CheatRowView.h"
 
+#include "ui/Theme.h"
+
 CheatRowView::CheatRowView() {
     titleView.maxWidth = 300;
     titleView.fontID = FONT_ID;
@@ -24,13 +26,10 @@ CheatRowView::CheatRowView() {
 void CheatRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
-    Color titleColor = Color::WHITE;
-    titleColor.a *= 0.85f;
+    Color titleColor = Theme::labelColor;
+    Color subtitleColor = Theme::secondaryLabelColor;
 
     Color selectedTitleColor = Color::WHITE;
-
-    Color subtitleColor = Color::WHITE;
-    subtitleColor.a *= 0.35f;
     
     Color selectedSubtitleColor = Color::WHITE;
     selectedSubtitleColor.a *= 0.50f;

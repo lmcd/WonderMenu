@@ -21,7 +21,7 @@ ScreenshotsImportPopover::ScreenshotsImportPopover(Scene* baseScene, Screenshots
 
     messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
     messageLabel.align = ALIGN_CENTER;
-    messageLabel.textColor = Color(140);
+    messageLabel.textColor = Theme::popoverMessageColor;
     messageLabel.setString("%i $07screenshots found!\nWould you like to save them?", reader->count);
 }
 

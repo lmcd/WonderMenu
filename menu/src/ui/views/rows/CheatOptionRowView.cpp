@@ -5,6 +5,8 @@
 
 #include "CheatOptionRowView.h"
 
+#include "ui/Theme.h"
+
 CheatOptionRowView::CheatOptionRowView() {
     titleView.fontID = FONT_ID;
     titleView.align = ALIGN_LEFT;
@@ -16,8 +18,7 @@ CheatOptionRowView::CheatOptionRowView() {
 void CheatOptionRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
-    Color titleColor = Color::WHITE;
-    titleColor.a *= 0.85f;
+    Color titleColor = Theme::labelColor;
 
     Color selectedTitleColor = Color::WHITE;
     

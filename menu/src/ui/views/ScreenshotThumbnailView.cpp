@@ -7,6 +7,7 @@
 #include <malloc.h>
 
 #include "ScreenshotThumbnailView.h"
+#include "utils/utils.h"
 
 static constexpr size_t SPRITE_HEADER_OFFSET = (64 - (sizeof(sprite_t) % 64)) % 64;
 
@@ -15,9 +16,12 @@ ScreenshotThumbnailView::ScreenshotThumbnailView() {
 
     imageView1.scaleMode = ImageView::ASPECT_FILL;
     imageView1.opacity = 1.0;
+    imageView1.ignoresTextureAlpha = true;
 
     imageView2.scaleMode = ImageView::ASPECT_FILL;
     imageView2.opacity = 0.5;
+    imageView2.ignoresTextureAlpha = true;
+    imageView2.isOpaque = false;
 
     borderView.isSmooth = true;
     borderView.color = Color::WHITE;
@@ -43,7 +47,13 @@ sprite_t* ScreenshotThumbnailView::createScaledSprite(const surface_t* sourceSur
     int stride = width * 2;
     int size   = stride * height;
 
-    void* allocation = memalign(64, SPRITE_HEADER_OFFSET + sizeof(sprite_t) + size);
+    // Rounded up to whole 16-byte cache lines, so nothing else on the heap
+    // shares the last line with the pixels. If it did, the CPU touching that
+    // neighbour (e.g. the next allocation's header) would pull the line into the
+    // cache with stale pixels, and write them back over the RDP's later on.
+    size_t allocationSize = ALIGN(SPRITE_HEADER_OFFSET + sizeof(sprite_t) + size, 16);
+
+    void* allocation = memalign(64, allocationSize);
     sprite_t* sprite = (sprite_t*)((uint8_t*)allocation + SPRITE_HEADER_OFFSET);
 
     memset(sprite, 0, sizeof(sprite_t));
@@ -52,6 +62,13 @@ sprite_t* ScreenshotThumbnailView::createScaledSprite(const surface_t* sourceSur
     sprite->flags   = FMT_RGBA16 & SPRITE_FLAGS_TEXFORMAT;
     sprite->hslices = 1;
     sprite->vslices = 1;
+
+    // The RDP writes the pixels straight to RDRAM, bypassing the data cache.
+    // memalign() can return memory that's still dirty in the cache from its
+    // previous use, and those stale lines would later be written back over the
+    // rendered pixels (corrupting the thumbnail saved to the SD card). So write
+    // the header back, and drop every cached line over the allocation first.
+    data_cache_hit_writeback_invalidate(allocation, allocationSize);
 
     // Surface backed by the sprite's own pixels, so rendering into the surface
     // fills the sprite directly -- no intermediate buffer or copy.
@@ -64,10 +81,17 @@ sprite_t* ScreenshotThumbnailView::createScaledSprite(const surface_t* sourceSur
     // source into TMEM-sized chunks.
     params.filtering = true;
 
+    // Attaching doesn't save the render mode, and the scene renderer only sets
+    // its base mode once, so push/pop to keep bilinear filtering from leaking
+    // into everything drawn afterwards
     rdpq_attach_clear(&target, NULL);
+
+    rdpq_mode_push();
         rdpq_set_mode_standard();
         rdpq_mode_filter(FILTER_BILINEAR);
         rdpq_tex_blit(sourceSurface, 0, 0, &params);
+    rdpq_mode_pop();
+    
     rdpq_detach();
 
     return sprite;

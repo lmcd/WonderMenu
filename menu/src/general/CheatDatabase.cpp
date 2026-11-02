@@ -27,6 +27,17 @@ static void setTitle(char* dest, size_t destSize, const std::string& src) {
     dest[destSize - 1] = '\0';
 }
 
+// Groups with one of these reserved titles hold codes the menu applies itself,
+// rather than cheats offered to the user
+static CheatGroupType groupTypeForTitle(const std::string& title) {
+    if (title == "REQUIRED")            return CHEAT_GROUP_REQUIRED;
+    if (title == "osViSwapBuffer")      return CHEAT_GROUP_osViSwapBuffer;
+    if (title == "osSpTaskLoad")        return CHEAT_GROUP_osSpTaskLoad;
+    if (title == "osContGetReadData")   return CHEAT_GROUP_osContGetReadData;
+    if (title == "osContStartReadData") return CHEAT_GROUP_osContStartReadData;
+
+    return CHEAT_GROUP_USER_SELECTABLE;
+}
 
 static void writeU16BE(std::vector<uint8_t>& out, uint16_t v) {
     out.push_back((v >> 8) & 0xFF);
@@ -269,6 +280,13 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             std::string cheatTitle = groupSegments.back();
             groupSegments.pop_back();
 
+            // A top-level cheat with a reserved title (e.g. "$osViSwapBuffer")
+            // holds codes the menu applies itself. Give it a group of the same
+            // name, which is what carries the type.
+            if (groupSegments.empty() && groupTypeForTitle(cheatTitle) != CHEAT_GROUP_USER_SELECTABLE) {
+                groupSegments.push_back(cheatTitle);
+            }
+
             // Find longest common prefix with current stack
             size_t common = 0;
             while (common < groupSegments.size() && common < stack.size()
@@ -417,6 +435,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             size_t childGroup = nextGroupIdx++;
             nodeToGroup[it.ref] = childGroup;
             setTitle(groups[childGroup].title, sizeof(groups[childGroup].title), nodes[it.ref].name);
+            groups[childGroup].cheatGroupType = groupTypeForTitle(nodes[it.ref].name);
             if (groups[g].groupCount == 0)
                 groups[g].groupStartIndex = (uint16_t)childGroup;
             groups[g].groupCount++;
@@ -471,6 +490,7 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
         writeU16BE(out, group.cheatCount);
         writeU16BE(out, group.groupStartIndex);
         writeU16BE(out, group.groupCount);
+        out.push_back(group.cheatGroupType);
     }
 
     for (const auto& cheat : cheats) {
@@ -497,6 +517,34 @@ std::vector<uint8_t> CheatDatabase::serialize() const {
     return out;
 }
 #endif
+
+std::vector<uint16_t> CheatDatabase::cheatIndexesForGroupType(CheatGroupType type) const {
+    // A group's cheat span covers its whole sub-tree, so a matching group nested
+    // in another would list the same cheats twice
+    std::vector<bool> isIncluded(cheats.size(), false);
+
+    for (const CheatGroup& group : groups) {
+        if (group.cheatGroupType != type) {
+            continue;
+        }
+
+        uint16_t cheatEnd = group.cheatStartIndex + group.cheatCount;
+
+        for (uint16_t cheatIndex = group.cheatStartIndex; cheatIndex < cheatEnd && cheatIndex < cheats.size(); cheatIndex++) {
+            isIncluded[cheatIndex] = true;
+        }
+    }
+
+    std::vector<uint16_t> cheatIndexes;
+
+    for (size_t cheatIndex = 0; cheatIndex < isIncluded.size(); cheatIndex++) {
+        if (isIncluded[cheatIndex]) {
+            cheatIndexes.push_back((uint16_t)cheatIndex);
+        }
+    }
+
+    return cheatIndexes;
+}
 
 void CheatDatabase::printGroupContents(size_t groupIdx, const std::string& prefix) const
 {

@@ -59,14 +59,24 @@ void GameInfoTransitionScene::updateViews(const RenderInfo& renderInfo) {
     float yOffset = std::lerp(renderInfo.screenRect.size.height, 0, value);
 
     gameInfoScene->contentYOffset = yOffset;
+    gameInfoScene->isAnimatingOut = (transition.direction == Transition::BACKWARDS);
     gameInfoScene->tabControlView.opacity = opacityIn;
     gameInfoScene->scrollbarView.opacity = opacityIn;
 
     gameLaunchScene->updateViews(renderInfo);
     gameInfoScene->updateViews(renderInfo);
 
-    gameLaunchScene->cart3DView.intensity = opacityOut;
-    gameLaunchScene->labelView.opacity = opacityOut;
+    if (transition.progress > 0.25) {
+        // Cheaper antialiasing while the cheats UI is also being drawn
+        gameLaunchScene->cart3DView.flags |= CART_RENDER_REDUCED_AA;
+
+        if (transition.progress > 0.75) {
+            gameLaunchScene->cart3DView.isHidden = true;
+        }
+        else {
+            gameLaunchScene->cart3DView.isHidden = false;
+        }
+    }
 
     View* mainContentView = gameInfoScene->mainContentView;
     bool needsScissor = (mainContentView != nullptr);
@@ -78,6 +88,15 @@ void GameInfoTransitionScene::updateViews(const RenderInfo& renderInfo) {
         scissorRect.size.height = std::min(screenRect.size.height, worldFrame.origin.y);
 
         gameLaunchScene->view.scissorRect = scissorRect;
+    }
+
+    gameLaunchScene->cart3DView.intensity = opacityOut;
+    gameLaunchScene->labelView.opacity = opacityOut;
+
+    if (transition.progress > 0.25) {
+        // HACK: hidden for the whole animation, as the scissor stops it
+        // being redrawn (or cleared) once the content rises over it
+        gameLaunchScene->labelView.isHidden = true;
     }
 }
 
@@ -96,14 +115,14 @@ void GameInfoTransitionScene::update(const UpdateInfo& updateInfo) {
     if (transition.didReachBeginning()) {
         isFinishedCount++;
 
-        if (isFinishedCount == BUFF_COUNT) {
+        if (isFinishedCount == FRAMEBUFFER_COUNT) {
             popScene();
         }
     }
     else if (transition.didReachEnd()) {
         isFinishedCount++;
 
-        if (isFinishedCount == BUFF_COUNT) {
+        if (isFinishedCount == FRAMEBUFFER_COUNT) {
             pushScene(gameInfoScene);
         }
     }

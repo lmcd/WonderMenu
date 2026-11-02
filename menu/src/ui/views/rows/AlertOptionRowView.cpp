@@ -5,6 +5,8 @@
 
 #include "AlertOptionRowView.h"
 
+#include "ui/Theme.h"
+
 AlertOptionRowView::AlertOptionRowView() {
     titleView.fontID = FONT_ID;
     titleView.align = ALIGN_CENTER;
@@ -15,7 +17,7 @@ AlertOptionRowView::AlertOptionRowView() {
 void AlertOptionRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
-    Color destructiveColor = Color(255, 13, 13);
+    Color destructiveColor = Theme::destructiveLabelColor;
 
     Color titleColor = isDestructive ? destructiveColor : Color::WHITE;
     titleColor.a *= 0.85f;

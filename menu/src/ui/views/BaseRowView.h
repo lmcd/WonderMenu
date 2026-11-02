@@ -17,6 +17,18 @@ private:
 public:
     static constexpr int FONT_ID = Fonts::INTERDISPLAY_SEMIBOLD_15;
 
+    /**
+     * Fallback for rows with no shared sprites: render each row in turn.
+     * Rows with sprite-backed subviews shadow this with their own
+     * `renderGroup`, so each sprite is uploaded once for the whole group.
+     */
+    template<typename Range>
+    static void renderGroup(const RenderInfo& renderInfo, Range&& views) {
+        for (BaseRowView& view : views) {
+            view.render(renderInfo);
+        }
+    }
+
     bool isExpanded = false;
     bool isSelected = false;
     bool isDown = false;
@@ -52,14 +64,17 @@ public:
         }
     }
 
-    void render(const RenderInfo& renderInfo) {
-        if (finalIsHidden) {
-            return;
-        }
+    /**
+     * Rows that are hidden, or scrolled off the top or bottom of the display,
+     * have nothing to contribute, so are skipped rather than clipping every
+     * subview
+     */
+    bool isVisible(const RenderInfo& renderInfo) const {
+        return !finalIsHidden && finalFrame.intersects(renderInfo.screenRect);
+    }
 
-        // Rows scrolled off the top or bottom of the display have nothing to
-        // contribute, so skip them rather than clipping every subview
-        if (!finalFrame.intersects(renderInfo.screenRect)) {
+    void render(const RenderInfo& renderInfo) {
+        if (!isVisible(renderInfo)) {
             return;
         }
 

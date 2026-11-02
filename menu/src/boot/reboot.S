@@ -53,6 +53,14 @@
 # The DMA engine addresses RDRAM with the low 24 bits.
 #define RDRAM_ADDRESS_MASK  0x00FFFFFF
 
+# DMEM, uncached, all of which is free scratch on the HLE paths.
+#define DMEM_ADDRESS        0xA4000000
+#define DMEM_SIZE           0x1000
+
+# The end of the base 4 MiB of RDRAM, as the DMA engine addresses it. The
+# Expansion Pak above it holds the cheat patcher and engine, which must survive.
+#define RDRAM_BASE_END      0x00400000
+
 
 .set noat
 .section .text.reboot, "ax", %progbits
@@ -246,6 +254,61 @@ wait_sp_dma:
 
 # Shared tail for both HLE paths: the game is in RDRAM, hand control to it.
 hle_enter_game:
+    # Zero the rest of the base 4 MiB past the loaded game, which otherwise still
+    # holds whatever the menu left there. The RSP's DMA engine writes it out from
+    # a zeroed DMEM, far quicker than CPU stores. Neither HLE path leaves a DMA
+    # in flight, so DMEM is free.
+    li $t4, DMEM_ADDRESS
+    li $t5, DMEM_ADDRESS + DMEM_SIZE
+zero_dmem:
+    sw $zero, 0($t4)
+    addiu $t4, $t4, 4
+    bne $t4, $t5, zero_dmem
+
+    li $t0, SP_ADDRESS
+
+    # From the end of the game's MiB, rounded up to the DMA engine's 8 bytes
+    li $t9, RDRAM_ADDRESS_MASK
+    and $t4, $a2, $t9
+    li $t1, (GAME_LOAD_SIZE + 7)
+    addu $t4, $t4, $t1
+    li $t1, -8
+    and $t4, $t4, $t1
+
+    li $t5, RDRAM_BASE_END
+
+zero_rdram_chunk:
+    sltu $t1, $t4, $t5
+    beqz $t1, zero_rdram_done
+
+    # A whole DMEM's worth at a time, or whatever is left
+    subu $t6, $t5, $t4
+    li $t1, DMEM_SIZE
+    sltu $t7, $t6, $t1
+    bnez $t7, 1f
+    move $t6, $t1
+1:
+
+wait_sp_zero_slot:
+    lw $t1, SP_STATUS($t0)
+    andi $t1, $t1, SP_STATUS_DMA_FULL
+    bnez $t1, wait_sp_zero_slot
+
+    # DMEM -> RDRAM, the engine holding one running and one queued
+    sw $zero, SP_MEM_ADDR($t0)
+    sw $t4, SP_DRAM_ADDR($t0)
+    addiu $t1, $t6, -1
+    sw $t1, SP_WR_LEN($t0)
+
+    addu $t4, $t4, $t6
+    b zero_rdram_chunk
+
+zero_rdram_done:
+wait_sp_zero_dma:
+    lw $t1, SP_STATUS($t0)
+    andi $t1, $t1, SP_STATUS_DMA_BUSY
+    bnez $t1, wait_sp_zero_dma
+
     # The game arrived by DMA, behind both caches. Invalidate them so the
     # freshly loaded code and data are what actually gets executed and read.
     # Dirty lines are discarded rather than written back: everything the boot

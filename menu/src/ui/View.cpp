@@ -4,6 +4,9 @@
 */
 
 #include "ui/View.h"
+#include "ui/Theme.h"
+#include "util/Color.h"
+#include "util/Size.h"
 
 View::~View() {
     if (superview) {
@@ -168,7 +171,7 @@ bool View::isPendingRemoval(const View* view) {
 void View::updateRecursive(const RenderInfo& renderInfo) {
     finalFrame = frame;
 
-    updateSubtree(renderInfo, 1.0f, isHidden, frame.origin);
+    updateSubtree(renderInfo, 1.0f, isHidden, frame.origin, backgroundColor);
 }
 
 void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsOpaque) {
@@ -183,15 +186,16 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
         }
 
         if (subview->backgroundColor.a == 255) {
+            // The subview's background fades with the subview itself, towards
+            // whatever is behind it (not the theme background, which is only
+            // right at the root, and not the superview's opacity, which misses
+            // the subview's own fade)
             finalBlendColor2 = subview->backgroundColor;
+            finalBlendColor2.rgb = finalBlendColor2.rgb.lerpTo(finalBlendColor.rgb, 1.0f - subview->finalOpacity);
+        }
 
-            finalBlendColor2.rgb *= subview->finalOpacity;
-            subview->finalBlendColor   = finalBlendColor2;
-        }
-        else {
-            subview->finalBlendColor = finalBlendColor2;
-        }
-        
+        subview->finalBlendColor = finalBlendColor2;
+
         subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
         subview->finalFrame.origin = finalPosition + subview->frame.origin;
         subview->finalFrame.size   = subview->frame.size;
@@ -210,14 +214,14 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
     }
 }
 
-surface_t View::renderToSurface(const RenderInfo& renderInfo) {
+void View::prepareOffscreenRender(const RenderInfo& renderInfo) {
     // The view is rendered detached from its superview and the rest of the
     // view hierachy, so reset all final render values.
     finalOpacity  = 1.0f;
     finalIsHidden = isHidden;
     finalFrame    = Rect(Vec2::ZERO, frame.size);
     finalIsOpaque = isOpaque;
-    finalBlendColor = (backgroundColor.a == 255) ? backgroundColor : Color::BLACK;
+    finalBlendColor = (backgroundColor.a == 255) ? backgroundColor : Theme::backgroundColor;
 
     update(renderInfo);
 
@@ -229,6 +233,49 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
         finalBlendColor,
         finalIsOpaque
     );
+}
+
+void View::drawOffscreen(const RenderInfo& renderInfo, const surface_t& surface) {
+    setSubtreeNeedsFullRender();
+
+    rdpq_attach(&surface, NULL);
+
+    rdpq_mode_push();
+
+    rdpq_set_mode_fill(Color::BLACK);
+
+    clearSubtree(renderInfo);
+
+    rdpq_mode_pop();
+
+    render(renderInfo);
+
+    rdpq_detach();
+}
+
+Image* View::renderToImage(const RenderInfo& renderInfo) {
+    prepareOffscreenRender(renderInfo);
+
+    Size size = finalFrame.size;
+
+    if (size.width <= 0 || size.height <= 0) {
+        return nullptr;
+    }
+
+    Image* image = new Image(size);
+
+    if (!image->isValid()) {
+        delete image;
+        return nullptr;
+    }
+
+    drawOffscreen(renderInfo, image->surface());
+
+    return image;
+}
+
+surface_t View::renderToSurface(const RenderInfo& renderInfo) {
+    prepareOffscreenRender(renderInfo);
 
     int width  = finalFrame.size.width;
     int height = finalFrame.size.height;
@@ -243,20 +290,7 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
         return (surface_t){};
     }
 
-    setSubtreeNeedsFullRender();
-
-    rdpq_attach(&surface, NULL);
-
-    rdpq_mode_push();
-    rdpq_set_mode_fill(Color::BLACK);
-
-    clearSubtree(renderInfo);
-
-    rdpq_mode_pop();
-
-    render(renderInfo);
-
-    rdpq_detach();
+    drawOffscreen(renderInfo, surface);
 
     return surface;
 }
@@ -336,6 +370,10 @@ void Drawable::setBlendColor(Color color) {
     rdpq_set_blend_color(color);
 }
 
+void Drawable::setEnvironmentColor(Color color) {
+    rdpq_set_env_color(color);
+}
+
 void Drawable::drawFilledRect(Rect rect) {
     rdpq_fill_rectangle(
         rect.minX(),
@@ -352,31 +390,6 @@ void Drawable::drawSprite(sprite_t* sprite, Vec2 position, const rdpq_blitparms_
         position.y,
         params)
     ;
-}
-
-void Drawable::drawTexturedRect(rdpq_tile_t tile, Rect screenRect, Rect spriteRect) {
-    rdpq_texture_rectangle_scaled(
-        tile,
-        screenRect.minX(),
-        screenRect.minY(),
-        screenRect.maxX(),
-        screenRect.maxY(),
-        spriteRect.minX(),
-        spriteRect.minY(),
-        spriteRect.maxX(),
-        spriteRect.maxY()
-    );
-}
-
-void Drawable::drawTexturedRect(rdpq_tile_t tile, Rect rect, int s, int t) {
-    rdpq_texture_rectangle(
-        tile,
-        rect.minX(),
-        rect.minY(),
-        rect.maxX(),
-        rect.maxY(),
-        s, t
-    );
 }
 
 void Drawable::clearRect(const Rect& rect, Color clearColor) {
@@ -410,12 +423,17 @@ void Drawable::clearRect(const Rect& rect, Color clearColor) {
 }
 
 void Drawable::clearDrawnBoxes() {
-    for (int i = 0; i < BUFF_COUNT; i++) {
+    for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
         drawnBoundingBox[i] = Rect();
     }
 }
 
 void Drawable::addPendingRenderRect(int bufferIndex, Rect dirtyRect) {
+    // Nothing to redraw, and rendering it would set an empty scissor
+    if (dirtyRect.size.width <= 0 || dirtyRect.size.height <= 0) {
+        return;
+    }
+
     uint8_t bit = bufferBit(bufferIndex);
 
     renderMask |= bit;
@@ -467,7 +485,7 @@ void Drawable::setNeedsDisplay(Rect dirtyRect) {
         return;
     }
 
-    for (int i = 0; i < BUFF_COUNT; i++) {
+    for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
         addPendingRenderRect(i, dirtyRect);
     }
 }
@@ -475,13 +493,18 @@ void Drawable::setNeedsDisplay(Rect dirtyRect) {
 void Drawable::update(const RenderInfo&) {
     if (finalBlendColor != lastFinalBlendColor) {
         setNeedsRender();
+        setNeedsClear();
         lastFinalBlendColor = finalBlendColor;
     }
 
     if (finalOpacity != lastFinalOpacity) {
         setNeedsRender();
-        setNeedsClear();
+        
         lastFinalOpacity = finalOpacity;
+
+        if (!finalIsOpaque || finalOpacity == 0.0f) {
+            setNeedsClear();
+        }
     }
 
     if (finalIsHidden != lastFinalIsHidden) {

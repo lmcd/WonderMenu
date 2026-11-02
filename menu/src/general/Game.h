@@ -131,6 +131,15 @@ public:
             return romFile.hasHomebrewGameCode();
         }
     }
+
+    bool requiresExpansionPak() {
+        if (databaseEntry != nullptr) {
+            return databaseEntry->requiresExpansionPak;
+        }
+        else {
+            return true;
+        }
+    }
 };
 
 struct GameGroup {

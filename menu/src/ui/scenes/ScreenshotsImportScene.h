@@ -9,6 +9,7 @@
 #include <fatfs/ff.h>
 #include <string>
 
+#include "general/GameDSO.h"
 #include "general/ScreenshotsSDRAMReader.h"
 #include "general/ScreenshotWriter.h"
 #include "ui/Scene.h"
