@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include <libdragon.h>
 
 #include "boot/boot.h"
@@ -81,10 +83,18 @@ class LoadROMToCartWorker : public Worker {
             return (romFile.size + KiB(128) - 1) / KiB(128);
         }
 
-        unsigned int total = (session.sdram_size + session.chunk_size - 1) / session.chunk_size;
-        unsigned int loaded = session.loaded_bytes / session.chunk_size;
+        // Including a session that failed, which closed the file: there's
+        // nothing more it can load.
+        if (session.is_complete || !flashcart_load_rom_session_valid(&session)) {
+            return 0;
+        }
 
-        return loaded >= total ? 0 : (total - loaded);
+        // Covers the flash past the SDRAM portion too, as it's in the ROM size.
+        // At least one while the session is open, whatever's left to round.
+        size_t loaded = std::min((size_t)session.loaded_bytes, session.rom_size);
+        size_t remaining = (session.rom_size - loaded + session.chunk_size - 1) / session.chunk_size;
+
+        return std::max(remaining, (size_t)1);
     }
 
     void doWork() override {
@@ -115,21 +125,6 @@ public:
         beginSession();
 
         flashcart_mark_end_rom_chunks_loaded(&session);
-    }
-
-    /**
-     * Load whatever is left of the ROM in one blocking go, and close the
-     * session. Does nothing if the session was never opened.
-     *
-     * @param progressHandler Invoked as the remaining chunks land, so the caller
-     *                        can keep drawing while the load blocks. Optional.
-     */
-    flashcart_err_t finish(flashcart_progress_callback_t* progressHandler = nullptr) {
-        if (!hasSession) {
-            return FLASHCART_OK;
-        }
-
-        return flashcart_finish_load_rom_session(&session, progressHandler);
     }
 
     int workRemaining() override {
@@ -225,10 +220,11 @@ public:
     }
 
     /**
-     * @see LoadROMToCartWorker::finish
+     * Is the whole ROM on the cart, ready to boot? Needs `loadBeginningChunks`
+     * set to get there.
      */
-    flashcart_err_t finish(flashcart_progress_callback_t* progressHandler = nullptr) {
-        return cartWorker.finish(progressHandler);
+    bool hasLoadedToCart() {
+        return cartWorker.workRemaining() == 0;
     }
 
     int workRemaining() override {

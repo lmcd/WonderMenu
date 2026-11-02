@@ -66,7 +66,7 @@ static bool ed64_vseries_has_feature (flashcart_features_t feature) {
  * @return flashcart_load_rom_session_t The load session, zeroed out on failure.
  */
 static flashcart_load_rom_session_t ed64_vseries_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
-    return flashcart_utils_begin_load_rom_session(rom_path, rom_object, initial_chunk, MiB(64));
+    return flashcart_utils_begin_load_rom_session(rom_path, rom_object, initial_chunk, MiB(64), MiB(64));
 }
 
 /**
@@ -78,17 +78,6 @@ static flashcart_load_rom_session_t ed64_vseries_begin_load_rom_session (char *r
  */
 static flashcart_err_t ed64_vseries_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks) {
     return flashcart_utils_load_next_rom_chunk(session, ROM_ADDRESS, load_beginning_chunks);
-}
-
-/**
- * @brief Load everything left in a chunked ROM load session into the EverDrive-64 V series.
- * 
- * @param session Pointer to the load session.
- * @param progress Progress callback function.
- * @return flashcart_err_t Error code.
- */
-static flashcart_err_t ed64_vseries_finish_load_rom_session (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress) {
-    return flashcart_utils_finish_load_rom_session(session, ROM_ADDRESS, progress);
 }
 
 
@@ -147,7 +136,6 @@ static flashcart_t flashcart_ed64_vseries = {
     .get_firmware_version = ed64_vseries_get_firmware_version,
     .begin_load_rom_session = ed64_vseries_begin_load_rom_session,
     .load_next_rom_chunk = ed64_vseries_load_next_rom_chunk,
-    .finish_load_rom_session = ed64_vseries_finish_load_rom_session,
     .load_file = ed64_vseries_load_file,
     .load_save = ed64_vseries_load_save,
     .load_64dd_ipl = NULL,

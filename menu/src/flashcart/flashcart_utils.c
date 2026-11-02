@@ -121,18 +121,12 @@ bool fatfs_get_file_sectors (char *path, uint32_t *address, address_type_t type,
     return error;
 }
 
-/**
- * @brief Update the progress bookkeeping of a chunked load session.
- * 
- * @param session Pointer to the load session.
- * @param loaded Number of bytes loaded by the last read.
- */
-static void update_load_rom_session_progress (flashcart_load_rom_session_t *session, UINT loaded) {
+void flashcart_utils_update_load_rom_session_progress (flashcart_load_rom_session_t *session, UINT loaded) {
     session->loaded_bytes += loaded;
     session->progress = fminf(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
 }
 
-flashcart_load_rom_session_t flashcart_utils_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk, size_t max_rom_size) {
+flashcart_load_rom_session_t flashcart_utils_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk, size_t max_rom_size, size_t max_sdram_size) {
     FIL fil;
 
     // Opening from a locator captured when the directory was enumerated costs
@@ -167,125 +161,99 @@ flashcart_load_rom_session_t flashcart_utils_begin_load_rom_session (char *rom_p
 
     size_t chunk_size = KiB(128);
 
-    size_t sdram_size = rom_size;
+    size_t sdram_size = MIN(rom_size, max_sdram_size);
 
-    unsigned int offset = chunk_size * initial_chunk;
+    size_t offset = chunk_size * initial_chunk;
 
-    f_lseek(&fil, offset);
+    // A ROM that ends before the initial chunk lies entirely in the beginning
+    // chunks, so there's no end to stream first.
+    bool starts_past_end = (offset >= sdram_size);
+
+    f_lseek(&fil, starts_past_end ? 0 : offset);
 
     return (flashcart_load_rom_session_t) {
-        fil,
-        chunk_size,
-        sdram_size,
-        initial_chunk,
-        rom_size,
-        initial_chunk,
-        0,
-        0,
-        false
+        .fil = fil,
+        .chunk_size = chunk_size,
+        .sdram_size = sdram_size,
+        .current_chunk = starts_past_end ? 0 : initial_chunk,
+        .rom_size = rom_size,
+        .initial_chunk = initial_chunk,
+        .progress = 0.0f,
+        .loaded_bytes = 0,
+        .has_loaded_end_chunk = starts_past_end,
+        .flash_offset = 0,
+        .is_complete = false,
     };
 }
 
-flashcart_err_t flashcart_utils_load_next_rom_chunk (flashcart_load_rom_session_t *session, uint32_t rom_address, bool load_beginning_chunks) {
+flashcart_err_t flashcart_utils_load_rom_chunk (flashcart_load_rom_session_t *session, uint32_t rom_address) {
     FIL *fil = &session->fil;
     UINT br;
     size_t sdram_size = session->sdram_size;
 
-    unsigned int offset = session->chunk_size * session->current_chunk;
+    size_t offset = session->chunk_size * session->current_chunk;
 
-    if (session->has_loaded_end_chunk) {
-        if (!load_beginning_chunks) {
-            return FLASHCART_ERR_LOAD;
-        }
-
-        if (session->current_chunk >= session->initial_chunk) {
-            return FLASHCART_ERR_LOAD;
-        }
-    }
-
-    if (offset >= sdram_size) {
-        session->has_loaded_end_chunk = true;
-        session->current_chunk = 0;
-
-        offset = 0;
-
-        f_lseek(fil, 0);
-
-        if (!load_beginning_chunks || session->initial_chunk == 0) {
-            return FLASHCART_ERR_LOAD;
-        }
+    // Wrapping around, or loading anything in between, moves the file position
+    // away from this chunk.
+    if ((f_tell(fil) != offset) && (f_lseek(fil, offset) != FR_OK)) {
+        return FLASHCART_ERR_LOAD;
     }
 
     size_t block_size = MIN(sdram_size - offset, session->chunk_size);
     if (f_read(fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
-        f_close(fil);
         return FLASHCART_ERR_LOAD;
     }
 
-    update_load_rom_session_progress(session, br);
+    flashcart_utils_update_load_rom_session_progress(session, br);
+
+    debugf("[FLASHCART] Loaded chunk %i\n", session->current_chunk);
 
     session->current_chunk++;
+
+    if (!session->has_loaded_end_chunk && ((session->chunk_size * session->current_chunk) >= sdram_size)) {
+        session->has_loaded_end_chunk = true;
+        session->current_chunk = 0;
+    }
 
     return FLASHCART_OK;
 }
 
-flashcart_err_t flashcart_utils_finish_load_rom_session (flashcart_load_rom_session_t *session, uint32_t rom_address, flashcart_progress_callback_t *progress) {
-    FIL *fil = &session->fil;
-    UINT br;
-    size_t sdram_size = session->sdram_size;
-    size_t chunk_size = session->chunk_size;
+bool flashcart_utils_has_loaded_rom_chunks (const flashcart_load_rom_session_t *session) {
+    size_t beginning_size = MIN(session->chunk_size * session->initial_chunk, session->sdram_size);
 
-    unsigned int start_offset = chunk_size * session->current_chunk;
+    return session->has_loaded_end_chunk && ((session->chunk_size * session->current_chunk) >= beginning_size);
+}
 
-    if (!session->has_loaded_end_chunk) {
-        for (unsigned int offset = start_offset; offset < sdram_size; offset += chunk_size) {
-            size_t block_size = MIN(sdram_size - offset, chunk_size);
-            if (f_read(fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
-                f_close(fil);
-                return FLASHCART_ERR_LOAD;
-            }
+flashcart_err_t flashcart_utils_complete_load_rom_session (flashcart_load_rom_session_t *session) {
+    session->is_complete = true;
 
-            update_load_rom_session_progress(session, br);
-
-            if (progress) {
-                progress(session->progress);
-            }
-
-            session->current_chunk++;
-        }
-
-        if (f_tell(fil) != sdram_size) {
-            f_close(fil);
-            return FLASHCART_ERR_LOAD;
-        }
-
-        f_lseek(fil, 0);
-
-        session->has_loaded_end_chunk = true;
-        session->current_chunk = 0;
-        start_offset = 0;
-    }
-
-    unsigned int end_offset = chunk_size * session->initial_chunk;
-
-    for (unsigned int offset = start_offset; offset < end_offset; offset += chunk_size) {
-        size_t block_size = MIN(sdram_size - offset, chunk_size);
-        if (f_read(fil, (void *) (rom_address + offset), block_size, &br) != FR_OK) {
-            f_close(fil);
-            return FLASHCART_ERR_LOAD;
-        }
-
-        update_load_rom_session_progress(session, br);
-
-        if (progress) {
-            progress(session->progress);
-        }
-
-        session->current_chunk++;
-    }
-
-    if (f_close(fil) != FR_OK) {
+    if (f_close(&session->fil) != FR_OK) {
         return FLASHCART_ERR_LOAD;
+    }
+
+    return FLASHCART_OK;
+}
+
+flashcart_err_t flashcart_utils_load_next_rom_chunk (flashcart_load_rom_session_t *session, uint32_t rom_address, bool load_beginning_chunks) {
+    if (session->has_loaded_end_chunk && !load_beginning_chunks) {
+        return FLASHCART_ERR_LOAD;
+    }
+
+    // Already true when flashcart_mark_end_rom_chunks_loaded skipped the end
+    // and there are no beginning chunks
+    if (!flashcart_utils_has_loaded_rom_chunks(session)) {
+        flashcart_err_t err = flashcart_utils_load_rom_chunk(session, rom_address);
+
+        if (err != FLASHCART_OK) {
+            f_close(&session->fil);
+            return err;
+        }
+    }
+
+    // Straight away rather than on the next call, so the caller sees the
+    // session complete as soon as the last chunk lands.
+    if (flashcart_utils_has_loaded_rom_chunks(session)) {
+        return flashcart_utils_complete_load_rom_session(session);
     }
 
     return FLASHCART_OK;

@@ -28,15 +28,6 @@ class GameDatabase;
  */
 class GameLaunchScene : public Scene {
 private:
-    /**
-     * During the final load of the ROM, we exit the class and live inside
-     * `romLoadProgressHandler`. We need a reference back to the renderer so we
-     * can continue to draw the progress bar.
-     */
-    static SceneRenderer* currentRenderer;
-
-    static void romLoadProgressHandler(float progress);
-
     ProgressBarView progressBarView;
 
     /**
@@ -51,7 +42,6 @@ private:
     bool progressBarShouldTrackTransition = false;
 
     bool hasInitiatedLaunch = false;
-    bool isFinalisingROMLoad = false;
 
     /**
      * Streams the ROM into the cart's SDRAM and then stages its first MiB into

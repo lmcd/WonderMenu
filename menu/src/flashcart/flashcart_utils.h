@@ -62,34 +62,61 @@ void fatfs_fix_file_size (FIL *fil);
 bool fatfs_get_file_sectors (char *path, uint32_t *address, address_type_t address_type, uint32_t max_sectors);
 
 /**
- * @brief Open a ROM file and prepare a chunked load session for a flat (SDRAM only) flashcart.
+ * @brief Count bytes a chunked load session has loaded towards its progress.
+ * 
+ * @param session Pointer to the load session.
+ * @param loaded Number of bytes loaded by the last read.
+ */
+void flashcart_utils_update_load_rom_session_progress (flashcart_load_rom_session_t *session, UINT loaded);
+
+/**
+ * @brief Open a ROM file and prepare a chunked load session.
  * 
  * @param rom_path Path to the ROM file.
  * @param rom_object Optional file locator captured while enumerating the directory (may be NULL).
  * @param initial_chunk The chunk to start loading from.
  * @param max_rom_size Largest ROM size the flashcart can hold.
+ * @param max_sdram_size Largest part of the ROM that goes in the SDRAM portion, chunk by chunk. Anything past it is the flashcart's to load.
  * @return flashcart_load_rom_session_t The load session, zeroed out on failure.
  */
-flashcart_load_rom_session_t flashcart_utils_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk, size_t max_rom_size);
+flashcart_load_rom_session_t flashcart_utils_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk, size_t max_rom_size, size_t max_sdram_size);
 
 /**
- * @brief Load the next chunk of a flat (SDRAM only) chunked load session.
+ * @brief Load the current chunk of a chunked load session's SDRAM portion, and move on to the next.
+ * 
+ * Wraps around to the beginning chunks once the end of the SDRAM portion is
+ * loaded. Leaves the file open on failure.
+ * 
+ * @param session Pointer to the load session. Must have a chunk left, see @ref flashcart_utils_has_loaded_rom_chunks.
+ * @param rom_address Flashcart ROM base address.
+ * @return flashcart_err_t Error code.
+ */
+flashcart_err_t flashcart_utils_load_rom_chunk (flashcart_load_rom_session_t *session, uint32_t rom_address);
+
+/**
+ * @brief Check whether a chunked load session has loaded all of its SDRAM portion: the end, then the beginning chunks.
+ * 
+ * @param session Pointer to the load session.
+ * @return true if there are no chunks left to load, false otherwise.
+ */
+bool flashcart_utils_has_loaded_rom_chunks (const flashcart_load_rom_session_t *session);
+
+/**
+ * @brief Mark a chunked load session complete and close the file.
+ * 
+ * @param session Pointer to the load session.
+ * @return flashcart_err_t Error code.
+ */
+flashcart_err_t flashcart_utils_complete_load_rom_session (flashcart_load_rom_session_t *session);
+
+/**
+ * @brief Load the next chunk of a flat (SDRAM only) chunked load session, completing it after the last.
  * 
  * @param session Pointer to the load session.
  * @param rom_address Flashcart ROM base address.
  * @param load_beginning_chunks Whether to keep loading the chunks before the initial chunk once the end of the ROM has been reached.
- * @return flashcart_err_t Error code. FLASHCART_ERR_LOAD is returned once there is nothing left to load.
+ * @return flashcart_err_t Error code. FLASHCART_ERR_LOAD is returned without loading anything while waiting on load_beginning_chunks.
  */
 flashcart_err_t flashcart_utils_load_next_rom_chunk (flashcart_load_rom_session_t *session, uint32_t rom_address, bool load_beginning_chunks);
-
-/**
- * @brief Load everything left in a flat (SDRAM only) chunked load session and close the file.
- * 
- * @param session Pointer to the load session.
- * @param rom_address Flashcart ROM base address.
- * @param progress Progress callback function.
- * @return flashcart_err_t Error code.
- */
-flashcart_err_t flashcart_utils_finish_load_rom_session (flashcart_load_rom_session_t *session, uint32_t rom_address, flashcart_progress_callback_t *progress);
 
 #endif /* FLASHCART_UTILS_H__ */

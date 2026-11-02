@@ -18,12 +18,6 @@
 #include "ui/scenes/GameInfoScene.h"
 #include "ui/scenes/GameInfoTransitionScene.h"
 
-SceneRenderer* GameLaunchScene::currentRenderer = nullptr;
-
-void GameLaunchScene::romLoadProgressHandler(float) {
-    currentRenderer->advance();
-}
-
 GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database)
     : Scene(),
     romWorker(game.romFile),
@@ -149,10 +143,6 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 }
 
 void GameLaunchScene::update(const UpdateInfo& updateInfo) {
-    if (isFinalisingROMLoad) {
-        return;
-    }
-
     if (transition.direction == Transition::IDLE) {
         joypad_buttons_t btn = updateInfo.btn;
 
@@ -181,18 +171,19 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
         transition.direction = Transition::IDLE;
     }
     else if (transition.didReachEnd()) {
+        // Carry on streaming a frame at a time until the whole ROM is on the
+        // cart, so the progress bar keeps drawing as normal.
+        if (!romWorker.hasLoadedToCart()) {
+            advanceWorkers();
+            return;
+        }
+
         // Lets the boot path copy the game's opening MiB out of RDRAM rather
         // than fetching it from the cart again.
         bootSession.hasStagedFirstMB = romWorker.hasStagedFirstMB();
         bootSession.applyUserChoices(state, database);
         bootSession.loadSpeedrunFile();
         bootSession.loadSaveFile();
-
-        isFinalisingROMLoad = true;
-
-        currentRenderer = renderer;
-        romWorker.finish(romLoadProgressHandler);
-        currentRenderer = nullptr;
 
         clearProgressBarArea();
 

@@ -84,17 +84,6 @@ static flashcart_err_t dummy_load_next_rom_chunk (flashcart_load_rom_session_t *
 }
 
 /**
- * @brief Dummy function to finish a chunked ROM load session.
- * 
- * @param session Pointer to the load session.
- * @param progress Progress callback function.
- * @return flashcart_err_t Error code.
- */
-static flashcart_err_t dummy_finish_load_rom_session (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress) {
-    return FLASHCART_OK;
-}
-
-/**
  * @brief Dummy function to load a file into the flashcart.
  * 
  * @param file_path Path to the file.
@@ -133,7 +122,6 @@ static flashcart_t *flashcart = &((flashcart_t) {
     .has_feature = dummy_has_feature,
     .begin_load_rom_session = dummy_begin_load_rom_session,
     .load_next_rom_chunk = dummy_load_next_rom_chunk,
-    .finish_load_rom_session = dummy_finish_load_rom_session,
     .load_file = dummy_load_file,
     .load_save = dummy_load_save,
     .load_64dd_ipl = NULL,
@@ -322,12 +310,10 @@ flashcart_err_t flashcart_load_rom (char *rom_path, bool byte_swap, flashcart_pr
     }
 
     /* A one-shot load is just a session opened at the first chunk and finished
-       straight away: `finish` streams from the current chunk to the end of the
-       ROM, and starting at chunk 0 leaves no earlier chunks to come back for.
-       Each cart's address map and configuration still live behind begin/finish,
-       so nothing cart-specific moves up here -- it just stops being written
-       twice per cart. Byte swapping is applied by those two, from the flag
-       `begin` records. */
+       straight away: starting at chunk 0 leaves no earlier chunks to come back
+       for. Each cart's address map and configuration live behind begin and
+       load_next_rom_chunk, so nothing cart-specific moves up here. Byte
+       swapping is applied by those two, from the flag `begin` records. */
     flashcart_load_rom_session_t session =
         flashcart_begin_load_rom_session(rom_path, NULL, byte_swap, 0);
 
@@ -384,6 +370,12 @@ bool flashcart_load_rom_session_valid (const flashcart_load_rom_session_t *sessi
 flashcart_err_t flashcart_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks) {
     flashcart_err_t err;
 
+    /* Checked first, as completing the session closes the file, which makes it
+       invalid. */
+    if ((session != NULL) && session->is_complete) {
+        return FLASHCART_ERR_LOAD;
+    }
+
     if (!flashcart_load_rom_session_valid(session)) {
         return FLASHCART_ERR_ARGS;
     }
@@ -433,21 +425,21 @@ void flashcart_mark_end_rom_chunks_loaded (flashcart_load_rom_session_t *session
  * @return flashcart_err_t Error code.
  */
 flashcart_err_t flashcart_finish_load_rom_session (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress) {
-    flashcart_err_t err;
+    while (!session->is_complete) {
+        /* With load_beginning_chunks set, only a failure stops the session
+           short of completing. */
+        flashcart_err_t err = flashcart_load_next_rom_chunk(session, true);
 
-    if (!flashcart_load_rom_session_valid(session)) {
-        return FLASHCART_ERR_ARGS;
+        if (err != FLASHCART_OK) {
+            return err;
+        }
+
+        if (progress) {
+            progress(session->progress);
+        }
     }
 
-    if (!flashcart->finish_load_rom_session) {
-        return FLASHCART_ERR_FUNCTION_NOT_SUPPORTED;
-    }
-
-    cart_card_byteswap = load_rom_session_byteswap;
-    err = flashcart->finish_load_rom_session(session, progress);
-    cart_card_byteswap = false;
-
-    return err;
+    return FLASHCART_OK;
 }
 
 /**
