@@ -20,7 +20,7 @@ bool ELFFile::exists() {
     return (romAddress() != 0);
 }
 
-void ELFFile::copyCode(uint8_t* image, uint32_t capacity) {
+void ELFFile::place(uint32_t capacity) {
     imageBase = 0;
     imageSize = 0;
 
@@ -73,9 +73,10 @@ void ELFFile::copyCode(uint8_t* image, uint32_t capacity) {
 
     Elf32_Phdr segment;
 
-    // The image starts at the lowest segment, besides the exception-vectors
-    // placeholder skipped below
+    // The image spans the segments, besides the exception-vectors placeholder
+    // skipped below
     uint32_t base = UINT32_MAX;
+    uint32_t end = 0;
 
     int loadable = 0;
     
@@ -94,6 +95,7 @@ void ELFFile::copyCode(uint8_t* image, uint32_t capacity) {
 
         if (segment.p_memsz != 0 && segment.p_vaddr != 0x80000000) {
             base = std::min(base, (uint32_t)segment.p_vaddr);
+            end = std::max(end, (uint32_t)(segment.p_vaddr + segment.p_memsz));
         }
     }
 
@@ -102,9 +104,15 @@ void ELFFile::copyCode(uint8_t* image, uint32_t capacity) {
         "Should be 3 PT_LOAD segments. %d found.", loadable
     );
 
-    uint32_t end = base;
+    assertf(
+        end > base && end - base <= capacity,
+        "Payload image (0x%08lx to 0x%08lx) is over 0x%lx bytes",
+        base, end, capacity
+    );
 
-    memset(image, 0, capacity);
+    // Zeroed first, so every segment's BSS is, and any gap between them.
+    // Through the cache, which the write-back before each DMA below empties.
+    memset((void*)base, 0, end - base);
 
     for (int i = 0; i < phnum; i++) {
         uint32_t ph = elfBase + phoff + i * sizeof(Elf32_Phdr);
@@ -148,27 +156,22 @@ void ELFFile::copyCode(uint8_t* image, uint32_t capacity) {
             i, vaddr, filesz, memsz
         );
 
-        // Into the image, at the segment's offset from the base. Its BSS is
-        // already zero, from the memset above.
-        assertf(
-            vaddr >= base && vaddr + memsz <= base + capacity,
-            "Segment %d (0x%08lx, 0x%lx bytes) is outside the 0x%lx byte image at 0x%08lx",
-            i, vaddr, memsz, capacity, base
-        );
-
-        void* dst = image + (vaddr - base);
+        // Straight to its load address. Its BSS is already zero, from the
+        // memset above.
+        void* dst = (void*)vaddr;
         data_cache_hit_writeback_invalidate(dst, memsz);   /* before DMA */
         uint32_t length = (filesz + 1) & ~1u;
 
         if (length) {
             dma_read(dst, elfBase + offset, length);
         }
-
-        end = std::max(end, vaddr + memsz);
     }
+
+    // It's run as code
+    inst_cache_hit_invalidate((void*)base, end - base);
 
     imageBase = base;
     imageSize = end - base;
 
-    debugf("[ELFFile] Loaded payload image (0x%lx bytes for 0x%08lx)\n", imageSize, imageBase);
+    debugf("[ELFFile] Placed payload image (0x%lx bytes at 0x%08lx)\n", imageSize, imageBase);
 }

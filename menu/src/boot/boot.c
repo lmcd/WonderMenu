@@ -37,15 +37,16 @@ static io32_t *boot_get_device_base (boot_params_t *params) {
  * Can we boot this cartridge ourselves instead of running its IPL3?
  *
  * Only the plain retail CIC is claimed for now -- 6102/7101, which covers most
- * NTSC carts including Super Mario 64. Everything else (64DD variants, the
- * x105/x106 oddities, unrecognised or homebrew IPL3s) keeps running the real
- * thing, which is the safer default and a useful bisect when a game misbehaves.
+ * NTSC carts including Super Mario 64 -- and x103 (e.g. Banjo-Kazooie).
+ * Everything else (64DD variants, the x105/x106 oddities, unrecognised or
+ * homebrew IPL3s) keeps running the real thing, which is the safer default and
+ * a useful bisect when a game misbehaves.
  *
  * @param cic_type The type detected from the cartridge's IPL3.
  * @returns true to take the HLE path in reboot.S.
  */
 static bool boot_can_hle (cic_type_t cic_type) {
-    return cic_type == CIC_x102;
+    return cic_type == CIC_x102;// || cic_type == CIC_x103;
 }
 
 /**
@@ -205,6 +206,16 @@ void boot (boot_params_t *params) {
     /* Where IPL3 would have put the game, and where it would have jumped:
        ROM header offset 0x08 is the load address and the initial PC. */
     uint32_t game_entry_address = io_read((uint32_t) (&base[2]));
+
+    /* x103 and x106 IPL3s load and enter the game this far below the header's
+       entry point, e.g. Banjo-Kazooie's header says 0x80100400 for code linked
+       at 0x80000400 */
+    if (params->cic_type == CIC_x103) {
+        game_entry_address -= 0x100000;
+    }
+    else if (params->cic_type == CIC_x106) {
+        game_entry_address -= 0x200000;
+    }
     uint32_t game_source_address = hle_staged
         ? GAME_STAGING_ADDRESS
         : (uint32_t) (&base[GAME_LOAD_ROM_OFFSET / sizeof(io32_t)]);
@@ -243,6 +254,9 @@ void boot (boot_params_t *params) {
     register uint32_t game_entry asm ("a2");
     register uint32_t game_source asm ("a3");
     register uint32_t jump_target asm ("t8");
+    register uint32_t rsp_imem_word asm ("s0");
+    register uint32_t rsp_dmem_word asm ("s1");
+    register uint32_t sets_rsp_words asm ("s2");
     register uint32_t boot_device asm ("s3");
     register uint32_t tv_type asm ("s4");
     register uint32_t reset_type asm ("s5");
@@ -256,6 +270,13 @@ void boot (boot_params_t *params) {
     // With cheats the patcher runs first and jumps onwards via t1; without it
     // there is nothing to do but enter the game.
     jump_target = cheats_installed ? cheats_patcher_address() : game_entry_address;
+    /* What the x103 IPL3 leaves at the start of IMEM (6103) and DMEM, which
+       Banjo-Kazooie checks for before loading its RSP boot microcode (ucode.c
+       in the decomp), hanging without it. Not known for the other types, so
+       they're left as the HLE path leaves them. */
+    sets_rsp_words = (hle_boot && params->cic_type == CIC_x103);
+    rsp_imem_word = 6103;
+    rsp_dmem_word = 0xFFFFFFFF;
     boot_device = (params->device_type & 0x01);
     tv_type = (params->tv_type & 0x03);
     reset_type = BOOT_RESET_TYPE_COLD;
@@ -274,6 +295,9 @@ void boot (boot_params_t *params) {
         [game_entry] "r" (game_entry),
         [game_source] "r" (game_source),
         [jump_target] "r" (jump_target),
+        [rsp_imem_word] "r" (rsp_imem_word),
+        [rsp_dmem_word] "r" (rsp_dmem_word),
+        [sets_rsp_words] "r" (sets_rsp_words),
         [boot_device] "r" (boot_device),
         [tv_type] "r" (tv_type),
         [reset_type] "r" (reset_type),

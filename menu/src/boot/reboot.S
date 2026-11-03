@@ -57,6 +57,9 @@
 #define DMEM_ADDRESS        0xA4000000
 #define DMEM_SIZE           0x1000
 
+# IMEM, uncached. This code runs from it, past its first word.
+#define IMEM_ADDRESS        0xA4001000
+
 # The end of the base 4 MiB of RDRAM, as the DMA engine addresses it. The
 # Expansion Pak above it holds the cheat patcher and engine, which must survive.
 #define RDRAM_BASE_END      0x00400000
@@ -158,6 +161,8 @@ run_ipl3:
 #   a2 = game load/entry address (KSEG0, from ROM header offset 0x08)
 #   a3 = cartridge source address of the game code (ROM offset 0x1000)
 #   t8 = where to jump once loaded: the cheat patcher, or a2 when no cheats
+#   s0, s1 = IMEM's and DMEM's first words, as the game's IPL3 leaves them
+#   s2 = non-zero to write s0 and s1 (see hle_enter_game)
 #   s3-s7 = boot flags, already published to the OS info block by boot()
 hle_boot:
     li $t0, PI_ADDRESS
@@ -202,6 +207,7 @@ wait_pi_dma:
 #   a2 = game load/entry address (KSEG0, from ROM header offset 0x08)
 #   a3 = staged copy of the game's first MiB (GAME_STAGING_ADDRESS)
 #   t8 = where to jump once copied: the cheat patcher, or a2 when no cheats
+#   s0-s2 = as for hle_boot
 #   s3-s7 = boot flags, already published to the OS info block by boot()
 #
 # DMEM is free scratch here: the HLE paths never load IPL3 into it, and the RSP
@@ -308,6 +314,17 @@ wait_sp_zero_dma:
     lw $t1, SP_STATUS($t0)
     andi $t1, $t1, SP_STATUS_DMA_BUSY
     bnez $t1, wait_sp_zero_dma
+
+    # Leave the RSP's memory starting as the game's IPL3 would have, for games
+    # that check (e.g. Banjo-Kazooie, which won't load its RSP boot microcode
+    # otherwise). Now DMEM's no longer the zero source, and IMEM's first word
+    # is the x105 IPL2 stub, which the HLE paths never run.
+    beqz $s2, rsp_memory_done
+    li $t1, DMEM_ADDRESS
+    sw $s1, 0($t1)
+    li $t1, IMEM_ADDRESS
+    sw $s0, 0($t1)
+rsp_memory_done:
 
     # The game arrived by DMA, behind both caches. Invalidate them so the
     # freshly loaded code and data are what actually gets executed and read.

@@ -37,8 +37,7 @@
 // includes this header, so the declaration there comes too late to be of use.
 extern WarmResetState warmResetState;
 
-// Where the payload's image waits between load() and placeCode(). Static, so it's
-// in the menu's BSS, below anything the heap or the payload can reach.
+// Most the payload's image may be, BSS included
 #define PAYLOAD_MAX_SIZE KiB(16)
 
 struct BootSession : public Worker {
@@ -62,7 +61,7 @@ private:
     // `PayloadData`, which staging would otherwise overwrite
     bool isRecording = false;
 
-    // Loaded by IntroScene, and placed by launch()
+    // Placed by commitToLaunch()
     ELFFile payloadFile = ELFFile("payload.elf.stripped");
 
     // `PayloadData` lives at the start of the expansion pak's upper 4 MiB.
@@ -71,17 +70,10 @@ private:
     ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
     GameInfo* gameInfo = &payloadData->gameInfo;
 
-    alignas(16) static inline uint8_t payloadImage[PAYLOAD_MAX_SIZE];
-    // The game's state_write, state_frame_delay and state_render_rect, copied
-    // out of its DSO by loadDSO() and placed after the payload by launch().
-    // Static for the same reason as makeCheatList()'s list. 0 bytes when the
-    // game has no DSO, or (state_frame_delay only) when it doesn't define one.
-    alignas(16) static inline uint8_t stateWriteImage[GAME_STATE_WRITE_MAX_SIZE] = {};
-    uint32_t stateWriteSize = 0;
-    alignas(16) static inline uint8_t stateFrameDelayImage[GAME_STATE_FRAME_DELAY_MAX_SIZE] = {};
-    uint32_t stateFrameDelaySize = 0;
-    alignas(16) static inline uint8_t stateRenderRectImage[GAME_STATE_RENDER_RECT_MAX_SIZE] = {};
-    uint32_t stateRenderRectSize = 0;
+    // Where loadDSO() placed the game's state_write, state_frame_delay and
+    // state_render_rect, for `PayloadData::dsoSymbols`. 0 for each it didn't:
+    // the game has no DSO, or (state_frame_delay only) doesn't define one.
+    DSOSymbols dsoSymbols;
 
     int cartWorkRemaining() {
         return cartWorker ? cartWorker->workRemaining() : 0;
@@ -103,7 +95,7 @@ private:
     }
 
     // Static rather than on the heap: the heap reaches into the Expansion Pak,
-    // where staging the payload in launch() could overwrite it
+    // where the payload and its settings are placed
     uint32_t* makeCheatList() {
         static uint32_t tempCheatItems[MAX_CHEAT_CODE_ARRAYLIST_SIZE];
         size_t itemCount = 0;
@@ -142,103 +134,68 @@ cheatLimitReached:
     }
 
     void loadPayload() {
-        payloadFile.copyCode(payloadImage, sizeof(payloadImage));
+        payloadFile.place(PAYLOAD_MAX_SIZE);
     }
 
     /**
-     * Copies state_write, state_frame_delay and state_render_rect out of the
+     * Places state_write, state_frame_delay and state_render_rect, out of the
      * game's state DSO (rom:/state/<code>.dso, <code> being the cart ID in
-     * uppercase, e.g. "SM" for NSME), for launch() to place after the payload.
+     * uppercase, e.g. "SM" for NSME), one after the other just past the
+     * payload's image, and notes where in `dsoSymbols`. Call after
+     * loadPayload(), which says where the payload ends.
      */
     void loadDSO() {
-        stateWriteSize = 0;
-        stateFrameDelaySize = 0;
-        stateRenderRectSize = 0;
+        dsoSymbols = DSOSymbols();
 
-        // Closed on return: only the copy is needed from here on
+        uint32_t payloadEnd = payloadFile.imageEnd();
+
+        if (payloadEnd == 0) {
+            return;
+        }
+
+        // Closed on return: only the placed copies are needed from here on
         GameDSO dso;
 
         if (!dso.open(game->romFile.uniqueID)) {
             return;
         }
 
-        stateWriteSize = dso.copyCode(GAME_STATE_WRITE_SYMBOL, stateWriteImage, sizeof(stateWriteImage));
+        uint32_t currentSymbolAddress = ALIGN(payloadEnd, 16);
+
+        uint32_t stateWriteSize = dso.copyCode(GAME_STATE_WRITE_SYMBOL, (uint8_t*)currentSymbolAddress, GAME_STATE_WRITE_MAX_SIZE);
 
         if (stateWriteSize == 0) {
             debugf("[BootSession] State DSO has no usable state_write\n");
             return;
         }
 
-        // Optional: most games show the frame they've just drawn
-        stateFrameDelaySize = dso.copyCode(GAME_STATE_FRAME_DELAY_SYMBOL, stateFrameDelayImage, sizeof(stateFrameDelayImage));
+        dsoSymbols.state_write = currentSymbolAddress;
 
-        stateRenderRectSize = dso.copyCode(GAME_STATE_RENDER_RECT_SYMBOL, stateRenderRectImage, sizeof(stateRenderRectImage));
-
-        debugf("[BootSession] Loaded state_write (%lu bytes), state_frame_delay (%lu bytes) and state_render_rect (%lu bytes)\n",
-            (unsigned long)stateWriteSize, (unsigned long)stateFrameDelaySize, (unsigned long)stateRenderRectSize);
-    }
-
-    /**
-     * Copies `size` bytes of code to `address`, so it can be run from there.
-     */
-    static void placeCode(uint32_t address, const uint8_t* image, uint32_t size) {
-        void* dst = (void*)address;
-
-        // Through the cache, as ELFFile::place() does, then out to RDRAM and
-        // out of the I-cache, since it's run as code
-        memcpy(dst, image, size);
-
-        data_cache_hit_writeback_invalidate(dst, size);
-        inst_cache_hit_invalidate(dst, size);
-    }
-
-    void placePayload() {
-        placeCode(payloadFile.imageBase, payloadImage, payloadFile.imageSize);
-    }
-
-    /**
-     * Copies loadDSO()'s state_write to just past the payload's image, its
-     * state_frame_delay just past that, and its state_render_rect just past
-     * that, and returns where, for `PayloadData::dsoSymbols`. 0 for each
-     * there's nothing to place. Call after the payload is placed.
-     */
-    DSOSymbols placeDSOSymbols() {
-        DSOSymbols symbols;
-
-        uint32_t payloadEnd = payloadFile.imageEnd();
-
-        if (payloadEnd == 0) {
-            return symbols;
-        }
-
-        uint32_t currentSymbolAddress = ALIGN(payloadEnd, 16);
-
-        if (stateWriteSize != 0) {
-            placeCode(currentSymbolAddress, stateWriteImage, stateWriteSize);
-            symbols.state_write = currentSymbolAddress;
-
-            debugf("[BootSession] Placed state_write at 0x%08lx\n", (unsigned long)currentSymbolAddress);
-        }
+        debugf("[BootSession] Placed state_write (%lu bytes) at 0x%08lx\n",
+            (unsigned long)stateWriteSize, (unsigned long)currentSymbolAddress);
 
         currentSymbolAddress = ALIGN(currentSymbolAddress + stateWriteSize, 16);
 
-        if (stateFrameDelaySize != 0) {
-            placeCode(currentSymbolAddress, stateFrameDelayImage, stateFrameDelaySize);
-            symbols.state_frame_delay = currentSymbolAddress;
+        // Optional: most games show the frame they've just drawn
+        uint32_t stateFrameDelaySize = dso.copyCode(GAME_STATE_FRAME_DELAY_SYMBOL, (uint8_t*)currentSymbolAddress, GAME_STATE_FRAME_DELAY_MAX_SIZE);
 
-            debugf("[BootSession] Placed state_frame_delay at 0x%08lx\n", (unsigned long)currentSymbolAddress);
+        if (stateFrameDelaySize != 0) {
+            dsoSymbols.state_frame_delay = currentSymbolAddress;
+
+            debugf("[BootSession] Placed state_frame_delay (%lu bytes) at 0x%08lx\n",
+                (unsigned long)stateFrameDelaySize, (unsigned long)currentSymbolAddress);
         }
 
         currentSymbolAddress = ALIGN(currentSymbolAddress + stateFrameDelaySize, 16);
 
+        uint32_t stateRenderRectSize = dso.copyCode(GAME_STATE_RENDER_RECT_SYMBOL, (uint8_t*)currentSymbolAddress, GAME_STATE_RENDER_RECT_MAX_SIZE);
+
         if (stateRenderRectSize != 0) {
-            placeCode(currentSymbolAddress, stateRenderRectImage, stateRenderRectSize);
-            symbols.state_render_rect = currentSymbolAddress;
+            dsoSymbols.state_render_rect = currentSymbolAddress;
 
-            debugf("[BootSession] Placed state_render_rect at 0x%08lx\n", (unsigned long)currentSymbolAddress);
+            debugf("[BootSession] Placed state_render_rect (%lu bytes) at 0x%08lx\n",
+                (unsigned long)stateRenderRectSize, (unsigned long)currentSymbolAddress);
         }
-
-        return symbols;
     }
 
 public:
@@ -459,11 +416,11 @@ public:
             return;
         }
 
-        // Load payload.
+        // Place payload into Expansion Pak memory.
         // Requires DFS to still be intact.
         loadPayload();
         
-        // Load game DSO.
+        // Place game DSO into Expansion Pak memory, after the payload.
         // Requires DFS to still be intact.
         loadDSO();
     }
@@ -494,8 +451,8 @@ public:
         }
 
         if (canUseExpansionPak) {
-            // Construct `GameInfo` here, before the payload is written into
-            // memory, which may erase things on the heap, such as `game`.
+            // Construct `GameInfo` here, before `PayloadData` is written,
+            // which may erase things on the heap, such as `game`.
             GameInfo stagedGameInfo = {};
             stagedGameInfo.romSize     = game->romFile.size;
             stagedGameInfo.uniqueID[0] = game->romFile.uniqueID[0];
@@ -524,12 +481,6 @@ public:
             }
 
             cheatList = makeCheatList();
-
-            // Place payload into Expansion Pak memory.
-            placePayload();
-
-            // Place game DSO into Expansio Pak memory. 
-            DSOSymbols dsoSymbols = placeDSOSymbols();
 
             payloadData->memSize    = __boot_memsize;
             payloadData->cardType   = cart_type;

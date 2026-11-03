@@ -31,20 +31,21 @@ struct ELFFile {
     bool exists();
 
     /**
-     * Read the uncompressed ELF payload out of ROM into a static image, ready
-     * for `placeCode()`. Must be done while the menu's ROM is still in cart SDRAM:
-     * loading a game overwrites it.
+     * Read the uncompressed ELF payload out of ROM straight to its load
+     * addresses, ready to run, failing an assert if its image would be more
+     * than `capacity` bytes. Must be done while the menu's ROM is still in
+     * cart SDRAM: loading a game overwrites it.
      */
-    void copyCode(uint8_t* image, uint32_t capacity);
+    void place(uint32_t capacity);
 
     // The payload's lowest load address, and the size of the span from there
-    // to the end of its highest segment. 0 until loaded.
+    // to the end of its highest segment. 0 until placed.
     uint32_t imageBase = 0;
     uint32_t imageSize = 0;
 
     /**
      * The address just past the payload's highest segment, BSS included. 0
-     * until loaded.
+     * until placed.
      */
     uint32_t imageEnd() const {
         return (imageSize != 0) ? (imageBase + imageSize) : 0;

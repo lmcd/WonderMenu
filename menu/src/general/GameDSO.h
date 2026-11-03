@@ -88,7 +88,9 @@ struct GameDSO {
     /**
      * Copies a function's code out of the DSO to `image`, as many bytes as its
      * size symbol (`name` + GAME_STATE_SIZE_SYMBOL_SUFFIX) says, if it has
-     * both and it fits. Returns how many bytes were copied: 0 if it didn't.
+     * both and it fits, and writes it out to RDRAM and out of the I-cache so
+     * it can be run from there. Returns how many bytes were copied: 0 if it
+     * didn't.
      */
     uint32_t copyCode(const char* name, uint8_t* image, uint32_t capacity) const {
         char sizeName[64];
@@ -102,6 +104,10 @@ struct GameDSO {
         }
 
         memcpy(image, code, *size);
+
+        data_cache_hit_writeback_invalidate(image, *size);
+        // It's run as code
+        inst_cache_hit_invalidate(image, *size);
 
         return *size;
     }
