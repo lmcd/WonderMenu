@@ -117,4 +117,8 @@ struct GameDSO {
     game_state::SpriteFunction spriteFunction() const {
         return (game_state::SpriteFunction)symbol(GAME_STATE_SPRITE_SYMBOL);
     }
+
+    game_state::RenderRectFunction renderRectFunction() const {
+        return (game_state::RenderRectFunction)symbol(GAME_STATE_RENDER_RECT_SYMBOL);
+    }
 };
