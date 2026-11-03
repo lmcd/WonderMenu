@@ -20,7 +20,6 @@
 
 GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database)
     : Scene(),
-    romWorker(game.romFile),
     game(game),
     cartRenderer(cartRenderer),
     database(database) {
@@ -34,7 +33,7 @@ GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDat
     view.addSubview(&labelView);
     view.addSubview(&cart3DView);
 
-    bootSession.game = &game;
+    bootSession.start(game);
 
     if (game.id() != state.gameID) {
         state.gameID = game.id();
@@ -42,7 +41,7 @@ GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDat
     }
 
     if (state.romIsLoaded) {
-        romWorker.markEndChunksLoaded();
+        bootSession.markEndChunksLoaded();
     }
 }
 
@@ -84,7 +83,7 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
             progressBarView.isHidden = true;
         }
         else {
-            progressBarView.progress = romWorker.progress();
+            progressBarView.progress = bootSession.progress();
             progressBarView.isHidden = false;
         }
     }
@@ -148,7 +147,7 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
 
         if (btn.a) {
             transition.direction = Transition::FORWARDS;
-            progressBarShouldTrackTransition = (romWorker.framesRemaining() < 34);
+            progressBarShouldTrackTransition = (bootSession.framesRemaining() < 34);
 
             hasInitiatedLaunch = true;
 
@@ -173,14 +172,11 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
     else if (transition.didReachEnd()) {
         // Carry on streaming a frame at a time until the whole ROM is on the
         // cart, so the progress bar keeps drawing as normal.
-        if (!romWorker.hasLoadedToCart()) {
-            advanceWorkers();
+        if (!bootSession.hasLoadedToCart()) {
+            bootSession.advance();
             return;
         }
 
-        // Lets the boot path copy the game's opening MiB out of RDRAM rather
-        // than fetching it from the cart again.
-        bootSession.hasStagedFirstMB = romWorker.hasStagedFirstMB();
         bootSession.applyUserChoices(state, database);
         bootSession.loadSpeedrunFile();
         bootSession.loadSaveFile();
@@ -196,14 +192,7 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
 
     transition.advance();
 
-    advanceWorkers();
-}
-
-void GameLaunchScene::advanceWorkers() {
-    // Only pull the game's opening chunks forward once the launch is committed;
-    // before that the worker keeps streaming the tail.
-    romWorker.loadBeginningChunks = hasInitiatedLaunch;
-    romWorker.advance();
+    bootSession.advance();
 }
 
 static void clearFramebufferRows(void* buffer, uint32_t stride, int minRow, int maxRow) {

@@ -112,7 +112,7 @@ struct __attribute__((packed)) SpeedrunSettings {
     uint8_t reserved[9] = {0};
 };
 
-// Size: 8
+// Size: 12
 struct __attribute__((packed)) DSOSymbols {
     // Address (in Expansion Pak) of `state_write()`.
     // Usually immediately follows the payload image.
@@ -123,6 +123,11 @@ struct __attribute__((packed)) DSOSymbols {
     // Usually immediately follows the `state_write()` image.
     // Cached KSEG0.
     uint32_t state_frame_delay = 0;
+
+    // Address (in Expansion Pak) of `state_render_rect()`.
+    // Usually immediately follows the `state_frame_delay()` image.
+    // Cached KSEG0.
+    uint32_t state_render_rect = 0;
 };
 
 static_assert(offsetof(SpeedrunSettings, sampleCount) == 0, "sampleCount must stay word aligned");
@@ -137,30 +142,29 @@ struct __attribute__((packed)) PayloadData {
     uint32_t empty2;
     // Size: 4
     uint32_t memSize;
-    // Size: 4
-    uint32_t reserved1;
+    // Size: 1
+    uint8_t cardType;
+    // Size: 3
+    uint8_t reserved1[3] = {0};
     // Size: 12
     ScreenshotSettings screenshotSettings;
     // Size: 16
     SpeedrunSettings speedrunSettings;
     // Size: 8
     GameInfo gameInfo;
-    // Size: 1
-    uint8_t cardType;
-    // Size: 3
-    uint8_t reserved2[3] = {0};
-    // Size: 8
+    // Size: 12
     DSOSymbols dsoSymbols;
 };
 
 static_assert(sizeof(GameInfo)           ==  8, "GameInfo must be 8 bytes");
 static_assert(sizeof(ScreenshotSettings) == 12, "ScreenshotSettings must be 12 bytes");
 static_assert(sizeof(SpeedrunSettings)   == 16, "SpeedrunSettings must be 16 bytes");
-static_assert(sizeof(DSOSymbols)         ==  8, "DSOSymbols must be 8 bytes");
+static_assert(sizeof(DSOSymbols)         == 12, "DSOSymbols must be 12 bytes");
 static_assert(sizeof(PayloadData)        == 64, "PayloadData must be 64 bytes");
 
 static_assert(offsetof(PayloadData, memSize)            ==  8);
+static_assert(offsetof(PayloadData, cardType)           == 12);
 static_assert(offsetof(PayloadData, screenshotSettings) == 16);
 static_assert(offsetof(PayloadData, speedrunSettings)   == 28);
 static_assert(offsetof(PayloadData, gameInfo)           == 44);
-static_assert(offsetof(PayloadData, dsoSymbols)         == 56);
+static_assert(offsetof(PayloadData, dsoSymbols)         == 52);

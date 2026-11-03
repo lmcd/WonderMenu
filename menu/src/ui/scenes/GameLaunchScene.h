@@ -10,7 +10,6 @@
 #include "main.h"
 
 #include "animation/Transition.h"
-#include "general/Worker.h"
 #include "ui/Scene.h"
 #include "ui/views/drawables/Cart3DView.h"
 #include "ui/views/drawables/LabelView.h"
@@ -43,12 +42,6 @@ private:
 
     bool hasInitiatedLaunch = false;
 
-    /**
-     * Streams the ROM into the cart's SDRAM and then stages its first MiB into
-     * the Expansion Pak. Driven a step at a time from `update`.
-     */
-    LoadROMWorker romWorker;
-
 public:
     const char* name() { return "GameLaunchScene"; }
 
@@ -66,12 +59,6 @@ public:
 
     Vec3f rotationForFrame(int frameNumber);
     Vec3f rotationForLaunch();
-
-    /**
-     * Run one frame's worth of background work: streaming the ROM into the
-     * cart's SDRAM and then staging its first MiB into the Expansion Pak.
-     */
-    void advanceWorkers();
 
     /**
      * Manually clear the area occupied on-screen by the progress bar before
