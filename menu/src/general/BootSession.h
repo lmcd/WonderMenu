@@ -151,7 +151,7 @@ cheatLimitReached:
             return;
         }
 
-        payloadFile.place(PAYLOAD_MAX_SIZE);
+        payloadFile.copyCode(PAYLOAD_MAX_SIZE);
 
         uint32_t payloadEnd = payloadFile.imageEnd();
 

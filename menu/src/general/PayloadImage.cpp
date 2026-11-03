@@ -22,7 +22,7 @@ bool PayloadImage::open(const char* filename) {
     return true;
 }
 
-void PayloadImage::place(uint32_t capacity) {
+void PayloadImage::copyCode(uint32_t capacity) {
     imageBase = 0;
     imageSize = 0;
 
@@ -56,5 +56,5 @@ void PayloadImage::place(uint32_t capacity) {
     imageBase = PAYLOAD_IMAGE_BASE;
     imageSize = PAYLOAD_IMAGE_SIZE;
 
-    debugf("[PayloadImage] Placed payload image (0x%lx bytes at 0x%08lx)\n", imageSize, imageBase);
+    debugf("[PayloadImage] Copied payload image (0x%lx bytes at 0x%08lx)\n", imageSize, imageBase);
 }

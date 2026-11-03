@@ -30,19 +30,19 @@ struct PayloadImage {
     }
 
     /**
-     * Read the opened image out of ROM straight to its load address, ready to
-     * run, failing an assert if it would be more than `capacity` bytes. Places
-     * nothing if it isn't open.
+     * Copies the opened image out of ROM straight to its load address, ready
+     * to run, failing an assert if it would be more than `capacity` bytes.
+     * Copies nothing if it isn't open.
      */
-    void place(uint32_t capacity);
+    void copyCode(uint32_t capacity);
 
     // The payload's load address, and the size of its image, BSS included. 0
-    // until placed.
+    // until copied.
     uint32_t imageBase = 0;
     uint32_t imageSize = 0;
 
     /**
-     * The address just past the payload's image, BSS included. 0 until placed.
+     * The address just past the payload's image, BSS included. 0 until copied.
      */
     uint32_t imageEnd() const {
         return (imageSize != 0) ? (imageBase + imageSize) : 0;
