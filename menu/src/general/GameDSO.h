@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
@@ -110,6 +112,37 @@ struct GameDSO {
         inst_cache_hit_invalidate(image, *size);
 
         return *size;
+    }
+
+    /**
+     * Copies each of the functions `names` as copyCode() above does, one after
+     * the other from `image`, each 16-byte aligned (as `image` must be), for as
+     * long as there's room in `capacity`. Returns where each one went: nullptr
+     * for any the DSO doesn't have, or that didn't fit, which take no room.
+     */
+    template <typename... Names>
+    std::array<uint8_t*, sizeof...(Names)> copyCode(uint8_t* image, uint32_t capacity, Names... names) const {
+        static_assert(sizeof...(Names) > 0, "copyCode() needs at least one name");
+
+        const char* nameList[] = {names...};
+        std::array<uint8_t*, sizeof...(Names)> placed = {};
+
+        uint32_t offset = 0;
+
+        for (size_t i = 0; i < sizeof...(Names); i++) {
+            uint32_t size = copyCode(nameList[i], image + offset, capacity - offset);
+
+            if (size == 0) {
+                continue;
+            }
+
+            placed[i] = image + offset;
+
+            // Clamped, so what's left can't wrap around below 0
+            offset = std::min((offset + size + 15) & ~15u, capacity);
+        }
+
+        return placed;
     }
 
     game_state::TitleFunction titleFunction() const {

@@ -40,6 +40,10 @@ extern WarmResetState warmResetState;
 // Most the payload's image may be, BSS included
 #define PAYLOAD_MAX_SIZE KiB(16)
 
+// Most the game DSO's code placed after the payload may be. Each limit is a
+// multiple of 16, so this has room for the alignment between them.
+#define DSO_CODE_MAX_SIZE (GAME_STATE_WRITE_MAX_SIZE + GAME_STATE_FRAME_DELAY_MAX_SIZE + GAME_STATE_RENDER_RECT_MAX_SIZE)
+
 struct BootSession : public Worker {
 private:
     // Empty until start()
@@ -160,42 +164,28 @@ cheatLimitReached:
             return;
         }
 
-        uint32_t currentSymbolAddress = ALIGN(payloadEnd, 16);
+        uint32_t firstSymbolAddress = ALIGN(payloadEnd, 16);
 
-        uint32_t stateWriteSize = dso.copyCode(GAME_STATE_WRITE_SYMBOL, (uint8_t*)currentSymbolAddress, GAME_STATE_WRITE_MAX_SIZE);
+        // state_frame_delay is optional: most games show the frame they've just drawn
+        auto [state_write, state_frame_delay, state_render_rect] = dso.copyCode(
+            (uint8_t*)firstSymbolAddress, DSO_CODE_MAX_SIZE,
+            GAME_STATE_WRITE_SYMBOL,
+            GAME_STATE_FRAME_DELAY_SYMBOL,
+            GAME_STATE_RENDER_RECT_SYMBOL
+        );
 
-        if (stateWriteSize == 0) {
+        if (state_write == nullptr) {
             debugf("[BootSession] State DSO has no usable state_write\n");
             return;
         }
 
-        dsoSymbols.state_write = currentSymbolAddress;
+        dsoSymbols.state_write       = (uint32_t)state_write;
+        dsoSymbols.state_frame_delay = (uint32_t)state_frame_delay;
+        dsoSymbols.state_render_rect = (uint32_t)state_render_rect;
 
-        debugf("[BootSession] Placed state_write (%lu bytes) at 0x%08lx\n",
-            (unsigned long)stateWriteSize, (unsigned long)currentSymbolAddress);
-
-        currentSymbolAddress = ALIGN(currentSymbolAddress + stateWriteSize, 16);
-
-        // Optional: most games show the frame they've just drawn
-        uint32_t stateFrameDelaySize = dso.copyCode(GAME_STATE_FRAME_DELAY_SYMBOL, (uint8_t*)currentSymbolAddress, GAME_STATE_FRAME_DELAY_MAX_SIZE);
-
-        if (stateFrameDelaySize != 0) {
-            dsoSymbols.state_frame_delay = currentSymbolAddress;
-
-            debugf("[BootSession] Placed state_frame_delay (%lu bytes) at 0x%08lx\n",
-                (unsigned long)stateFrameDelaySize, (unsigned long)currentSymbolAddress);
-        }
-
-        currentSymbolAddress = ALIGN(currentSymbolAddress + stateFrameDelaySize, 16);
-
-        uint32_t stateRenderRectSize = dso.copyCode(GAME_STATE_RENDER_RECT_SYMBOL, (uint8_t*)currentSymbolAddress, GAME_STATE_RENDER_RECT_MAX_SIZE);
-
-        if (stateRenderRectSize != 0) {
-            dsoSymbols.state_render_rect = currentSymbolAddress;
-
-            debugf("[BootSession] Placed state_render_rect (%lu bytes) at 0x%08lx\n",
-                (unsigned long)stateRenderRectSize, (unsigned long)currentSymbolAddress);
-        }
+        debugf("[BootSession] Placed state_write at 0x%08lx, state_frame_delay at 0x%08lx and state_render_rect at 0x%08lx\n",
+            (unsigned long)dsoSymbols.state_write, (unsigned long)dsoSymbols.state_frame_delay,
+            (unsigned long)dsoSymbols.state_render_rect);
     }
 
 public:
