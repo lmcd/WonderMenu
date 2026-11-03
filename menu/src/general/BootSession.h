@@ -66,7 +66,7 @@ private:
     bool isRecording = false;
 
 
-    // `PayloadData` lives at the start of the expansion pak's upper 4 MiB.
+    // `PayloadData` lives at the start of the payload, at 7 MiB in the expansion pak.
     PayloadData* payloadData = (PayloadData*)PAYLOAD_ADDRESS;
     SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
@@ -341,8 +341,8 @@ public:
         // selected cheats don't work without them
         addCheatGroup(CHEAT_GROUP_REQUIRED);
 
-        CheatCode nmiHandlerCheatCode = {0xBE400240, 0x0000};
-        CheatCode jalHandlerCheatCode = {0xBB400260, 0x0000};
+        CheatCode nmiHandlerCheatCode = {0xBE700240, 0x0000};
+        CheatCode jalHandlerCheatCode = {0xBB700260, 0x0000};
 
         if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
             if (speedrunsState.isRecording) {

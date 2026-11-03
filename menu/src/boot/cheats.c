@@ -28,7 +28,7 @@
 #define ENGINE_TEMPORARY_ADDRESS (0x80710000)
 #define DEFAULT_ENGINE_ADDRESS (0x807C5C00)
 
-// The payload reserves the first 64 bytes at 0x80400000 (payload_settings /
+// The payload reserves the first 64 bytes at 0x80700000 (payload_settings /
 // PayloadData) for its own settings. The resume trampoline's game_ctx snapshot
 // buffer -- and every O_* offset / flag the engine writes into it -- therefore
 // sits this many bytes higher. MUST match the payload_settings size in resume.S.
@@ -331,7 +331,7 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
         // IP4 stays set until the NMI, so every later exception lands here
         // too. The flag lives in game_ctx (zero after staging) and is reached
         // uncached so it's coherent on the next exception.
-        *engine_p++ = I_LUI(REG_K0, 0xA040);
+        *engine_p++ = I_LUI(REG_K0, 0xA070);                                // PAYLOAD_ADDRESS
         *engine_p++ = I_LW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
         io32_t *fired_branch = engine_p;
         *engine_p++ = I_NOP();                                              // patched: BNE k1,0,not_nmi

@@ -9,7 +9,7 @@
 #include <cstdint>
 
 #define ROM_ADDRESS           0x10000000  // Cartridge Space - where a loaded game/ROM lives
-#define PAYLOAD_ADDRESS       0xA0400000  // @4MB (Expansion Pak - Uncached)
+#define PAYLOAD_ADDRESS       0xA0700000  // @7MB (Expansion Pak - Uncached)
 // #define GAME_STAGING_ADDRESS  0x80500000  // @5MB (Expansion Pak)
 #define M64_INPUTS_ADDRESS    0x80600000  // @6MB (Expansion Pak)
 
