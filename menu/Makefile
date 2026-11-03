@@ -85,8 +85,6 @@ assets_bin =  $(wildcard assets/sd/*.db) \
 
 assets_txt =  $(wildcard assets/*.txt)
 
-assets_elf =  $(wildcard assets/*.elf.stripped)
-
 assets_conv = $(patsubst assets/%,filesystem/%,$(assets_png:%.png=%.sprite)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_ttf:%.ttf=%.font64)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_otf:%.otf=%.font64)) \
@@ -95,7 +93,7 @@ assets_conv = $(patsubst assets/%,filesystem/%,$(assets_png:%.png=%.sprite)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_ini)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_bin)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_txt)) \
-			  $(patsubst assets/%,filesystem/%,$(assets_elf))
+			  filesystem/payload.bin
 
 all: $(PROJECT_NAME).z64
 all: rom-with-size
@@ -163,10 +161,25 @@ filesystem/%.txt: assets/%.txt
 	@echo "    [TEXT] $@"
 	@cp "$<" "$@"
 
-filesystem/%.elf.stripped: assets/%.elf.stripped
+# The payload's ELF, flattened into one image the menu DMAs in a single go, and
+# that image's layout as defines for PayloadImage.cpp. mkpayload.py works both
+# out from the ELF the same way, so they always agree.
+PAYLOAD_ELF    = assets/payload.elf.stripped
+PAYLOAD_LAYOUT = $(BUILD_DIR)/payload_layout.h
+MKPAYLOAD      = ../tools/mkpayload.py
+
+filesystem/payload.bin: $(PAYLOAD_ELF) $(MKPAYLOAD)
 	@mkdir -p $(dir $@)
-	@echo "    [ELF] $@"
-	@cp "$<" "$@"
+	@echo "    [PAYLOAD] $@"
+	@python3 -I $(MKPAYLOAD) bin "$<" "$@"
+
+$(PAYLOAD_LAYOUT): $(PAYLOAD_ELF) $(MKPAYLOAD)
+	@mkdir -p $(dir $@)
+	@echo "    [PAYLOAD] $@"
+	@python3 -I $(MKPAYLOAD) header "$<" "$@"
+
+$(BUILD_DIR)/src/general/PayloadImage.o: CXXFLAGS += -I$(BUILD_DIR)
+$(BUILD_DIR)/src/general/PayloadImage.o: $(PAYLOAD_LAYOUT)
 
 objs = $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(src))) \
        $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(src))) \

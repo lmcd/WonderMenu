@@ -3,12 +3,13 @@
 # Builds the two sub-projects in dependency order:
 #
 #   payload/  -- the Expansion Pak resident payload (payload.z64 + a stripped
-#                ELF that the menu loads in place at runtime)
+#                ELF, which the menu's build flattens into the payload.bin it
+#                loads in place at runtime)
 #   menu/     -- the menu ROM itself (WonderMenu.z64)
 #
-# The menu embeds the payload's stripped ELF as a filesystem asset (see
-# ELFFile / IntroScene), so the payload must be built first and its output
-# copied into menu/assets/ before the menu's DFS is packed.
+# The menu embeds the payload as a filesystem asset (see PayloadImage /
+# BootSession), so the payload must be built first and its output copied into
+# menu/assets/ before the menu's DFS is packed.
 
 N64_INST ?= /opt/libdragon
 export N64_INST

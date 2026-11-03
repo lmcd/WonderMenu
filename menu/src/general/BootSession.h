@@ -20,11 +20,11 @@
 #include "dso/game_state_abi.h"
 #include "flashcart/flashcart.h"
 #include "general/CheatDatabase.h"
-#include "general/ELFFile.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 #include "general/GameDSO.h"
 #include "general/M64File.h"
+#include "general/PayloadImage.h"
 #include "general/SceneStates.h"
 #include "general/WarmResetState.h"
 #include "general/Worker.h"
@@ -145,9 +145,9 @@ cheatLimitReached:
     void loadPayload() {
         dsoSymbols = DSOSymbols();
 
-        ELFFile payloadFile;
+        PayloadImage payloadFile;
 
-        if (!payloadFile.open("payload.elf.stripped")) {
+        if (!payloadFile.open("payload.bin")) {
             return;
         }
 
