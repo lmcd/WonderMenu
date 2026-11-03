@@ -16,7 +16,7 @@
 
 /**
  * A game's state DSO (rom:/state/<code>.dso, see dso/game_state_abi.h), open
- * for as long as this is. <code> is the cart ID in lowercase, e.g. "sm" for
+ * for as long as this is. <code> is the cart ID in uppercase, e.g. "SM" for
  * NSME. Only usable while the menu's ROM is in cart SDRAM.
  */
 struct GameDSO {
