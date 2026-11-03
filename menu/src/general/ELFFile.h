@@ -7,34 +7,33 @@
 
 #include <libdragon.h>
 #include <elf.h>
-#include <string>
 
+/**
+ * An uncompressed ELF payload in the DFS filesystem of the WonderMenu ROM.
+ * Only usable while the menu's ROM is in cart SDRAM: loading a game
+ * overwrites it.
+ */
 struct ELFFile {
-    ELFFile(const std::string& filename) : filename(filename) {}
-
     /**
-     * The filename (e.g. payload.elf.stripped).
-     * `ELFFile` only reads from DFS, so arbitary paths don't work.
+     * The ROM address of the file in DFS. 0 until opened.
      */
-    std::string filename;
+    uint32_t romAddress = 0;
 
     /**
-     * The ELF file lives in the DFS filesystem of the WonderMenu ROM.
-     * Return the ROM address associated with the file in DFS.
-     * 
+     * Opens the ELF file at `filename` (e.g. payload.elf.stripped) in DFS, so
+     * arbitrary paths don't work, and reads its header. False if it's missing
+     * or isn't a payload `place()` can load.
      */
-    uint32_t romAddress();
+    bool open(const char* filename);
+
+    bool isOpen() const {
+        return romAddress != 0;
+    }
 
     /**
-     * Does the file exist in DFS?
-     */
-    bool exists();
-
-    /**
-     * Read the uncompressed ELF payload out of ROM straight to its load
-     * addresses, ready to run, failing an assert if its image would be more
-     * than `capacity` bytes. Must be done while the menu's ROM is still in
-     * cart SDRAM: loading a game overwrites it.
+     * Read the opened payload out of ROM straight to its load addresses, ready
+     * to run, failing an assert if its image would be more than `capacity`
+     * bytes. Places nothing if it isn't open.
      */
     void place(uint32_t capacity);
 
@@ -50,4 +49,9 @@ struct ELFFile {
     uint32_t imageEnd() const {
         return (imageSize != 0) ? (imageBase + imageSize) : 0;
     }
+
+private:
+    // From the header, read by open()
+    uint32_t phoff = 0;
+    int phnum = 0;
 };

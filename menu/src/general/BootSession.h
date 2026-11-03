@@ -65,8 +65,6 @@ private:
     // `PayloadData`, which staging would otherwise overwrite
     bool isRecording = false;
 
-    // Placed by commitToLaunch()
-    ELFFile payloadFile = ELFFile("payload.elf.stripped");
 
     // `PayloadData` lives at the start of the expansion pak's upper 4 MiB.
     PayloadData* payloadData = (PayloadData*)PAYLOAD_ADDRESS;
@@ -137,10 +135,6 @@ cheatLimitReached:
         }
     }
 
-    void loadPayload() {
-        payloadFile.place(PAYLOAD_MAX_SIZE);
-    }
-
     /**
      * Places state_write, state_frame_delay and state_render_rect, out of the
      * game's state DSO (rom:/state/<code>.dso, <code> being the cart ID in
@@ -148,8 +142,16 @@ cheatLimitReached:
      * payload's image, and notes where in `dsoSymbols`. Call after
      * loadPayload(), which says where the payload ends.
      */
-    void loadDSO() {
+    void loadPayload() {
         dsoSymbols = DSOSymbols();
+
+        ELFFile payloadFile;
+
+        if (!payloadFile.open("payload.elf.stripped")) {
+            return;
+        }
+
+        payloadFile.place(PAYLOAD_MAX_SIZE);
 
         uint32_t payloadEnd = payloadFile.imageEnd();
 
@@ -184,8 +186,10 @@ cheatLimitReached:
         dsoSymbols.state_render_rect = (uint32_t)state_render_rect;
 
         debugf("[BootSession] Placed state_write at 0x%08lx, state_frame_delay at 0x%08lx and state_render_rect at 0x%08lx\n",
-            (unsigned long)dsoSymbols.state_write, (unsigned long)dsoSymbols.state_frame_delay,
-            (unsigned long)dsoSymbols.state_render_rect);
+            (unsigned long)dsoSymbols.state_write,
+            (unsigned long)dsoSymbols.state_frame_delay,
+            (unsigned long)dsoSymbols.state_render_rect
+        );
     }
 
 public:
@@ -406,13 +410,9 @@ public:
             return;
         }
 
-        // Place payload into Expansion Pak memory.
+        // Place payload and DSO functions into Expansion Pak memory.
         // Requires DFS to still be intact.
         loadPayload();
-        
-        // Place game DSO into Expansion Pak memory, after the payload.
-        // Requires DFS to still be intact.
-        loadDSO();
     }
 
     void launch() {

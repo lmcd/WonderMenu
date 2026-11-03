@@ -12,31 +12,19 @@
 // From loader.c in libdragon
 #define PF_N64_COMPRESSED 0x1000
 
-uint32_t ELFFile::romAddress() {
-    return dfs_rom_addr(filename.c_str());
-}
+bool ELFFile::open(const char* filename) {
+    romAddress = 0;
+    phoff = 0;
+    phnum = 0;
 
-bool ELFFile::exists() {
-    return (romAddress() != 0);
-}
+    uint32_t elfBase = dfs_rom_addr(filename);
 
-void ELFFile::place(uint32_t capacity) {
-    imageBase = 0;
-    imageSize = 0;
-
-    if (!is_memory_expanded()) {
-        debugf("[ELFFile] Expansion Pak required to load ELF payloads\n");
-        return;
-    }
-
-    if (!exists()) {
-        debugf("[ELFFile] Payload doesn't exist! %s\n", filename.c_str());
-        return;
+    if (elfBase == 0) {
+        debugf("[ELFFile] Payload doesn't exist! %s\n", filename);
+        return false;
     }
 
     Elf32_Ehdr header;
-
-    uint32_t elfBase = romAddress();
 
     data_cache_hit_writeback_invalidate(&header, sizeof(header));
     dma_read_raw_async(&header, elfBase, sizeof(header));
@@ -48,28 +36,48 @@ void ELFFile::place(uint32_t capacity) {
         header.e_ident[EI_MAG2] == ELFMAG2 &&
         header.e_ident[EI_MAG3] == ELFMAG3;
 
-    assertf(
-        hasELFMagic,
-        "No ELF at 0x%08lx (read %02X %02X %02X %02X). Point rom_base at the raw "
-        "payload.elf.stripped.",
-        elfBase,
-        header.e_ident[EI_MAG0], header.e_ident[EI_MAG1],
-        header.e_ident[EI_MAG2], header.e_ident[EI_MAG3]
-    );
+    if (!hasELFMagic) {
+        debugf(
+            "[ELFFile] No ELF at 0x%08lx (read %02X %02X %02X %02X). Point rom_base at the raw "
+            "payload.elf.stripped.\n",
+            (unsigned long)elfBase,
+            header.e_ident[EI_MAG0], header.e_ident[EI_MAG1],
+            header.e_ident[EI_MAG2], header.e_ident[EI_MAG3]
+        );
+        return false;
+    }
 
-    uint32_t entry = header.e_entry;
-    uint32_t phoff = header.e_phoff;
-    int phnum = header.e_phnum;
+    if (header.e_phnum == 0 || header.e_phnum >= 16) {
+        debugf("[ELFFile] Program header table entry count bad: %d\n", header.e_phnum);
+        return false;
+    }
 
-    assertf(
-        phnum > 0 && phnum < 16,
-        "Program header table entry count bad: %d", phnum
-    );
+    if (header.e_entry != 0x80401000) {
+        debugf("[ELFFile] Payload entry = %08lx. Expected 0x80401000\n", (unsigned long)header.e_entry);
+        return false;
+    }
 
-    assertf(
-        entry == 0x80401000,
-        "Payload entry = %08lx. Expected 0x80401000", entry
-    );
+    romAddress = elfBase;
+    phoff = header.e_phoff;
+    phnum = header.e_phnum;
+
+    return true;
+}
+
+void ELFFile::place(uint32_t capacity) {
+    imageBase = 0;
+    imageSize = 0;
+
+    if (!isOpen()) {
+        return;
+    }
+
+    if (!is_memory_expanded()) {
+        debugf("[ELFFile] Expansion Pak required to load ELF payloads\n");
+        return;
+    }
+
+    uint32_t elfBase = romAddress;
 
     Elf32_Phdr segment;
 

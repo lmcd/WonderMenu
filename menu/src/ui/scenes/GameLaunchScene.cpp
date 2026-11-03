@@ -178,8 +178,6 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
         }
 
         bootSession.applyUserChoices(state, database);
-        bootSession.loadSpeedrunFile();
-        bootSession.loadSaveFile();
 
         clearProgressBarArea();
 
