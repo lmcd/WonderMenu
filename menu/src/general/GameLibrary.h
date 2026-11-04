@@ -123,8 +123,6 @@ public:
 
     void warmClusterOffsets();
 
-    void loadGamesFast();
-
     /**
      * Reload game list from the directories in `romDirectoryPaths`
      */
