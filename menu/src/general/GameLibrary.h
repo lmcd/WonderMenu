@@ -46,7 +46,6 @@ struct __attribute__((packed)) CacheResult {
     int16_t entryIndex = -1;
     uint8_t version = 0;
     uint32_t crc1 = 0;
-    uint32_t sclust = 0;
 };
 
 class GameLibrary {

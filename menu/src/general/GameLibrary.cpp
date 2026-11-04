@@ -525,7 +525,6 @@ void GameLibrary::loadGames() {
                 cache[fileIndex].entryIndex = cacheResult.entryIndex;
                 cache[fileIndex].version = cacheResult.version;
                 cache[fileIndex].crc1 = cacheResult.crc1;
-                cache[fileIndex].sclust = cacheResult.sclust;
             }
             else {
                 cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
@@ -536,7 +535,6 @@ void GameLibrary::loadGames() {
                     cache[fileIndex].entryIndex = (databaseEntry == nullptr) ? -1 : databaseEntry->entryIndex;
                     cache[fileIndex].version = romFile->version;
                     cache[fileIndex].crc1 = romFile->crc1;
-                    cache[fileIndex].sclust = romFile->fileObject.sclust;
                 } else {
                     debugf("[GameLibrary] Failed to load ROM file: %s\n", filename);
 
@@ -546,7 +544,6 @@ void GameLibrary::loadGames() {
                     cache[fileIndex].entryIndex = -1;
                     cache[fileIndex].version = 0;
                     cache[fileIndex].crc1 = 0;
-                    cache[fileIndex].sclust = 0;
 
                     continue;
                 }
