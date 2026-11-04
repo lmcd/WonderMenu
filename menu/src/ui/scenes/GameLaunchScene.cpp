@@ -170,20 +170,20 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
         transition.direction = Transition::IDLE;
     }
     else if (transition.didReachEnd()) {
-        // Carry on streaming a frame at a time until the whole ROM is on the
-        // cart, so the progress bar keeps drawing as normal.
-        if (!bootSession.hasLoadedToCart()) {
-            bootSession.advance();
-            return;
+        if (bootSession.hasLoadedToCart()) {
+            bootSession.applyUserChoices(state, database);
+
+            clearProgressBarArea();
+
+            state.romIsLoaded = true;
+
+            renderer->end();
         }
-
-        bootSession.applyUserChoices(state, database);
-
-        clearProgressBarArea();
-
-        state.romIsLoaded = true;
-
-        renderer->end();
+        else {
+            // Carry on streaming a frame at a time until the whole ROM is on the
+            // cart, so the progress bar keeps drawing as normal.
+            bootSession.advance();
+        }
 
         return;
     }
