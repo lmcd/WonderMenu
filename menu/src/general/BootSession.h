@@ -56,25 +56,18 @@ private:
 
     int totalWork = 0;
 
-    M64File* m64File;
     CheatList cheatList;
 
-    // Held here until launch() stages the payload and writes it into
-    // `PayloadData`, which staging would otherwise overwrite
-    bool isRecording = false;
-
-    uint8_t numberOfControllers = 1;
+    // Where loadDSO() placed the game's state_write, state_frame_delay and
+    // state_render_rect, for `PayloadData::dsoSymbols`. 0 for each it didn't:
+    // the game has no DSO, or (state_frame_delay only) doesn't define one.
+    DSOSymbols dsoSymbols;
 
     // `PayloadData` lives at the start of the payload, at 7 MiB in the expansion pak.
     PayloadData* payloadData = (PayloadData*)PAYLOAD_ADDRESS;
     SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
     GameInfo* gameInfo = &payloadData->gameInfo;
-
-    // Where loadDSO() placed the game's state_write, state_frame_delay and
-    // state_render_rect, for `PayloadData::dsoSymbols`. 0 for each it didn't:
-    // the game has no DSO, or (state_frame_delay only) doesn't define one.
-    DSOSymbols dsoSymbols;
 
     int cartWorkRemaining() {
         return cartWorker ? cartWorker->workRemaining() : 0;
@@ -146,6 +139,33 @@ private:
         dsoSymbols.state_render_rect = (uint32_t)state_render_rect;
     }
 
+    void loadSpeedrunFile(M64File* m64File) {
+        if (m64File == nullptr) {
+            return;
+        }
+
+        m64File->stageInputsTable(M64_INPUTS_ADDRESS);
+
+        debugf("[BootSession] Staged inputs table from %s (%lu bytes)\n", m64File->filename.c_str(), (unsigned long)m64File->size);
+    }
+
+    void loadSaveFile() {
+        if (game->databaseEntry == nullptr) {
+            return;
+        }
+
+        std::string romFilePath = game->romFile.path;
+
+        std::string saveFilename = std::filesystem::path(romFilePath).filename().replace_extension(".sav").string();
+        std::string saveFilePath = "sd:/saves/" + saveFilename;
+
+        debugf("[BootSession] Save file %s\n", saveFilePath.c_str());
+
+        flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->saveType;
+
+        flashcart_load_save(saveFilePath.data(), saveType);
+    }
+
 public:
     Game* game;
 
@@ -203,126 +223,123 @@ public:
         return 1.0f - ((float)remaining / totalWork);
     }
 
-    void loadSpeedrunFile() {
-        if (m64File == nullptr) {
-            return;
-        }
-
-        m64File->stageInputsTable(M64_INPUTS_ADDRESS);
-
-        debugf("[BootSession] Staged inputs table from %s (%lu bytes)\n", m64File->filename.c_str(), (unsigned long)m64File->size);
-    }
-
-    void loadSaveFile() {
-        if (m64File != nullptr) {
-            return;
-        }
-
-        if (isRecording) {
-            return;
-        }
-
-        if (game->databaseEntry == nullptr) {
-            return;
-        }
-
-        std::string romFilePath = game->romFile.path;
-
-        std::string saveFilename = std::filesystem::path(romFilePath).filename().replace_extension(".sav").string();
-        std::string saveFilePath = "sd:/saves/" + saveFilename;
-
-        debugf("[BootSession] Save file %s\n", saveFilePath.c_str());
-
-        flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->saveType;
-
-        flashcart_load_save(saveFilePath.data(), saveType);
-    }
-
     void applyUserChoices(GameInfoState& gameInfoState, GameDatabase& database) {
         SpeedrunsState& speedrunsState = gameInfoState.speedrunsState;
         CheatsState& cheatsState = gameInfoState.cheatsState;
 
-        m64File = nullptr;
-        isRecording = false;
-        numberOfControllers = speedrunsState.numberOfControllers;
-
+        bool isRecording = false;
+        M64File* m64File = nullptr;
+        
         cheatList = CheatList();
+
         cheatList.cheatsDatabase = database.loadCheatDatabase(game->databaseEntry);
 
-        // The game's REQUIRED cheats (e.g. an enabler code) go first, as the
-        // selected cheats don't work without them
-        cheatList.addCheatGroup(CHEAT_GROUP_REQUIRED);
+        auto adjustPayloadAddress = [](uint32_t address) -> uint32_t {
+            return address + ((PAYLOAD_ADDRESS & 0x00FF0000) >> 0);
+        };
 
-        CheatCode nmiHandlerCheatCode = {0xBE700240, 0x0000};
-        CheatCode jalHandlerCheatCode = {0xBB700260, 0x0000};
+        CheatCode nmiHandlerCheatCode = {adjustPayloadAddress(0xBE000240), 0x0000, 0x0000};
+        CheatCode jalHandlerCheatCode = {adjustPayloadAddress(0xBB000260), 0x0000};
 
-        if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
-            if (speedrunsState.isRecording) {
-                // NMI-reset handler
-                cheatList.addCheatCode(nmiHandlerCheatCode);
+        if (canUseExpansionPak) {
+            // The game's REQUIRED cheats (e.g. an enabler code) go first, as the
+            // selected cheats don't work without them
+            cheatList.addCheatGroup(CHEAT_GROUP_REQUIRED);
 
-                // Show record icon
-                cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_RECORD_ICON);
+            if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
+                if (speedrunsState.isRecording) {
+                    // NMI-reset handler
+                    cheatList.addCheatCode(nmiHandlerCheatCode);
 
-                // Increment frame number
-                cheatList.addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
-
-                // Write controller state to expansion pak
-                cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_WRITE_M64_INPUTS);
-            }
-            else {
-                for (M64File* candidate : game->m64Files) {
-                    if (candidate->crc == speedrunsState.selectedCRC) {
-                        m64File = candidate;
-                        break;
-                    }
-                }
-
-                if (m64File != nullptr) {
-                    // Show play icon
-                    cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_PLAY_ICON);
+                    // Show record icon
+                    cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_RECORD_ICON);
 
                     // Increment frame number
                     cheatList.addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
 
-                    // Read controller state from expansion pak
-                    cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_READ_M64_INPUTS);
+                    // Write controller state to expansion pak
+                    cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_WRITE_M64_INPUTS);
+                }
+                else {
+                    for (M64File* candidate : game->m64Files) {
+                        if (candidate->crc == speedrunsState.selectedCRC) {
+                            m64File = candidate;
+                            break;
+                        }
+                    }
+
+                    if (m64File != nullptr) {
+                        // Show play icon
+                        cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_PLAY_ICON);
+
+                        // Increment frame number
+                        cheatList.addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
+
+                        // Read controller state from expansion pak
+                        cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_READ_M64_INPUTS);
+                    }
+                }
+
+                isRecording = speedrunsState.isRecording;
+            }
+            else if (cheatList.cheatsDatabase != nullptr && cheatsState.enabledCheatIndexes.size() > 0) {
+                for (int cheatIndex : cheatsState.enabledCheatIndexes) {
+                    const uint16_t* option = cheatsState.multipleChoiceIndexes.find(cheatIndex);
+
+                    cheatList.addCheatCodes(cheatIndex, option ? (int16_t)*option : -1);
                 }
             }
 
-            isRecording = speedrunsState.isRecording;
-        }
-        else if (cheatList.cheatsDatabase != nullptr && cheatsState.enabledCheatIndexes.size() > 0) {
-            for (int cheatIndex : cheatsState.enabledCheatIndexes) {
-                const uint16_t* option = cheatsState.multipleChoiceIndexes.find(cheatIndex);
-
-                cheatList.addCheatCodes(cheatIndex, option ? (int16_t)*option : -1);
+            if (cheatList.itemCount > 0) {
+                cheatList.addCheatCode(jalHandlerCheatCode);
             }
+
+            // Place payload and DSO functions into Expansion Pak memory.
+            // Requires DFS to still be intact.
+            loadPayload();
+
+            uint8_t controllerCount = 1;
+            uint32_t sampleCount = 0;
+
+            if (m64File != nullptr) {
+                loadSpeedrunFile(m64File);
+
+                controllerCount = m64File->controllerCount;
+                sampleCount = m64File->sampleCount;
+            }
+            else if (isRecording) {
+                controllerCount = speedrunsState.numberOfControllers;
+            }
+
+            payloadData->memSize    = __boot_memsize;
+            payloadData->cardType   = cart_type;
+            payloadData->dsoSymbols = dsoSymbols;
+
+            gameInfo->romSize     = game->romFile.size;
+            gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
+            gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
+            gameInfo->region      = (uint8_t)game->romFile.regionCode;
+            gameInfo->version     = game->romFile.version;
+
+            screenshotSettings->showOverlay  = true;
+            screenshotSettings->overlayDelay = 32;
+
+            speedrunSettings->showOverlay = true;
+            speedrunSettings->isRecording = isRecording;
+            speedrunSettings->controllerCount = controllerCount;
+            speedrunSettings->sampleCount = sampleCount;
         }
 
-        if (cheatList.itemCount > 0) {
-            cheatList.addCheatCode(jalHandlerCheatCode);
+        if (m64File == nullptr && !isRecording) {
+            loadSaveFile();
         }
-
-        loadSpeedrunFile();
-        loadSaveFile();
     }
 
     void commitToLaunch() {
         loadBeginningChunks = true;
-
-        if (!canUseExpansionPak) {
-            return;
-        }
-
-        // Place payload and DSO functions into Expansion Pak memory.
-        // Requires DFS to still be intact.
-        loadPayload();
     }
 
     void launch() {
-        boot_params.cheat_list = nullptr;
-
         // Make sure we're not writing into an area occupied by game code.
         if (game->romFile.size < MiB(64)) {
             // Write state that can be retrieved again after a 'warm' reset,
@@ -345,38 +362,10 @@ public:
         }
 
         if (canUseExpansionPak) {
-            uint8_t controllerCount = 1;
-            uint32_t sampleCount = 0;
-
-            if (m64File != nullptr) {
-                controllerCount = m64File->controllerCount;
-                sampleCount = m64File->sampleCount;
-            }
-            else if (isRecording) {
-                controllerCount = numberOfControllers;
-            }
-
             boot_params.cheat_list = cheatList;
-
-            payloadData->memSize    = __boot_memsize;
-            payloadData->cardType   = cart_type;
-            payloadData->dsoSymbols = dsoSymbols;
-
-            gameInfo->romSize     = game->romFile.size;
-            gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
-            gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
-            gameInfo->region      = (uint8_t)game->romFile.regionCode;
-            gameInfo->version     = game->romFile.version;
-
-            screenshotSettings->nextNumber   = 0;
-            screenshotSettings->showOverlay  = true;
-            screenshotSettings->overlayDelay = 32;
-            screenshotSettings->writeOffset  = 0;
-
-            speedrunSettings->showOverlay = true;
-            speedrunSettings->isRecording = isRecording;
-            speedrunSettings->controllerCount = controllerCount;
-            speedrunSettings->sampleCount = sampleCount;
+        }
+        else {
+            boot_params.cheat_list = nullptr;
         }
 
         // Boot into the selected game.

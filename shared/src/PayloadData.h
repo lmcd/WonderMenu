@@ -59,18 +59,14 @@ struct __attribute__((packed)) ScreenshotsHeader {
 
 // Size: 12
 struct __attribute__((packed)) ScreenshotSettings {
-    // Size: 2
-    int16_t nextNumber = 0;
     // Size: 1
     uint8_t controllerPort = 0;
     // Size: 1
     bool showOverlay = true;
-    // Size: 4
-    uint32_t writeOffset = 0;
     // Size: 1
     uint8_t overlayDelay = 32;
-    // Size: 3
-    uint8_t reserved[3] = {0};
+    // Size: 9
+    uint8_t reserved[9] = {0};
 };
 
 // Size: 16

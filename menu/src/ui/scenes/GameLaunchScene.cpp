@@ -151,6 +151,7 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
 
             hasInitiatedLaunch = true;
 
+            bootSession.applyUserChoices(state, database);
             bootSession.commitToLaunch();
         }
         else if (btn.b) {
@@ -171,8 +172,6 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
     }
     else if (transition.didReachEnd()) {
         if (bootSession.hasLoadedToCart()) {
-            bootSession.applyUserChoices(state, database);
-
             clearProgressBarArea();
 
             state.romIsLoaded = true;
