@@ -218,7 +218,7 @@ void boot (boot_params_t *params) {
        cart transfer already happened behind the launch animation, so all that is
        left at boot time is a quick RDRAM-to-RDRAM copy. */
     bool hle_boot = boot_can_hle(params->cic_type);
-    bool hle_staged = hle_boot && params->rom_staged_in_memory && is_memory_expanded();
+    bool hle_staged = hle_boot && params->rom_staged_memory_address > 0 && is_memory_expanded();
 
     uint32_t boot_path = !hle_boot   ? BOOT_PATH_IPL3
                        : hle_staged  ? BOOT_PATH_HLE_STAGED
@@ -249,7 +249,7 @@ void boot (boot_params_t *params) {
         game_entry_address -= 0x200000;
     }
     uint32_t game_source_address = hle_staged
-        ? GAME_STAGING_ADDRESS
+        ? params->rom_staged_memory_address
         : (uint32_t) (&base[GAME_LOAD_ROM_OFFSET / sizeof(io32_t)]);
 
     uint32_t version_value = (params->tv_type == BOOT_TV_TYPE_PAL) ? 6

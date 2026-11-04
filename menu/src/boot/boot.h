@@ -28,15 +28,6 @@ extern "C" {
 #define GAME_LOAD_ROM_OFFSET KiB(4)
 #define GAME_LOAD_SIZE       MiB(1)
 
-/**
- * @brief Where the game's first MiB is staged in RDRAM ahead of an HLE boot.
- *
- * 1 MiB into the Expansion Pak, i.e. the 5 MiB point. Whoever stages it there
- * (see `LoadROMFirstMBToMemoryWorker`) sets `rom_staged_in_memory` so the boot
- * path knows it can copy from here instead of from the cart.
- */
-#define GAME_STAGING_ADDRESS (0x80500000)
-
 /** @brief Boot device type enumeration */
 typedef enum {
     BOOT_DEVICE_TYPE_ROM = 0, /**< Boot from ROM */
@@ -65,7 +56,7 @@ typedef struct {
     cic_type_t cic_type;
     uint8_t cic_seed; /**< CIC seed */
     bool detect_cic_seed; /**< Flag to detect CIC seed */
-    bool rom_staged_in_memory; /**< Game's first MiB is staged at GAME_STAGING_ADDRESS */
+    uint32_t rom_staged_memory_address; /**< Game's first MiB */
     uint32_t *cheat_list; /**< Pointer to the cheat list */
 } boot_params_t;
 

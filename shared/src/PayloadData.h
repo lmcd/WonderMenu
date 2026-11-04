@@ -8,13 +8,17 @@
 #include <cstddef>
 #include <cstdint>
 
-#define ROM_ADDRESS           0x10000000  // Cartridge Space - where a loaded game/ROM lives
-#define PAYLOAD_ADDRESS       0xA0700000  // @7MB (Expansion Pak - Uncached)
-// #define GAME_STAGING_ADDRESS  0x80500000  // @5MB (Expansion Pak)
-#define M64_INPUTS_ADDRESS    0x80600000  // @6MB (Expansion Pak)
+#define ROM_ADDRESS               0x10000000  // Cartridge Space - where a loaded game/ROM lives
 
-#define ROM_SCREENSHOT_MAGIC  1093627481  // Just a random number
-#define ROM_SPEEDRUN_MAGIC    3412958702  // Just a random number
+#define PAYLOAD_ADDRESS           0xA0700000  // @7MB (Expansion Pak, Uncached)
+#define GAME_STAGING_ADDRESS      0x80500000  // @5MB (Expansion Pak)
+#define M64_INPUTS_ADDRESS        0x80600000  // @6MB (Expansion Pak)
+#define FRAMEBUFFER_COPY_ADDRESS  0x80500000  // @5MB (Expansion Pak)
+
+#define FRAMEBUFFER_COPY_MAX_SIZE 0x00100000  // MiB(1)
+
+#define ROM_SCREENSHOT_MAGIC      1093627481  // Just a random number
+#define ROM_SPEEDRUN_MAGIC        3412958702  // Just a random number
 
 // Layout of a recording the payload leaves in cart space, after the game ROM,
 // for the menu to save as an M64. The inputs are frameCount samples of
@@ -24,11 +28,6 @@
 #define ROM_SPEEDRUN_CONTROLLER_COUNT_OFFSET 8
 #define ROM_SPEEDRUN_INPUTS_OFFSET           16
 
-// @5MB (Expansion Pak). The menu stages the game's first MiB here before boot
-// (GAME_STAGING_ADDRESS in boot.h), so it's free once the game is running. The
-// payload copies the framebuffer on screen here: 1 MiB covers 640x480 RGBA16.
-#define FRAMEBUFFER_COPY_ADDRESS  0x80500000
-#define FRAMEBUFFER_COPY_MAX_SIZE 0x00100000 // MiB(1)
 
 // Upper bound on the screenshot count read back from the cart, which is only
 // guarded by the magic word above.
@@ -51,35 +50,11 @@ enum HookIdentifier : uint16_t {
 };
 
 // Size: 8
-struct __attribute__((packed)) GameInfo {
-    // Size: 4
-    uint32_t romSize;
-    // Size: 2
-    char uniqueID[2];
-    // Size: 1
-    uint8_t region;
-    // Size: 1
-    uint8_t version;
-};
-
-// Size: 8
 struct __attribute__((packed)) ScreenshotsHeader {
     // Size: 4
     uint32_t magic = 0;
     // Size: 4
     uint32_t count = 0;
-};
-
-// Size: 4
-struct __attribute__((packed)) ScreenshotHeader {
-    // Size: 2
-    uint16_t width;
-    // Size: 2
-    uint16_t height;
-    // Size: 1
-    bool containsGameData;
-    // Size: 1
-    uint8_t reserved[1] = {0};
 };
 
 // Size: 12
@@ -112,6 +87,20 @@ struct __attribute__((packed)) SpeedrunSettings {
     uint8_t reserved[9] = {0};
 };
 
+static_assert(offsetof(SpeedrunSettings, sampleCount) == 0, "sampleCount must stay word aligned");
+
+// Size: 8
+struct __attribute__((packed)) GameInfo {
+    // Size: 4
+    uint32_t romSize;
+    // Size: 2
+    char uniqueID[2];
+    // Size: 1
+    uint8_t region;
+    // Size: 1
+    uint8_t version;
+};
+
 // Size: 12
 struct __attribute__((packed)) DSOSymbols {
     // Address (in Expansion Pak) of `state_write()`.
@@ -129,8 +118,6 @@ struct __attribute__((packed)) DSOSymbols {
     // Cached KSEG0.
     uint32_t state_render_rect = 0;
 };
-
-static_assert(offsetof(SpeedrunSettings, sampleCount) == 0, "sampleCount must stay word aligned");
 
 // Size: 64
 struct __attribute__((packed)) PayloadData {
