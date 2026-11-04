@@ -19,6 +19,18 @@ boot_params_t boot_params;
 #define OS_INFO_ADDRESS       (0xA0000300)
 #define OS_INFO_NMI_BUFFER_WORDS (16)
 
+/* The x103 IPL3 copies its last stage, DMEM 0x4C0-0x767, to the start of RDRAM
+   and runs it from there while it fills DMEM and IMEM. The game inherits it:
+   Banjo-Kazooie checks the word at 0x800001D8 and clips its view if it isn't
+   there. IPL3 sits at the same offsets in DMEM as in the ROM. */
+#define X103_IPL3_STAGE_START   (0x4C0)
+#define X103_IPL3_STAGE_END     (0x768)
+#define X103_IPL3_STAGE_ADDRESS (0xA0000000)
+
+/* What the x103 IPL3 writes to osCicId. Banjo-Kazooie and Diddy Kong Racing
+   check it. The x102 IPL3 doesn't write osCicId at all. */
+#define X103_OS_CIC_ID (6103)
+
 /**
  * Selects the base IO address for the configured boot device.
  *
@@ -46,7 +58,7 @@ static io32_t *boot_get_device_base (boot_params_t *params) {
  * @returns true to take the HLE path in reboot.S.
  */
 static bool boot_can_hle (cic_type_t cic_type) {
-    return cic_type == CIC_x102;// || cic_type == CIC_x103;
+    return cic_type == CIC_x102 || cic_type == CIC_x103;
 }
 
 /**
@@ -67,7 +79,9 @@ static void boot_write_os_info (boot_params_t *params, uint32_t version) {
                ? (0xA0000000 | ROM_DDIPL_BASE)
                : (0xA0000000 | ROM_CART_BASE);              // osRomBase
     os_info[3] = BOOT_RESET_TYPE_COLD;                      // osResetType
-    os_info[4] = (params->cic_seed & 0xFF);                 // osCicId
+    os_info[4] = (params->cic_type == CIC_x103)
+               ? X103_OS_CIC_ID
+               : (params->cic_seed & 0xFF);                 // osCicId
     os_info[5] = version;                                   // osVersion
     os_info[6] = __boot_memsize;                            // osMemSize
 
@@ -75,6 +89,24 @@ static void boot_write_os_info (boot_params_t *params, uint32_t version) {
        report a cold reset, so hand it over zeroed. */
     for (int i = 0; i < OS_INFO_NMI_BUFFER_WORDS; i++) {
         os_info[7 + i] = 0;
+    }
+}
+
+/**
+ * Leave the x103 IPL3's last stage at the start of RDRAM, as running it would.
+ *
+ * This overwrites the menu's exception vectors, so interrupts are disabled
+ * first. Nothing needs them again: the next stop is reboot.S, then the game.
+ *
+ * @param base The boot device, read for the cartridge's own IPL3.
+ */
+static void boot_write_x103_ipl3_stage (io32_t *base) {
+    disable_interrupts();
+
+    volatile uint32_t *dst = (volatile uint32_t *) X103_IPL3_STAGE_ADDRESS;
+
+    for (uint32_t offset = X103_IPL3_STAGE_START; offset < X103_IPL3_STAGE_END; offset += sizeof(io32_t)) {
+        *dst++ = io_read((uint32_t) (&base[offset / sizeof(io32_t)]));
     }
 }
 
@@ -247,6 +279,11 @@ void boot (boot_params_t *params) {
             "cheats: %i\n",
             (int) params->cic_type, cheats_installed
         );
+    }
+
+    // Last, as it disables interrupts
+    if (hle_boot && params->cic_type == CIC_x103) {
+        boot_write_x103_ipl3_stage(base);
     }
 
     register uint32_t skip_rdram_reset asm ("a0");
