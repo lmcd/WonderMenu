@@ -293,14 +293,14 @@ void GameDatabase::warmClusterOffsets(const std::vector<GameDatabase::Entry*>& e
         }
     }
 
-    for (GameDatabase::Entry* entry : entries) {
-        if (!entry->hasCheatDatabase()) {
-            continue;
-        }
+    // for (GameDatabase::Entry* entry : entries) {
+    //     if (!entry->hasCheatDatabase()) {
+    //         continue;
+    //     }
         
-        f_lseek(&file, cheatsStartOffset + entry->cheatByteOffset);
-        entry->cheatsCluster = file.clust;
-    }
+    //     f_lseek(&file, cheatsStartOffset + entry->cheatByteOffset);
+    //     entry->cheatsCluster = file.clust;
+    // }
 }
 
 bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, int chunkOffset, int chunkCount) {
