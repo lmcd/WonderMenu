@@ -47,7 +47,7 @@ struct GameDSO {
         }
 
         char dfsPath[16];
-        snprintf(dfsPath, sizeof(dfsPath), "state/%c%c.dso", toupper(id0), toupper(id1));
+        snprintf(dfsPath, sizeof(dfsPath), "state/%c%c.dso", id0, id1);
 
         uint32_t romAddress = dfs_rom_addr(dfsPath);
         
