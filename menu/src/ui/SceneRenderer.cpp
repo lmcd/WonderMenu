@@ -213,6 +213,17 @@ void SceneRenderer::render(int frameNumber) {
         
         lastSurface = display_get();
 
+        for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
+            if (framebuffers[i] == lastSurface) {
+                break;
+            }
+
+            if (framebuffers[i] == nullptr) {
+                framebuffers[i] = lastSurface;
+                break;
+            }
+        }
+
         rdpq_attach(lastSurface, NULL);
         rdpq_mode_zbuf(false, false);
 

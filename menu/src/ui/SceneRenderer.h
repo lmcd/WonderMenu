@@ -66,6 +66,13 @@ public:
      */
     surface_t* lastSurface = nullptr;
 
+    /*
+     * Every framebuffer display_get() has handed out so far, in the order
+     * first seen. libdragon shows them in FIFO order, so at any point one can
+     * be on screen, one queued behind it, and one being drawn.
+     */
+    surface_t* framebuffers[FRAMEBUFFER_COUNT] = {};
+
     SceneRenderer(Scene* initialScene = nullptr);
     ~SceneRenderer();
 

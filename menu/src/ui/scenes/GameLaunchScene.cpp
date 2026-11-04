@@ -193,48 +193,25 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
     bootSession.advance();
 }
 
-static void clearFramebufferRows(void* buffer, uint32_t stride, int minRow, int maxRow) {
-    uint8_t* rows = (uint8_t *)buffer + (minRow * stride);
-    uint32_t length = (maxRow - minRow) * stride;
-
-    memset(rows, 0, length);
-
-    // The framebuffers are allocated uncached - no cache invalidation
-    // necessary.
-}
-
 void GameLaunchScene::clearProgressBarArea() {
-    // This runs from `update`, after the frame just rendered (still showing the
-    // bar) has been queued, but before the vblank that swaps it onto the screen
-    // -- so it, not the buffer at VI_ORIGIN, is what the game inherits. Clear
-    // the bar from both, rather than waiting a frame for the swap.
-    surface_t* surface = renderer->lastSurface;
+    // A little margin for the antialiased edges of the rounded corners
+    Rect frame = progressBarView.worldFrame().insetBy(Vec2(-2, -2));
 
-    if (surface == nullptr) {
-        return;
+    // Queued behind the frame, so there's no need to wait for it first
+    for (surface_t* surface : renderer->framebuffers) {
+        if (surface == nullptr) {
+            continue;
+        }
+
+        rdpq_attach(surface, NULL);
+        rdpq_set_mode_fill(Color::BLACK);
+        rdpq_fill_rectangle(frame.minX(), frame.minY(), frame.maxX(), frame.maxY());
+        rdpq_detach();
     }
 
-    Rect frame = progressBarView.frame.insetBy(Vec2(0, -2));
-
-    int minRow = frame.minY();
-    int maxRow = frame.maxY();
-
-    if (maxRow <= minRow) {
-        return;
-    }
-
-    // Let the RDP finish drawing the queued frame first.
+    // The game takes over the framebuffers' memory, so the fills must have
+    // landed before it boots
     rspq_wait();
-
-    clearFramebufferRows(surface->buffer, surface->stride, minRow, maxRow);
-
-    uint32_t origin = vi_read(VI_ORIGIN);
-
-    if (origin != 0) {
-        // Interlaced, the origin is a row further on for odd fields; the
-        // padding around the bar covers that.
-        clearFramebufferRows(VirtualUncachedAddr(origin), surface->stride, minRow, maxRow);
-    }
 }
 
 void GameLaunchScene::showGameInfo() {
