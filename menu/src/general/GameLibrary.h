@@ -23,6 +23,9 @@
 #define MAX_NUMBER_OF_DIRECTORIES 255
 #define MAX_DIRECTORY_LENGTH 128
 
+#define MAX_NUMBER_OF_RECENTS 16
+#define MAX_NUMBER_OF_FAVOURITES 16
+
 struct __attribute__((packed)) CacheHeader {
     uint8_t empty1[1] = {0};
 

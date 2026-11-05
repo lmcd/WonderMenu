@@ -181,7 +181,7 @@ void GameLibrary::loadHistoryAndFavourites() {
     
     parser.beginSection("history");
 
-    while (parser.read(iniEntry)) {
+    while (recentsPaths.size() < MAX_NUMBER_OF_RECENTS && parser.read(iniEntry)) {
         if (iniEntry.primaryPath.empty()) {
             continue;
         }
@@ -191,7 +191,7 @@ void GameLibrary::loadHistoryAndFavourites() {
 
     parser.beginSection("favorite");
 
-    while (parser.read(iniEntry)) {
+    while (favouritesPaths.size() < MAX_NUMBER_OF_FAVOURITES && parser.read(iniEntry)) {
         if (iniEntry.primaryPath.empty()) {
             continue;
         }
@@ -262,6 +262,10 @@ void GameLibrary::addToRecents(GameGroup gameGroup) {
 
     recentGroups.emplace(recentGroups.begin(), *game);
 
+    if (recentGroups.size() > MAX_NUMBER_OF_RECENTS) {
+        recentGroups.erase(recentGroups.begin() + MAX_NUMBER_OF_RECENTS, recentGroups.end());
+    }
+
     saveHistoryAndFavourites();
 }
 
@@ -279,6 +283,12 @@ void GameLibrary::toggleFavourite(GameGroup gameGroup) {
     }
     else {
         favouriteGroups.emplace(favouriteGroups.begin(), *game);
+
+        // The oldest favourite drops off the end, so it's no longer one
+        while (favouriteGroups.size() > MAX_NUMBER_OF_FAVOURITES) {
+            favouriteGroups.back().preferredGame()->isFavourite = false;
+            favouriteGroups.pop_back();
+        }
     }
 
     saveHistoryAndFavourites();
