@@ -210,7 +210,7 @@ public:
 
     static uint32_t djb2(const unsigned char* data, size_t length);
 
-    bool isDatabaseOpen();
+    bool isOpen() const;
 
     int getLabelTileOffset(int tileIndex);
 

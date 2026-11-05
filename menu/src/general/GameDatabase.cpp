@@ -58,7 +58,7 @@ GameDatabase::~GameDatabase() {
     close();
 }
 
-bool GameDatabase::isDatabaseOpen() {
+bool GameDatabase::isOpen() const {
     #ifndef N64
     return false;
     #else
@@ -93,7 +93,7 @@ bool GameDatabase::loadEntriesIntoMemory() {
         return true;
     }
 
-    if (!isDatabaseOpen() || entryCount == 0) {
+    if (!isOpen() || entryCount == 0) {
         return false;
     }
 
@@ -142,7 +142,7 @@ void GameDatabase::releaseEntriesFromMemory() {
 }
 
 GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
-    if (!isDatabaseOpen()) {
+    if (!isOpen()) {
         return nullptr;
     }
 
@@ -232,7 +232,7 @@ GameDatabase::Entry* GameDatabase::entryForUniqueID(char uniqueID[2], RegionCode
 }
 
 GameDatabase::Entry* GameDatabase::entryForROMFile(ROMFile* romFile) {
-    if (!isDatabaseOpen()) {
+    if (!isOpen()) {
         return nullptr;
     }
     
@@ -272,7 +272,7 @@ void GameDatabase::warmClusterOffsets(const std::vector<GameDatabase::Entry*>& e
 }
 
 bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, int chunkOffset, int chunkCount) {
-    if (!isDatabaseOpen()) {
+    if (!isOpen()) {
         return false;
     }
 
@@ -359,7 +359,7 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 #endif
 
 SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
-    if (!isDatabaseOpen()) {
+    if (!isOpen()) {
         return nullptr;
     }
 
@@ -420,7 +420,7 @@ SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
 }
 
 CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
-    if (!isDatabaseOpen()) {
+    if (!isOpen()) {
         return nullptr;
     }
 
@@ -592,7 +592,7 @@ void GameDatabase::close() {
     releaseEntriesFromMemory();
 
     #ifdef N64
-    if (isDatabaseOpen()) {
+    if (isOpen()) {
         f_close(&file);
     }
 
