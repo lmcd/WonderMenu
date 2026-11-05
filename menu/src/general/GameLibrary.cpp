@@ -211,7 +211,7 @@ void GameLibrary::loadHistoryAndFavourites() {
 
     INIParser parser(iniPath);
     INIParser::Entry iniEntry;
-    
+
     parser.beginSection("history");
 
     while (recentsPaths.size() < MAX_NUMBER_OF_RECENTS && parser.read(iniEntry)) {
@@ -478,7 +478,7 @@ void GameLibrary::warmClusterOffsets() {
     // to right is faster
     std::sort(entries.begin(), entries.end(),
         [](const GameDatabase::Entry* a, const GameDatabase::Entry* b) {
-            return a->smallLabelTileIndex < b->smallLabelTileIndex;
+            return a->data.smallLabelTileIndex < b->data.smallLabelTileIndex;
         }
     );
 
@@ -497,10 +497,6 @@ void GameLibrary::loadGames() {
     int fileIndex = -1;
     int entryIndex = 0;
 
-    // Move database entires from cart space into memory for quicker retrieval.
-    // NOTE: this suprisingly only saves about 22ms of load time for a library
-    // of 900 games. Hmmm...
-    database.loadEntriesIntoMemory();
     std::vector<uint32_t> recentsHashes = filenameHashes(recentsPaths);
     std::vector<uint32_t> favouritesHashes = filenameHashes(favouritesPaths);
 
@@ -619,9 +615,9 @@ void GameLibrary::loadGames() {
             }
 
             if (databaseEntry != nullptr) {
-                romFile->uniqueID[0] = databaseEntry->uniqueID[0];
-                romFile->uniqueID[1] = databaseEntry->uniqueID[1];
-                romFile->regionCode = databaseEntry->regionCode;
+                romFile->uniqueID[0] = databaseEntry->data.uniqueID[0];
+                romFile->uniqueID[1] = databaseEntry->data.uniqueID[1];
+                romFile->regionCode = databaseEntry->data.regionCode;
             }
 
             Game& lastGame = allGames.emplace_back(*romFile, databaseEntry);
@@ -668,8 +664,6 @@ void GameLibrary::loadGames() {
             }
         } while (scanner.next());
     }
-
-    database.releaseEntriesFromMemory();
 
     // fileIndex is the last 0-based index; the count is one more than that
     cachedFileCount = fileIndex + 1;

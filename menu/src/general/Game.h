@@ -134,7 +134,7 @@ public:
 
     bool requiresExpansionPak() {
         if (databaseEntry != nullptr) {
-            return databaseEntry->requiresExpansionPak;
+            return databaseEntry->data.requiresExpansionPak;
         }
         else {
             return true;

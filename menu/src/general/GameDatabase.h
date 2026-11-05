@@ -102,63 +102,67 @@ public:
     /**
      * Database entry for a known game
      */
-    struct __attribute__((packed)) Entry {
-        // The title of the game (e.g. Banjo Kazooie)
-        char title[DB_ENTRY_TITLE_LENGTH];
+    struct Entry {
+        struct __attribute__((packed)) Data {
+            // The title of the game (e.g. Banjo Kazooie)
+            char title[DB_ENTRY_TITLE_LENGTH];
 
-        // The developer of the game (e.g. Rareware)
-        char developer[DB_ENTRY_DEVELOPER_LENGTH];
+            // The developer of the game (e.g. Rareware)
+            char developer[DB_ENTRY_DEVELOPER_LENGTH];
 
-        // An alphanumeric character that specifies the kind of media the game is stored on.
-        CategoryCode categoryCode;
+            // An alphanumeric character that specifies the kind of media the game is stored on.
+            CategoryCode categoryCode;
 
-        // The 2 character game ID (e.g. BK)
-        char uniqueID[2] = "0";
+            // The 2 character game ID (e.g. BK)
+            char uniqueID[2] = "0";
 
-        RegionCode regionCode;
+            RegionCode regionCode;
 
-        SaveType saveType;
+            SaveType saveType;
 
-        uint8_t cicType;
+            uint8_t cicType;
 
-        uint16_t smallLabelTileIndex;
-        uint16_t largeLabelTileIndex;
+            uint16_t smallLabelTileIndex;
+            uint16_t largeLabelTileIndex;
 
-        // Byte offset into cheat data section
-        // 0xFFFFFFFF = no cheats
-        uint32_t cheatByteOffset;
+            // Byte offset into cheat data section
+            // 0xFFFFFFFF = no cheats
+            uint32_t cheatByteOffset;
 
-        // Byte offset into speedrun data section
-        // 0xFFFFFFFF = no speedruns
-        uint32_t speedrunsByteOffset;
+            // Byte offset into speedrun data section
+            // 0xFFFFFFFF = no speedruns
+            uint32_t speedrunsByteOffset;
 
-        bool requiresExpansionPak;
+            bool requiresExpansionPak;
 
-        // Spare room for fields added later
-        uint8_t reserved[DB_ENTRY_RESERVED_LENGTH];
+            // Spare room for fields added later
+            uint8_t reserved[DB_ENTRY_RESERVED_LENGTH];
+        };
 
-        // Not imported from .db file (DB_ENTRY_SIZE ends here):
+        Data& data;
 
         uint32_t labelTileCluster = 0;
         uint32_t largeLabelTileCluster = 0;
         uint32_t cheatsCluster = 0;
         uint16_t entryIndex;
 
+        Entry(Data& data, uint16_t entryIndex) : data(data), entryIndex(entryIndex) {}
+
         bool hasSpeedrunDatabase() {
-            return speedrunsByteOffset != NO_SPEEDRUNS_DATABASE;
+            return data.speedrunsByteOffset != NO_SPEEDRUNS_DATABASE;
         }
 
         bool hasCheatDatabase() {
-            return cheatByteOffset != NO_CHEATS_DATABASE;
+            return data.cheatByteOffset != NO_CHEATS_DATABASE;
         }
 
         bool hasHomebrewGameCode() {
             // Homebrew developed with libdragon has a 'ED' unique ID
-            if (uniqueID[0] == 'E' && uniqueID[1] == 'D') {
+            if (data.uniqueID[0] == 'E' && data.uniqueID[1] == 'D') {
                 return true;
             }
             // Some Homebrew titles appear to have NULL bytes here
-            else if (uniqueID[0] == 0 && uniqueID[1] == 0) {
+            else if (data.uniqueID[0] == 0 && data.uniqueID[1] == 0) {
                 return true;
             }
             else {
@@ -172,7 +176,8 @@ private:
 
     std::unordered_map<uint32_t, uint16_t> titleLookupMap;
 
-    Entry placeholderEntry;
+    Entry::Data placeholderData;
+    Entry placeholderEntry{placeholderData, 0};
 
     #ifdef N64
     // Zeroed so `obj.fs` reads as null (not open) until load() opens it
@@ -184,12 +189,7 @@ private:
      */
     uint16_t entryCount = 0;
 
-    /**
-     * The whole entries block held in RDRAM, `entryCount` records of
-     * `DB_ENTRY_SIZE` bytes each. Null until `loadEntriesIntoMemory()` is
-     * called, which is what `readEntryAtIndex` keys its fast path off.
-     */
-    unsigned char* entriesData = nullptr;
+    Entry::Data* entriesData = nullptr;
 
     long entriesStartOffset;
     long labelsStartOffset;
@@ -200,6 +200,9 @@ private:
 
     bool seekTo(long offset);
     bool readBytes(void* buffer, size_t size);
+
+    bool loadEntriesIntoMemory();
+    void releaseEntriesFromMemory();
 
 public:
     GameDatabase();
@@ -214,24 +217,10 @@ public:
     Entry* readEntryAtIndex(uint16_t index);
 
     /**
-     * On `load()`, entries are moved from the SD card into cartridge SDRAM.
-     * This method moves the entries again from cart space in main memory.
-     * This provides a fast path for database seeking on boot.
-     */
-    bool loadEntriesIntoMemory();
-
-    /**
-     * Release memory temporarily occupied by database entries during boot.
-     */
-    void releaseEntriesFromMemory();
-
-    bool hasEntriesInMemory() const { return entriesData != nullptr; }
-
-    /**
      * Read only the region code for the entry at the given index.
      * Cheaper than readEntryAtIndex when scanning variants, as it avoids
-     * allocating and reading the full entry.
-     * Returns RegionCode::UNKNOWN on read failure.
+     * allocating an entry.
+     * Returns RegionCode::UNKNOWN for an index outside the database.
      */
     RegionCode readRegionCodeAtIndex(uint16_t index);
 
@@ -276,10 +265,9 @@ public:
 };
 
 /**
- * Size in bytes of each game entry in the database: the fields of `Entry` that
- * are imported from the .db file
+ * Size in bytes of each game entry in the database
  */
-constexpr size_t DB_ENTRY_SIZE = offsetof(GameDatabase::Entry, labelTileCluster);
+constexpr size_t DB_ENTRY_SIZE = sizeof(GameDatabase::Entry::Data);
 
 static_assert(DB_ENTRY_SIZE == 120, "DB_ENTRY_SIZE must stay at 120 bytes");
 

@@ -107,9 +107,9 @@ bool GameDatabase::loadEntriesIntoMemory() {
     // Aligned for the DMA below; plain malloc everywhere else, where the
     // alignment buys nothing
     #ifdef N64
-    unsigned char* data = (unsigned char*)memalign(16, allocationSize);
+    Entry::Data* data = (Entry::Data*)memalign(16, allocationSize);
     #else
-    unsigned char* data = (unsigned char*)malloc(allocationSize);
+    Entry::Data* data = (Entry::Data*)malloc(allocationSize);
     #endif
 
     if (data == nullptr) {
@@ -146,51 +146,19 @@ GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
         return nullptr;
     }
 
-    if (index >= entryCount) {
+    if (entriesData == nullptr || index >= entryCount) {
         return nullptr;
     }
 
-    Entry* entry = new Entry();
-
-    size_t size = DB_ENTRY_SIZE;
-    uint32_t offset = entriesStartOffset + (size * index);
-
-    // Fast path: the whole block is resident, so no DMA or filesystem read
-    if (entriesData != nullptr) {
-        memcpy(entry, entriesData + ((size_t)index * size), size);
-    }
-    else {
-        #ifdef N64
-        data_cache_hit_writeback_invalidate(entry, size);
-        dma_read_raw_async(entry, ROM_ADDRESS_HEADER + offset, size);
-        dma_wait();
-        #endif
-    }
-
-    entry->entryIndex = index;
-
-    return entry;
+    return new Entry(entriesData[index], index);
 }
 
 RegionCode GameDatabase::readRegionCodeAtIndex(uint16_t index) {
-    // The regionCode byte is stored after title, developer, categoryCode and uniqueID
-    uint32_t offset = entriesStartOffset + (DB_ENTRY_SIZE * index)
-        + sizeof(Entry::title)
-        + sizeof(Entry::developer)
-        + sizeof(Entry::categoryCode)
-        + sizeof(Entry::uniqueID);
-
-    if (!seekTo(offset)) {
+    if (entriesData == nullptr || index >= entryCount) {
         return RegionCode::UNKNOWN;
     }
 
-    RegionCode regionCode = RegionCode::UNKNOWN;
-
-    if (!readBytes(&regionCode, sizeof(regionCode))) {
-        return RegionCode::UNKNOWN;
-    }
-
-    return regionCode;
+    return entriesData[index].regionCode;
 }
 
 int16_t GameDatabase::indexForTitle(char title[21]) {
@@ -279,14 +247,14 @@ GameDatabase::Entry* GameDatabase::entryForROMFile(ROMFile* romFile) {
 #ifdef N64
 void GameDatabase::warmClusterOffsets(const std::vector<GameDatabase::Entry*>& entries) {
     for (GameDatabase::Entry* entry : entries) {
-        int smallTileOffset = getLabelTileOffset(entry->smallLabelTileIndex);
+        int smallTileOffset = getLabelTileOffset(entry->data.smallLabelTileIndex);
 
         // Cache FAT cluster offsets of each label in the database
         f_lseek(&file, smallTileOffset);
         entry->labelTileCluster = file.clust;
 
-        if (entry->largeLabelTileIndex != 0) {
-            int largeTileOffset = getLabelTileOffset(entry->largeLabelTileIndex);
+        if (entry->data.largeLabelTileIndex != 0) {
+            int largeTileOffset = getLabelTileOffset(entry->data.largeLabelTileIndex);
 
             f_lseek(&file, largeTileOffset);
             entry->largeLabelTileCluster = file.clust;
@@ -309,16 +277,16 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
     }
 
     if (!entry) {
-        placeholderEntry.smallLabelTileIndex = 0;
-        placeholderEntry.largeLabelTileIndex = 4;
+        placeholderData.smallLabelTileIndex = 0;
+        placeholderData.largeLabelTileIndex = 4;
 
         entry = &placeholderEntry;
     }
-    else if (highRes && entry->largeLabelTileIndex == 0) {
+    else if (highRes && entry->data.largeLabelTileIndex == 0) {
         return false;
     }
 
-    uint16_t firstTileIndex = highRes ? entry->largeLabelTileIndex : entry->smallLabelTileIndex;
+    uint16_t firstTileIndex = highRes ? entry->data.largeLabelTileIndex : entry->data.smallLabelTileIndex;
     uint32_t firstTileCluster = highRes ? entry->largeLabelTileCluster : entry->labelTileCluster;
 
     uint16_t tileIndex = firstTileIndex + chunkOffset;
@@ -400,9 +368,9 @@ SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
         return nullptr;
     }
 
-    long offset = speedrunsStartOffset + (long)entry->speedrunsByteOffset;
+    long offset = speedrunsStartOffset + (long)entry->data.speedrunsByteOffset;
 
-    debugf("[GameDatabase] Reading speedruns at local offset: %li\n", (long)entry->speedrunsByteOffset);
+    debugf("[GameDatabase] Reading speedruns at local offset: %li\n", (long)entry->data.speedrunsByteOffset);
     debugf("[GameDatabase] Global offset: %li\n", offset);
 
     if (!seekTo(offset)) {
@@ -461,9 +429,9 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
         return nullptr;
     }
 
-    long offset = cheatsStartOffset + (long)entry->cheatByteOffset;
+    long offset = cheatsStartOffset + (long)entry->data.cheatByteOffset;
 
-    debugf("[GameDatabase] Reading cheats at local offset: %li\n", (long)entry->cheatByteOffset);
+    debugf("[GameDatabase] Reading cheats at local offset: %li\n", (long)entry->data.cheatByteOffset);
     debugf("[GameDatabase] Global offset: %li\n", offset);
 
     // if (entry->cheatsCluster != 0) {
@@ -610,6 +578,11 @@ bool GameDatabase::load(const char* filename) {
     debugf("[GameDatabase] Cheats Start Offset:    %li\n", cheatsStartOffset);
     debugf("[GameDatabase] Cheats Total Size:      %lu\n", (unsigned long)cheatsTotalSize);
     debugf("[GameDatabase] Speedruns Start Offset: %li\n", speedrunsStartOffset);
+
+    if (!loadEntriesIntoMemory()) {
+        close();
+        return false;
+    }
 
     return true;
 }

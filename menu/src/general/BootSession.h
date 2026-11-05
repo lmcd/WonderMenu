@@ -161,7 +161,7 @@ private:
 
         debugf("[BootSession] Save file %s\n", saveFilePath.c_str());
 
-        flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->saveType;
+        flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->data.saveType;
 
         flashcart_load_save(saveFilePath.data(), saveType);
     }
@@ -355,7 +355,7 @@ public:
 
         if (game->databaseEntry != nullptr) {
             boot_params.detect_cic_type = false;
-            boot_params.cic_type = (cic_type_t)game->databaseEntry->cicType;
+            boot_params.cic_type = (cic_type_t)game->databaseEntry->data.cicType;
         }
         else {
             boot_params.detect_cic_type = true;
