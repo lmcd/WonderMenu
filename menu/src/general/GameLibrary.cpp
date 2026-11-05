@@ -20,6 +20,39 @@ CacheResult cache[MAX_NUMBER_OF_FILES] = {0};
 
 static GameIDMap<int, -1> entryIndexMap;
 
+// The cache records a djb2 hash of each ROM's filename rather than its path,
+// so recents and favourites are matched by hashing their own filename the
+// same way. Hashed up front: otherwise it would be every path, every entry.
+static std::vector<uint32_t> filenameHashes(const std::vector<std::string>& romPaths) {
+    std::vector<uint32_t> hashes;
+    hashes.reserve(romPaths.size());
+
+    for (const std::string& romPath : romPaths) {
+        size_t separator = romPath.rfind('/');
+
+        const char* filename = (separator == std::string::npos)
+            ? romPath.c_str()
+            : romPath.c_str() + separator + 1;
+
+        hashes.push_back(GameDatabase::djb2((const unsigned char*)filename, strlen(filename)));
+    }
+
+    return hashes;
+}
+
+// `hashes` is `filenameHashes(paths)`. The hash rules out almost every path for
+// the cost of a compare, and the full path then confirms a match, so a ROM of
+// the same name in another folder doesn't match too.
+static bool containsPath(const std::vector<uint32_t>& hashes, const std::vector<std::string>& paths, uint32_t hash, const char* fullPath) {
+    for (size_t i = 0; i < hashes.size(); i++) {
+        if (hashes[i] == hash && paths[i] == fullPath) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 GameLibrary::GameLibrary(GameDatabase& database, const char* path) :
     database(database),
     path(path) {
@@ -468,6 +501,8 @@ void GameLibrary::loadGames() {
     // NOTE: this suprisingly only saves about 22ms of load time for a library
     // of 900 games. Hmmm...
     database.loadEntriesIntoMemory();
+    std::vector<uint32_t> recentsHashes = filenameHashes(recentsPaths);
+    std::vector<uint32_t> favouritesHashes = filenameHashes(favouritesPaths);
 
     // Each directory is relative to `path` and carries no trailing slash (the
     // root itself is an empty string)
@@ -622,11 +657,11 @@ void GameLibrary::loadGames() {
                 gameGroup.addGame(lastGame);
             }
 
-            if (std::find(recentsPaths.begin(), recentsPaths.end(), fullPath) != recentsPaths.end()) {
+            if (containsPath(recentsHashes, recentsPaths, hash, fullPath)) {
                 recentGroups.emplace_back(lastGame);
             }
 
-            if (std::find(favouritesPaths.begin(), favouritesPaths.end(), fullPath) != favouritesPaths.end()) {
+            if (containsPath(favouritesHashes, favouritesPaths, hash, fullPath)) {
                 lastGame.isFavourite = true;
 
                 favouriteGroups.emplace_back(lastGame);
