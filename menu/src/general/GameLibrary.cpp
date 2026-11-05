@@ -452,6 +452,8 @@ void GameLibrary::loadGames() {
             snprintf(scanPath, sizeof(scanPath), "%s%s/", path, directoryPath.c_str());
         }
 
+        size_t scanPathLength = strlen(scanPath);
+
         debugf("[GameLibrary] Reading ROM files in %s\n", scanPath);
 
         // Skip directories that are empty or don't exist
@@ -481,10 +483,13 @@ void GameLibrary::loadGames() {
                 break;
             }
 
-            // Build full path. Sized so scanPath (up to 511) + d_name (up to
-            // 255) can't truncate, keeping -Werror=format-truncation happy.
+            // Build full path. Both lengths are already known, so it's two
+            // copies rather than snprintf parsing a format string per ROM.
+            // Sized so scanPath (up to 511) + the name (up to 255) and its
+            // terminator always fit.
             char fullPath[768];
-            snprintf(fullPath, sizeof(fullPath), "%s%s", scanPath, filename);
+            memcpy(fullPath, scanPath, scanPathLength);
+            memcpy(fullPath + scanPathLength, filename, filenameLength + 1);
 
             ROMFile* romFile = new ROMFile(fullPath, fileIndex);
 
