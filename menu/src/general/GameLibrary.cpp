@@ -215,16 +215,14 @@ bool GameLibrary::saveHistoryAndFavourites() {
 
     debugf("[GameLibrary] Saving INI file: %s\n", iniPath);
 
-    FILE* file = fopen(iniPath, "w");
-
-    if (!file) {
-        debugf("[GameLibrary] Failed to open INI file for writing: %s\n", iniPath);
-        return false;
-    }
-
     // See `INIParser.h` for file format example
-    auto writeSection = [file](const char* section, const std::vector<GameGroup>& groups) {
-        fprintf(file, "[%s]\n", section);
+    std::string contents;
+    contents.reserve(KiB(8));
+
+    auto writeSection = [&contents](const char* section, const std::vector<GameGroup>& groups) {
+        contents += '[';
+        contents += section;
+        contents += "]\n";
 
         int index = 0;
 
@@ -235,19 +233,40 @@ bool GameLibrary::saveHistoryAndFavourites() {
                 continue;
             }
 
-            fprintf(file, "%d_primary_path=%s\n", index, game->romFile.path.c_str());
-            fprintf(file, "%d_secondary_path=\n", index);
-            fprintf(file, "%d_type=1\n", index);
+            std::string prefix = std::to_string(index);
+
+            contents += prefix + "_primary_path=" + game->romFile.path + "\n";
+            contents += prefix + "_secondary_path=\n";
+            contents += prefix + "_type=1\n";
 
             index++;
         }
     };
 
     writeSection("history", recentGroups);
-    fprintf(file, "\n");
+    contents += '\n';
     writeSection("favorite", favouriteGroups);
 
-    fclose(file);
+    // FA_OPEN_ALWAYS rather than truncating on open, so the write starts in the
+    // file's existing first cluster instead of freeing its chain and allocating
+    // a new one. f_truncate() then only drops what's past the new end.
+    FIL file = {};
+
+    if (f_open(&file, strip_fs_prefix(iniPath), FA_WRITE | FA_OPEN_ALWAYS) != FR_OK) {
+        debugf("[GameLibrary] Failed to open INI file for writing: %s\n", iniPath);
+        return false;
+    }
+
+    UINT bytesWritten = 0;
+
+    FRESULT writeResult = f_write(&file, contents.data(), contents.size(), &bytesWritten);
+    FRESULT truncateResult = f_truncate(&file);
+    FRESULT closeResult = f_close(&file);
+
+    if (writeResult != FR_OK || bytesWritten != contents.size() || truncateResult != FR_OK || closeResult != FR_OK) {
+        debugf("[GameLibrary] Failed to write INI file: %s\n", iniPath);
+        return false;
+    }
 
     return true;
 }
