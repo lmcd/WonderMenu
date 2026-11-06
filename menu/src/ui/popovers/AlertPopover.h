@@ -39,6 +39,10 @@ public:
         tableView.rowCount = (int)buttons.size();
     }
 
+    void setInitialButtonIndex(int index) {
+        initialSelectedRowIndex = index;
+    }
+
     void updateViews(const RenderInfo& renderInfo);
     void update(const UpdateInfo& updateInfo) override;
 };

@@ -40,6 +40,7 @@ struct SpeedrunRowView : public BaseRowView {
 
     bool isGroup = false;
     bool isChecked = false;
+    bool hasOptionSubtitle = false;
     int indentLevel = 0;
 
     SpeedrunRowView();

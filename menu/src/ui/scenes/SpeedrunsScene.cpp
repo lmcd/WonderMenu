@@ -13,6 +13,7 @@
 #include "general/M64File.h"
 #include "general/SpeedrunDatabase.h"
 #include "ui/Theme.h"
+#include "ui/popovers/AlertPopover.h"
 #include "ui/scenes/GameLaunchScene.h"
 #include "ui/views/ScrollbarView.h"
 
@@ -23,6 +24,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
       isRecording(state.isRecording),
       selectedRow(state.selectedRow),
       selectedCRC(state.selectedCRC),
+      numberOfControllers(state.numberOfControllers),
       state(state) {
     // Formatted up front, not per rebuild: the row titles point straight at these
     if (speedrunDatabase != nullptr) {
@@ -243,9 +245,23 @@ void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
                 selectedCRC = 0;
             }
             else {
-                isRecording = true;
-                selectedRow = -1;
-                selectedCRC = 0;
+                tableView.isADown = false;
+
+                Scene* baseScene = (parentScene != nullptr) ? parentScene : this;
+
+                AlertPopover* alert = new AlertPopover(baseScene, "CREATE SPEEDRUN");
+                alert->setButtons("1 Controller", "2 Controllers", "3 Controllers", "4 Controllers");
+                alert->setInitialButtonIndex(std::clamp((int)numberOfControllers, 1, 4) - 1);
+
+                auto result = alert->present();
+
+                if (result.didSucceed()) {
+                    numberOfControllers = result.value + 1;
+
+                    isRecording = true;
+                    selectedRow = -1;
+                    selectedCRC = 0;
+                }
             }
         }
         else if (row.isGroup) {
@@ -318,11 +334,18 @@ void SpeedrunsScene::updateViews(const RenderInfo&) {
         rowView->indentLevel = row.indentLevel;
         rowView->isGroup = row.isGroup;
         rowView->isExpanded = state.isGroupExpanded(row.index);
+        rowView->hasOptionSubtitle = row.isCreate;
 
         if (row.isCreate) {
             rowView->isChecked = isRecording;
-            rowView->titleView.stringReference = "Create a Speedrun!";
-            rowView->subtitleView.setString("");
+            rowView->titleView.stringReference = "Create a Speedrun";
+
+            if (isRecording) {
+                rowView->subtitleView.setString("^01%i %s", numberOfControllers, (numberOfControllers == 1) ? "Controller" : "Controllers");
+            }
+            else {
+                rowView->subtitleView.setString("");
+            }
         }
         else if (row.isGroup) {
             rowView->isChecked = false;

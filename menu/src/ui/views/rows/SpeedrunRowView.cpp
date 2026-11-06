@@ -74,7 +74,7 @@ void SpeedrunRowView::update(const RenderInfo& renderInfo) {
 
     subtitleView.frame.origin = subtitlePosition;
     subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor1;
-    subtitleView.alternateColor = subtitleColor2;
+    subtitleView.alternateColor = hasOptionSubtitle ? Color(2, 163, 238) : subtitleColor2;
 
     if (isSelected) {
         subtitleView.startAnimating();

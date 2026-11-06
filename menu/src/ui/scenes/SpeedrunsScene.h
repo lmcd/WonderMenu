@@ -76,6 +76,7 @@ private:
     bool& isRecording;
     int& selectedRow;
     uint32_t& selectedCRC;
+    uint8_t& numberOfControllers;
 
     SpeedrunsState& state;
 
