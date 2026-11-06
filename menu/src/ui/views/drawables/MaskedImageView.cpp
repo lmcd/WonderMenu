@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "MaskedImageView.h"
+#include "util/Vec2.h"
 
 void MaskedImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
@@ -116,7 +117,9 @@ void MaskedImageView::renderChunk(const Layout& layout, int s, int t, int width,
     float x = layout.rect.origin.x + (s * layout.scaleX);
     float y = layout.rect.origin.y + (t * layout.scaleY);
 
-    rdpq_tex_blit(&image->surface(), x, y, &params);
+    Vec2 position = Vec2(x, y);
+
+    drawImage(image, position, &params);
 }
 
 // How many rows of a corner fit in TMEM together with the same rows of its
@@ -214,8 +217,8 @@ void MaskedImageView::render(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    int imageWidth  = image->surface().width;
-    int imageHeight = image->surface().height;
+    int imageWidth  = image->size().width;
+    int imageHeight = image->size().height;
 
     Layout layout = {};
     layout.width  = imageWidth;

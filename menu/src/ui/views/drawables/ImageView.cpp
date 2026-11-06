@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "ImageView.h"
+#include "util/Vec2.h"
 
 void ImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
@@ -87,12 +88,12 @@ void ImageView::drawPart(const Rect& rect, const rdpq_blitparms_t& params, const
     // padded
     pushScissor(scissorRect);
 
-    rdpq_sprite_blit(
-        image->sprite(),
-        rect.minX() + s0 * scaleX,
-        rect.minY() + t0 * scaleY,
-        &partParams
+    Vec2 position = Vec2(
+      rect.minX() + s0 * scaleX,
+      rect.minY() + t0 * scaleY
     );
+
+    drawImage(image, position, &partParams);
 
     popScissor();
 }
@@ -198,7 +199,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    if (image == nullptr || image->sprite() == nullptr) {
+    if (image == nullptr || !image->isValid()) {
         return;
     }
 
@@ -254,7 +255,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
             pushScissor(scissorRect);
         }
 
-        drawSprite(image->sprite(), rect.origin, &params);
+        drawImage(image, rect.origin, &params);
 
         if (needsScissor) {
             popScissor();

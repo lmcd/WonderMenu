@@ -4,6 +4,7 @@
 */
 
 #include "ui/View.h"
+#include "ui/Image.h"
 #include "ui/Theme.h"
 #include "util/Color.h"
 #include "util/Size.h"
@@ -383,13 +384,13 @@ void Drawable::drawFilledRect(Rect rect) {
     );
 }
 
-void Drawable::drawSprite(sprite_t* sprite, Vec2 position, const rdpq_blitparms_t* params) {
-    rdpq_sprite_blit(
-        sprite,
+void Drawable::drawImage(Image* image, Vec2 position, const rdpq_blitparms_t* params) {
+    rdpq_tex_blit(
+        &image->surface(),
         position.x,
         position.y,
-        params)
-    ;
+        params
+    );
 }
 
 void Drawable::clearRect(const Rect& rect, Color clearColor) {

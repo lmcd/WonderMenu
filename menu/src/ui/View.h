@@ -260,7 +260,7 @@ protected:
 
     void drawFilledRect(Rect rect);
 
-    void drawSprite(sprite_t* sprite, Vec2 position, const rdpq_blitparms_t* params = NULL);
+    void drawImage(Image* image, Vec2 position, const rdpq_blitparms_t* params = NULL);
 
     // Defined here so they inline into callers, which draw many of them (one
     // per glyph for labels)

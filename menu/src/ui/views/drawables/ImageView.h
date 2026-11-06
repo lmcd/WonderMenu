@@ -27,7 +27,7 @@ public:
     };
     
 private:
-    const Image* lastImage = nullptr;
+    Image* lastImage = nullptr;
     ScaleMode lastScaleMode = {};
     uint32_t lastImageVersion = 0;
     bool lastUsesBilinearFiltering = false;
@@ -47,7 +47,7 @@ private:
 public:
     const char* name() const override { return "ImageView"; }
 
-    const Image* image = nullptr;
+    Image* image = nullptr;
     ScaleMode scaleMode = SCALE_NONE;
 
     // Bump this whenever the image's pixels change without the pointer

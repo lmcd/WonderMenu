@@ -47,7 +47,7 @@ public:
     const char* name() const override { return "MaskedImageView"; }
 
     // The image that's getting masked
-    const Image* image = nullptr;
+    Image* image = nullptr;
 
     // The corner radius on screen, whatever the image's scale
     uint8_t radius = 0;
