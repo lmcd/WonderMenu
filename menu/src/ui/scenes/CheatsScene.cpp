@@ -254,6 +254,8 @@ void CheatsScene::updateRowViews() {
 void CheatsScene::update(const UpdateInfo& updateInfo) {
     joypad_buttons_t btn = updateInfo.btn;
 
+    bootSession.advance();
+
     if (tableView.handleInputs(updateInfo)) {}
 
     InputWatcher::Event aButtonEvent = aButtonWatcher.update(updateInfo.joypad.btn.a);
