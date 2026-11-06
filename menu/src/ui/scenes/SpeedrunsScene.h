@@ -29,12 +29,18 @@ private:
      * Data associated with a row in the cheats table.
      */
     struct RowInfo {
-        // Does this row represent a group/folder?
-        // true if row represents a group
-        // false if row represents an entry
-        bool isGroup;
-        // Indexes `SpeedrunDatabase::groups` when `isGroup` is `true`
-        // Indexes `SpeedrunDatabase::entries` when `isGroup` is `false`
+        enum Type : uint8_t {
+            CREATE,
+            GROUP,
+            ENTRY,
+            UNCATEGORISED_GROUP,
+            UNCATEGORISED_ENTRY
+        };
+
+        Type type;
+        // Indexes `SpeedrunDatabase::groups` for `GROUP`
+        // Indexes `SpeedrunDatabase::entries` for `ENTRY`
+        // Indexes `uncategorisedM64Files` for `UNCATEGORISED_ENTRY`
         uint16_t index;
         uint16_t parentRowIndex;
         uint8_t indentLevel = 0;
@@ -43,8 +49,8 @@ private:
         uint16_t childRowCount = 0;
         // Runs in this group, which `childRowCount` only reflects while expanded
         uint16_t entryCount = 0;
-        bool isUncategorised = false;
-        bool isCreate = false;
+
+        bool isGroup() const { return type == GROUP || type == UNCATEGORISED_GROUP; }
     };
 
     SpeedrunDatabase* speedrunDatabase;
