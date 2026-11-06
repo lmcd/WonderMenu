@@ -18,7 +18,7 @@
  * The source is copied verbatim: it must already start with the sprite_t header
  * that sprite_load() expects.
  */
-class ScreenshotWriter {
+class ScreenshotSDWriter {
 private:
     bool hasOpened = false;
     int writeOffset = 0;
@@ -88,7 +88,7 @@ public:
             );
 
             if (result != FR_OK) {
-                debugf("[ScreenshotWriter] Failed to open %s (%i)\n", filename.c_str(), (int)result);
+                debugf("[ScreenshotSDWriter] Failed to open %s (%i)\n", filename.c_str(), (int)result);
                 didFail = true;
                 return false;
             }
@@ -111,7 +111,7 @@ public:
         UINT bytesWritten = 0;
 
         if (f_write(&fil, source, bytesToWrite, &bytesWritten) != FR_OK || bytesWritten != bytesToWrite) {
-            debugf("[ScreenshotWriter] Failed to write %s at offset %i\n", filename.c_str(), writeOffset);
+            debugf("[ScreenshotSDWriter] Failed to write %s at offset %i\n", filename.c_str(), writeOffset);
             didFail = true;
             close();
             return false;
@@ -128,7 +128,7 @@ public:
         return !didFail;
     }
 
-    ~ScreenshotWriter() {
+    ~ScreenshotSDWriter() {
         close();
     }
 };

@@ -30,7 +30,7 @@ ScreenshotsImportScene::~ScreenshotsImportScene() {
     debugf("[%s] Destruct\n", name());
 
     // Writers first: they hold FILs opened inside screenshotDir.
-    screenshotWriter.close();
+    screenshotSDWriter.close();
     thumbnailWriter.close();
     closeScreenshotDir();
 
@@ -216,7 +216,7 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
 
     // Proceed to the next screenshot every `screenshotFrameInterval` frames
     if (!startsNextScreenshot) {
-        if (screenshotWriter.isFinished()) {
+        if (screenshotSDWriter.isFinished()) {
             if (thumbnailWriter.hasSession()) {
                 float seconds = measure([&] {
                     thumbnailWriter.advance();
@@ -225,14 +225,14 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
                 debugf("[ScreenshotsImportScene] thumbnailWriter.advance: %.3fs\n", seconds);
             }
         }
-        else if (screenshotWriter.hasSession()) {
+        else if (screenshotSDWriter.hasSession()) {
             float seconds = measure([&] {
-                screenshotWriter.advance();
+                screenshotSDWriter.advance();
             });
 
-            debugf("[ScreenshotsImportScene] screenshotWriter.advance: %.3fs\n", seconds);
+            debugf("[ScreenshotsImportScene] screenshotSDWriter.advance: %.3fs\n", seconds);
 
-            if (screenshotWriter.isFinished()) {
+            if (screenshotSDWriter.isFinished()) {
                 beginThumbnailWrite();
             }
         }
@@ -252,7 +252,7 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
     screenshotThumbnailView.setFullSizeScreenshotSurface(reader.surfaceForSprite(screenshotSprite));
 
     // The record is the .SPR as is, game state included
-    screenshotWriter.begin(
+    screenshotSDWriter.begin(
         &screenshotDir,
         filenameForScreenshot(currentScreenshotIndex, false),
         (const void*)(uintptr_t)reader.recordOffset,
