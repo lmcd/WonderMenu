@@ -177,14 +177,9 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
             state.romIsLoaded = true;
 
             renderer->end();
-        }
-        else {
-            // Carry on streaming a frame at a time until the whole ROM is on the
-            // cart, so the progress bar keeps drawing as normal.
-            bootSession.advance();
-        }
 
-        return;
+            return;
+        }
     }
 
     transition.advance();
