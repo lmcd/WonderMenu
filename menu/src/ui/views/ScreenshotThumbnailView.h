@@ -18,15 +18,7 @@ private:
     surface_t fullSizeScreenshotSurface = {};
     bool needsScaledSpriteRebuild = false;
 
-    sprite_t* scaledSprite1 = nullptr;
-    sprite_t* scaledSprite2 = nullptr;
-
-    Image scaledImage1;
-    Image scaledImage2;
-    Image composedImage;
-
-    static sprite_t* createScaledSprite(const surface_t* sourceSurface, int width);
-    static void freeScaledSprite(sprite_t* sprite);
+    static Image* createScaledImage(Image& source, int width, const RenderInfo& renderInfo);
 
 public:
     const char* name() const override { return "ScreenshotThumbnailView"; }
@@ -39,7 +31,7 @@ public:
     ScreenshotThumbnailView();
     ~ScreenshotThumbnailView();
 
-    sprite_t* thumbnailSprite() const { return scaledSprite1; }
+    const Image* thumbnailImage() const { return imageView1.image; }
 
     void setFullSizeScreenshotSurface(const surface_t& surface);
 

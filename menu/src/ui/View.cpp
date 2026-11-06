@@ -275,27 +275,6 @@ Image* View::renderToImage(const RenderInfo& renderInfo) {
     return image;
 }
 
-surface_t View::renderToSurface(const RenderInfo& renderInfo) {
-    prepareOffscreenRender(renderInfo);
-
-    int width  = finalFrame.size.width;
-    int height = finalFrame.size.height;
-
-    if (width <= 0 || height <= 0) {
-        return (surface_t){};
-    }
-
-    surface_t surface = surface_alloc(FMT_RGBA16, width, height);
-
-    if (surface.buffer == nullptr) {
-        return (surface_t){};
-    }
-
-    drawOffscreen(renderInfo, surface);
-
-    return surface;
-}
-
 void View::clearSubtree(const RenderInfo& renderInfo, bool force) {
     for (auto it = subviews.rbegin(); it != subviews.rend(); ++it) {
         View* subview = *it;

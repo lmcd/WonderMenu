@@ -120,9 +120,9 @@ int ScreenshotsImportScene::nextScreenshotIndex() {
 // When the main screenshot has been saved, we reuse it's space in cart SDRAM
 // to store the thumbnail, which we've already rendered
 void ScreenshotsImportScene::beginThumbnailWrite() {
-    sprite_t* thumbnailSprite = screenshotThumbnailView.thumbnailSprite();
+    const Image* thumbnailImage = screenshotThumbnailView.thumbnailImage();
 
-    if (thumbnailSprite == nullptr) {
+    if (thumbnailImage == nullptr) {
         return;
     }
 
@@ -133,14 +133,28 @@ void ScreenshotsImportScene::beginThumbnailWrite() {
         thumbnailWriter.write();
     }
 
-    uint32_t thumbnailSize =
-        (uint32_t)sizeof(sprite_t) +
-        (uint32_t)thumbnailSprite->width * thumbnailSprite->height * 2;
+    Size size = thumbnailImage->size();
+
+    // The Image's sprite is only a header pointing at its pixels, so the file's
+    // header is built here and written in front of them
+    alignas(8) sprite_t header = {};
+    header.width   = size.width;
+    header.height  = size.height;
+    header.flags   = FMT_RGBA16 & SPRITE_FLAGS_TEXFORMAT;
+    header.hslices = 1;
+    header.vslices = 1;
+
+    uint32_t pixelsSize = (uint32_t)size.width * size.height * 2;
+    uint32_t thumbnailSize = (uint32_t)sizeof(sprite_t) + pixelsSize;
 
     uint32_t thumbnailRecordSize = ALIGN(thumbnailSize, 512);
 
-    data_cache_hit_writeback(thumbnailSprite, thumbnailRecordSize);
-    dma_write_raw_async(thumbnailSprite, screenshotRecordOffset, thumbnailRecordSize);
+    data_cache_hit_writeback(&header, sizeof(header));
+    dma_write_raw_async(&header, screenshotRecordOffset, sizeof(header));
+    dma_wait();
+
+    // surface_alloc() pixels are uncached, so need no writeback
+    dma_write_raw_async(thumbnailImage->surface().buffer, screenshotRecordOffset + sizeof(sprite_t), pixelsSize);
     dma_wait();
 
     thumbnailWriter.begin(

@@ -221,12 +221,6 @@ public:
      * finished with it). nullptr if the view has no size or the allocation fails.
      */
     Image* renderToImage(const RenderInfo& renderInfo);
-
-    /**
-     * Render a view and of its subviews directly to an off-screen `surface_t`.
-     * This is a new allocation and must later be released with `surface_free`.
-     */
-    surface_t renderToSurface(const RenderInfo& renderInfo);
 };
 
 class Drawable: public View {
