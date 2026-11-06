@@ -26,7 +26,7 @@ private:
     RectView rectView;
     ImageView imageView;
 
-    sprite_t* logoSprite;
+    Image logoImage;
 
     float totalSeconds = 0;
 
@@ -36,7 +36,6 @@ public:
     LabelView<32> labelView;
 
     IntroScene(GameLibrary* gameLibrary);
-    ~IntroScene();
 
     void didBeginScene(SceneEntry entry) override;
     void updateViews(const RenderInfo& renderInfo) override;

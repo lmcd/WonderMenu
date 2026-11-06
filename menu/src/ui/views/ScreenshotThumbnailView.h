@@ -18,6 +18,13 @@ private:
     surface_t fullSizeScreenshotSurface = {};
     bool needsScaledSpriteRebuild = false;
 
+    sprite_t* scaledSprite1 = nullptr;
+    sprite_t* scaledSprite2 = nullptr;
+
+    Image scaledImage1;
+    Image scaledImage2;
+    Image composedImage;
+
     static sprite_t* createScaledSprite(const surface_t* sourceSurface, int width);
     static void freeScaledSprite(sprite_t* sprite);
 
@@ -30,6 +37,9 @@ public:
     ImageView imageView2;
 
     ScreenshotThumbnailView();
+    ~ScreenshotThumbnailView();
+
+    sprite_t* thumbnailSprite() const { return scaledSprite1; }
 
     void setFullSizeScreenshotSurface(const surface_t& surface);
 

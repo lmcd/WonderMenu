@@ -8,18 +8,12 @@
 
 #include "MaskedImageView.h"
 
-MaskedImageView::~MaskedImageView() {
-    if (imageSurface.buffer != nullptr) {
-        surface_free(&imageSurface);
-    }
-}
-
 void MaskedImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    if (imageSurface.buffer != lastImageBuffer) {
+    if (image != lastImage) {
         setNeedsRender();
-        lastImageBuffer = imageSurface.buffer;
+        lastImage = image;
     }
 
     if (imageVersion != lastImageVersion) {
@@ -122,7 +116,7 @@ void MaskedImageView::renderChunk(const Layout& layout, int s, int t, int width,
     float x = layout.rect.origin.x + (s * layout.scaleX);
     float y = layout.rect.origin.y + (t * layout.scaleY);
 
-    rdpq_tex_blit(&imageSurface, x, y, &params);
+    rdpq_tex_blit(&image->surface(), x, y, &params);
 }
 
 // How many rows of a corner fit in TMEM together with the same rows of its
@@ -149,7 +143,7 @@ void MaskedImageView::renderCorner(const Layout& layout, surface_t* maskSheet, i
 
     // A large corner of a 32-bit image doesn't fit in TMEM with its mask, so
     // it's drawn a band of rows at a time
-    int rowsPerUpload = cornerRowsPerUpload(surface_get_format(&imageSurface), size);
+    int rowsPerUpload = cornerRowsPerUpload(image->format(), size);
 
     for (int row = 0; row < size; row += rowsPerUpload) {
         int rows = std::min(rowsPerUpload, size - row);
@@ -159,7 +153,7 @@ void MaskedImageView::renderCorner(const Layout& layout, surface_t* maskSheet, i
         rdpq_tex_multi_begin();
             rdpq_tex_upload_sub(
                 TILE0,
-                &imageSurface,
+                &image->surface(),
                 NULL,
                 imageS,
                 imageT + row,
@@ -214,14 +208,14 @@ void MaskedImageView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    if (imageSurface.buffer == nullptr) {
+    if (image == nullptr || !image->isValid()) {
         return;
     }
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    int imageWidth  = imageSurface.width;
-    int imageHeight = imageSurface.height;
+    int imageWidth  = image->surface().width;
+    int imageHeight = image->surface().height;
 
     Layout layout = {};
     layout.width  = imageWidth;

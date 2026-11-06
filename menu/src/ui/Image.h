@@ -22,6 +22,8 @@
  */
 class Image {
 public:
+    Image() = default;
+
     /**
      * A blank image allocated with `surface_alloc()` (uncached), e.g. for the RDP
      * to render into. The pixels are left uninitialised.

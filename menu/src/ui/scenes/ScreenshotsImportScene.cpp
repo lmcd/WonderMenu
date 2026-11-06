@@ -120,7 +120,7 @@ int ScreenshotsImportScene::nextScreenshotIndex() {
 // When the main screenshot has been saved, we reuse it's space in cart SDRAM
 // to store the thumbnail, which we've already rendered
 void ScreenshotsImportScene::beginThumbnailWrite() {
-    sprite_t* thumbnailSprite = screenshotThumbnailView.imageView1.sprite;
+    sprite_t* thumbnailSprite = screenshotThumbnailView.thumbnailSprite();
 
     if (thumbnailSprite == nullptr) {
         return;

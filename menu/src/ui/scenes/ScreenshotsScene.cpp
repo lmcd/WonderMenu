@@ -44,14 +44,15 @@ namespace {
      * `sprite` at up to `maxScale`, scaled down only as far as it takes to fit
      * in `bounds`
      */
-    Size scaledToFit(const sprite_t* sprite, float maxScale, Size bounds) {
+    Size scaledToFit(Image* image, float maxScale, Size bounds) {
+        Size imageSize = image->size();
         float scale = std::min({
             maxScale,
-            (float)bounds.width / sprite->width,
-            (float)bounds.height / sprite->height
+            (float)bounds.width / imageSize.width,
+            (float)bounds.height / imageSize.height
         });
 
-        return Size(sprite->width * scale, sprite->height * scale);
+        return Size(imageSize.width * scale, imageSize.height * scale);
     }
 
     /**
@@ -156,7 +157,7 @@ ScreenshotsScene::ScreenshotsScene(Game* game)
 
     // Blended with what's under it, the bar's colour, rather than the theme's
     // background
-    cameraIconView.sprite = cameraIcon.sprite();
+    cameraIconView.image = &cameraIcon;
     cameraIconView.isOpaque = false;
     cameraIconView.isHidden = true;
 
@@ -312,7 +313,7 @@ void ScreenshotsScene::composeScreenshots(const RenderInfo& renderInfo) {
         containerView.frame = frame;
 
         imageView.frame = frame;
-        imageView.sprite = thumbnail->sprite();
+        imageView.image = thumbnail;
         imageView.scaleMode = ImageView::ASPECT_FILL;
         imageView.usesBilinearFiltering = true;
 
@@ -428,7 +429,7 @@ void ScreenshotsScene::releaseFullScreenshot() {
 
     delete fullScreenshot;
     fullScreenshot = nullptr;
-    fullScreenshotView.imageSurface = {};
+    fullScreenshotView.image = nullptr;
 }
 
 bool ScreenshotsScene::loadSelectedFullScreenshot() {
@@ -450,10 +451,9 @@ bool ScreenshotsScene::loadSelectedFullScreenshot() {
 
     fullScreenshot = image;
 
-    // A view of the Image's pixels, which the view doesn't own, so never frees.
-    // The old one was freed just before, so the new pixels are likely at the
-    // same address, which the view wouldn't see as a change.
-    fullScreenshotView.imageSurface = fullScreenshot->surface();
+    // The old one was freed just before, so the new one is likely at the same
+    // address, which the view wouldn't see as a change
+    fullScreenshotView.image = fullScreenshot;
     fullScreenshotView.imageVersion++;
 
     updateScreenshotState();
@@ -467,7 +467,7 @@ void ScreenshotsScene::updateScreenshotState() {
     metadataCount = 0;
 
     for (int i = 0; i < SPRITE_VIEW_COUNT; i++) {
-        spriteViews[i].sprite = nullptr;
+        spriteViews[i].image = nullptr;
         metadataLabels[i].setString("");
     }
 
@@ -502,7 +502,7 @@ void ScreenshotsScene::updateScreenshotState() {
         const game_state::Stat& stat = stats[i];
         bool hasSprite = stat.sprite >= 0 && stat.sprite < (int32_t)stateSprites.size();
 
-        spriteViews[metadataCount].sprite = hasSprite ? stateSprites[stat.sprite].sprite() : nullptr;
+        spriteViews[metadataCount].image = hasSprite ? &stateSprites[stat.sprite] : nullptr;
 
         // Without a sprite, the stat's title says what the value is
         if (hasSprite) {
@@ -656,14 +656,12 @@ void ScreenshotsScene::updateZoomedViews(const RenderInfo& renderInfo) {
 
     fadeBehindFullScreenshot(openValue, zoomValue);
 
-    const sprite_t* sprite = fullScreenshot->sprite();
-
     // Where it opens from, and its rect at each scale (scaled down only if it
     // wouldn't fit in the scene)
     Rect thumbnailInView = Rect(contentView.frame.origin + selectedThumbnailRect.origin, selectedThumbnailRect.size);
 
-    Rect standardRect   = centredIn(scaledToFit(sprite, 1.0f, view.frame.size), view.frame);
-    Rect fullscreenRect = centredIn(scaledToFit(sprite, 2.0f, view.frame.size), view.frame);
+    Rect standardRect   = centredIn(scaledToFit(fullScreenshot, 1.0f, view.frame.size), view.frame);
+    Rect fullscreenRect = centredIn(scaledToFit(fullScreenshot, 2.0f, view.frame.size), view.frame);
 
     // Between the two scales, kept centred, then from the thumbnail to there.
     // Once fully open this is the open rect exactly.
@@ -738,7 +736,7 @@ void ScreenshotsScene::updateGridViews(const RenderInfo& renderInfo) {
         // are hidden, rather than drawn over the tabs, and so is the one shown
         // at full size, as that's drawn in its place.
         imageViews[i].frame = rect;
-        imageViews[i].sprite = composedImages[i] != nullptr ? composedImages[i]->sprite() : nullptr;
+        imageViews[i].image = composedImages[i];
         imageViews[i].isHidden = composedImages[i] == nullptr || isScrolledOff || !isOnScreen(rect)
             || (isShowingFullScreenshot && i == selectedIndex);
     }
@@ -750,16 +748,16 @@ void ScreenshotsScene::updateGridViews(const RenderInfo& renderInfo) {
     // own frame unchanged: a scroll that keeps the selection in place, or a
     // delete shifting the next screenshot into the slot, or it reappearing once
     // the full size one closes. So it redraws on top.
-    sprite_t* selectedSprite = imageViews[selectedIndex].sprite;
+    const Image* selectedImage = imageViews[selectedIndex].image;
     bool isSelectedHidden = imageViews[selectedIndex].isHidden;
 
     if (selectedIndex != lastCornerIndex || scrollRow != lastCornerScrollRow
-        || selectedSprite != lastCornerSprite || isSelectedHidden != lastCornerHidden) {
+        || selectedImage != lastCornerImage || isSelectedHidden != lastCornerHidden) {
         selectedCornerView.setNeedsDisplay();
 
         lastCornerIndex = selectedIndex;
         lastCornerScrollRow = scrollRow;
-        lastCornerSprite = selectedSprite;
+        lastCornerImage = selectedImage;
         lastCornerHidden = isSelectedHidden;
     }
 
@@ -847,26 +845,26 @@ void ScreenshotsScene::updateViews(const RenderInfo& renderInfo) {
     int rowHeight = 0;
 
     for (int i = 0; i < metadataCount; i++) {
-        sprite_t* sprite = spriteViews[i].sprite;
+        const Image* image = spriteViews[i].image;
 
         metadataLabels[i].sizeToFit();
 
-        int spriteWidth = (sprite != nullptr) ? sprite->width + SPRITE_LABEL_SPACING : 0;
+        int spriteWidth = (image != nullptr) ? image->size().width + SPRITE_LABEL_SPACING : 0;
 
         rowWidth += (i > 0 ? SPRITE_PAIR_SPACING : 0) + spriteWidth + metadataLabels[i].frame.size.width;
-        rowHeight = std::max(rowHeight, (sprite != nullptr) ? (int)sprite->height : (int)metadataLabels[i].frame.size.height);
+        rowHeight = std::max(rowHeight, (image != nullptr) ? image->size().height : (int)metadataLabels[i].frame.size.height);
     }
 
     int pairX = (view.frame.size.width - rowWidth) / 2;
     int rowY = screenshotTitleLabel.frame.origin.y + SPRITE_ROW_SPACING;
 
     for (int i = 0; i < SPRITE_VIEW_COUNT; i++) {
-        sprite_t* sprite = spriteViews[i].sprite;
+        const Image* image = spriteViews[i].image;
         bool isShown = (i < metadataCount) && !screenshotTitleLabel.isHidden;
 
         spriteViews[i].usesMultipliedOpacity = false;
         spriteViews[i].opacity = metadataOpacity;
-        spriteViews[i].isHidden = !isShown || (sprite == nullptr);
+        spriteViews[i].isHidden = !isShown || (image == nullptr);
         spriteViews[i].isOpaque = false;
 
         metadataLabels[i].usesMultipliedOpacity = false;
@@ -878,9 +876,11 @@ void ScreenshotsScene::updateViews(const RenderInfo& renderInfo) {
             continue;
         }
 
-        if (sprite != nullptr) {
-            spriteViews[i].frame = Rect(pairX, rowY + (rowHeight - sprite->height) / 2, sprite->width, sprite->height);
-            pairX += sprite->width + SPRITE_LABEL_SPACING;
+        if (image != nullptr) {
+            Size imageSize = image->size();
+
+            spriteViews[i].frame = Rect(Vec2(pairX, rowY + (rowHeight - imageSize.height) / 2), imageSize);
+            pairX += imageSize.width + SPRITE_LABEL_SPACING;
         }
 
         // A label's origin is its baseline: put it where the text sits centred

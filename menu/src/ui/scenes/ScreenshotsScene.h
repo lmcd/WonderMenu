@@ -83,7 +83,7 @@ private:
     // What was under the corner overlay last frame, to know when to redraw it
     int lastCornerIndex = -1;
     int lastCornerScrollRow = -1;
-    sprite_t* lastCornerSprite = nullptr;
+    const Image* lastCornerImage = nullptr;
     bool lastCornerHidden = false;
 
     // The first row shown at the top of the grid. Rows above it are hidden.

@@ -24,7 +24,7 @@ private:
     InputWatcher aButtonWatcher;
 
     std::vector<FolderEntry> folderEntries;
-    sprite_t* sdCardSprite = nullptr;
+    Image sdCardImage = Image("rom:/ui/SD-128.RGBA16.sprite");
 
     void toggleSelectedFolder();
 
@@ -38,7 +38,6 @@ public:
     LabelView<64> messageLabel;
 
     ChooseFoldersPopover(Scene* baseScene, const std::vector<std::string>& paths);
-    ~ChooseFoldersPopover();
 
     void didBeginScene(SceneEntry entry) override;
     void update(const UpdateInfo& updateInfo) override;

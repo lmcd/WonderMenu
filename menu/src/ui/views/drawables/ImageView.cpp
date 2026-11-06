@@ -11,14 +11,14 @@
 void ImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    if (sprite != lastSprite) {
+    if (image != lastImage) {
         setNeedsRender();
-        lastSprite = sprite;
+        lastImage = image;
     }
 
-    if (spriteVersion != lastSpriteVersion) {
+    if (imageVersion != lastImageVersion) {
         setNeedsRender();
-        lastSpriteVersion = spriteVersion;
+        lastImageVersion = imageVersion;
     }
 
     if (scaleMode != lastScaleMode) {
@@ -61,8 +61,8 @@ void ImageView::drawPart(const Rect& rect, const rdpq_blitparms_t& params, const
     float scaleX = (params.scale_x != 0.0f) ? params.scale_x : 1.0f;
     float scaleY = (params.scale_y != 0.0f) ? params.scale_y : 1.0f;
 
-    int sourceWidth  = (params.width  != 0) ? params.width  : sprite->width  - params.s0;
-    int sourceHeight = (params.height != 0) ? params.height : sprite->height - params.t0;
+    int sourceWidth  = (params.width  != 0) ? params.width  : image->size().width  - params.s0;
+    int sourceHeight = (params.height != 0) ? params.height : image->size().height - params.t0;
 
     // The texels under the part, relative to the source crop. Filtering
     // samples a neighbour, so it needs one more texel each side.
@@ -88,7 +88,7 @@ void ImageView::drawPart(const Rect& rect, const rdpq_blitparms_t& params, const
     pushScissor(scissorRect);
 
     rdpq_sprite_blit(
-        sprite,
+        image->sprite(),
         rect.minX() + s0 * scaleX,
         rect.minY() + t0 * scaleY,
         &partParams
@@ -98,14 +98,11 @@ void ImageView::drawPart(const Rect& rect, const rdpq_blitparms_t& params, const
 }
 
 Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
-    Size spriteSize = Size(
-        sprite->width,
-        sprite->height
-    );
+    Size spriteSize = image->size();
 
     // Size is integral, so scale ratios must be computed in float.
-    float spriteWidth  = sprite->width;
-    float spriteHeight = sprite->height;
+    float spriteWidth  = spriteSize.width;
+    float spriteHeight = spriteSize.height;
 
     switch (scaleMode) {
         case SCALE_NONE:
@@ -201,7 +198,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    if (sprite == nullptr) {
+    if (image == nullptr || image->sprite() == nullptr) {
         return;
     }
 
@@ -257,7 +254,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
             pushScissor(scissorRect);
         }
 
-        drawSprite(sprite, rect.origin, &params);
+        drawSprite(image->sprite(), rect.origin, &params);
 
         if (needsScissor) {
             popScissor();

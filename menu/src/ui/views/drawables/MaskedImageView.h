@@ -15,7 +15,7 @@ private:
     inline static surface_t maskSheets[RectView::MAXIMUM_RADIUS] = {};
     inline static surface_t smoothMaskSheets[RectView::MAXIMUM_RADIUS] = {};
 
-    void* lastImageBuffer = nullptr;
+    const Image* lastImage = nullptr;
     uint8_t lastRadius = 0;
     uint32_t lastImageVersion = 0;
     bool lastFillsFrame = false;
@@ -46,10 +46,8 @@ private:
 public:
     const char* name() const override { return "MaskedImageView"; }
 
-    // The image that's getting masked. The view owns it: it's freed on
-    // destruction, and whoever replaces it frees what was there before. (A
-    // surface that doesn't own its pixels, e.g. an Image's, is never freed.)
-    surface_t imageSurface = {};
+    // The image that's getting masked
+    const Image* image = nullptr;
 
     // The corner radius on screen, whatever the image's scale
     uint8_t radius = 0;
@@ -70,11 +68,9 @@ public:
     // when it's drawn scaled
     bool usesBilinearFiltering = false;
 
-    // Bump this whenever the surface's pixels change without the pointer
+    // Bump this whenever the image's pixels change without the pointer
     // changing.
     uint32_t imageVersion = 0;
-
-    ~MaskedImageView();
 
     void update(const RenderInfo& renderInfo) override;
     void clear(const RenderInfo& renderInfo);

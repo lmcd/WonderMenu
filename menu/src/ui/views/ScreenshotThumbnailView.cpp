@@ -13,11 +13,14 @@ static constexpr size_t SPRITE_HEADER_OFFSET = (64 - (sizeof(sprite_t) % 64)) % 
 
 ScreenshotThumbnailView::ScreenshotThumbnailView() {
     isSmooth = true;
+    image = &composedImage;
 
+    imageView1.image = &scaledImage1;
     imageView1.scaleMode = ImageView::ASPECT_FILL;
     imageView1.opacity = 1.0;
     imageView1.ignoresTextureAlpha = true;
 
+    imageView2.image = &scaledImage2;
     imageView2.scaleMode = ImageView::ASPECT_FILL;
     imageView2.opacity = 0.5;
     imageView2.ignoresTextureAlpha = true;
@@ -33,6 +36,11 @@ ScreenshotThumbnailView::ScreenshotThumbnailView() {
     contentsView.addSubview(&imageView2);
 
     addSubview(&borderView);
+}
+
+ScreenshotThumbnailView::~ScreenshotThumbnailView() {
+    freeScaledSprite(scaledSprite1);
+    freeScaledSprite(scaledSprite2);
 }
 
 sprite_t* ScreenshotThumbnailView::createScaledSprite(const surface_t* sourceSurface, int width) {
@@ -121,22 +129,21 @@ void ScreenshotThumbnailView::update(const RenderInfo& renderInfo) {
         // it's about to be freed along with last time's sprites
         rspq_wait();
 
-        freeScaledSprite(imageView1.sprite);
-        freeScaledSprite(imageView2.sprite);
+        freeScaledSprite(scaledSprite1);
+        freeScaledSprite(scaledSprite2);
 
-        if (imageSurface.buffer != nullptr) {
-            surface_free(&imageSurface);
-        }
+        scaledSprite1 = createScaledSprite(&fullSizeScreenshotSurface, 160);
+        scaledSprite2 = createScaledSprite(&fullSizeScreenshotSurface, 80);
 
-        imageView1.sprite = createScaledSprite(&fullSizeScreenshotSurface, 160);
-        imageView2.sprite = createScaledSprite(&fullSizeScreenshotSurface, 80);
+        scaledImage1 = scaledSprite1 ? Image(sprite_get_pixels(scaledSprite1)) : Image();
+        scaledImage2 = scaledSprite2 ? Image(sprite_get_pixels(scaledSprite2)) : Image();
 
-        imageView1.spriteVersion++;
-        imageView2.spriteVersion++;
+        imageView1.imageVersion++;
+        imageView2.imageVersion++;
 
         // Composed here rather than drawn to the display, so this view can draw it
         // with its corners masked off
-        imageSurface = contentsView.renderToSurface(renderInfo);
+        composedImage = Image(contentsView.renderToSurface(renderInfo));
         imageVersion++;
 
         // Everything above only queued the work: the RDP is still reading the

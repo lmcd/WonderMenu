@@ -27,9 +27,9 @@ public:
     };
     
 private:
-    sprite_t* lastSprite = nullptr;
+    const Image* lastImage = nullptr;
     ScaleMode lastScaleMode = {};
-    uint32_t lastSpriteVersion = 0;
+    uint32_t lastImageVersion = 0;
     bool lastUsesBilinearFiltering = false;
     Rect lastOccludedRect = {};
 
@@ -47,12 +47,12 @@ private:
 public:
     const char* name() const override { return "ImageView"; }
 
-    sprite_t* sprite = nullptr;
+    const Image* image = nullptr;
     ScaleMode scaleMode = SCALE_NONE;
 
-    // Bump this whenever the sprite's pixels change without the pointer
+    // Bump this whenever the image's pixels change without the pointer
     // changing.
-    uint32_t spriteVersion = 0;
+    uint32_t imageVersion = 0;
 
     // In world space. Nothing inside it is drawn or cleared, e.g. where an
     // opaque view on top covers this one. Zero size occludes nothing.

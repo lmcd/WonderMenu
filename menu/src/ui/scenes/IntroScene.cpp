@@ -34,7 +34,7 @@ IntroScene::IntroScene(GameLibrary* gameLibrary)
     float seconds;
 
     seconds = measure([&] {
-        logoSprite = sprite_load("rom:/ui/Logo.RGBA32.sprite");
+        logoImage = Image("rom:/ui/Logo.RGBA32.sprite");
     });
 
     debugf("[IntroScene] Loaded Logo: %.3fs\n", seconds);
@@ -46,10 +46,6 @@ IntroScene::IntroScene(GameLibrary* gameLibrary)
     view.addSubview(&labelView);
 }
 
-IntroScene::~IntroScene() {
-    sprite_free(logoSprite);
-}
-
 void IntroScene::didBeginScene(SceneEntry) {
     labelView.setString("");
 }
@@ -59,9 +55,9 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
     rectView.frame = renderInfo.screenRect;
     rectView.usesMultipliedOpacity = false;
 
-    Size imageSize = Size(logoSprite->width, logoSprite->height);
+    Size imageSize = logoImage.size();
 
-    imageView.sprite = logoSprite;
+    imageView.image = &logoImage;
     imageView.frame = imageSize.centeredIn(view.frame);
     imageView.isHidden = (popoverTransitionProgress > 0);
 
