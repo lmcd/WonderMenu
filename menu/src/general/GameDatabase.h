@@ -83,11 +83,6 @@ constexpr size_t DB_L_LABEL_SIZE_PADDED = DB_L_LABEL_SIZE + (DB_LABEL_CHUNKS_PER
 constexpr size_t DB_ENTRY_TITLE_LENGTH = 64;
 constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
 
-/**
- * Spare bytes padded to the end of every entry.
- */
-constexpr size_t DB_ENTRY_RESERVED_LENGTH = 2;
-
 // TODO: don't hardcode
 constexpr int DB_STRINGS_START_OFFSET = 5224;
 
@@ -132,8 +127,9 @@ public:
 
             bool requiresExpansionPak;
 
-            // Spare room for fields added later
-            uint8_t reserved[DB_ENTRY_RESERVED_LENGTH];
+            // Position of the title in a case-insensitive sort of every title.
+            // Equal titles share an index.
+            uint16_t sortIndex;
         };
 
         Data& data;

@@ -133,6 +133,15 @@ public:
         }
     }
 
+    // `sortIndex` when title() comes from the database, -1 otherwise
+    int titleSortIndex() const {
+        if (databaseEntry != nullptr && databaseEntry->title()[0] != '\0') {
+            return databaseEntry->data.sortIndex;
+        }
+
+        return -1;
+    }
+
     bool requiresExpansionPak() {
         if (databaseEntry != nullptr) {
             return databaseEntry->data.requiresExpansionPak;

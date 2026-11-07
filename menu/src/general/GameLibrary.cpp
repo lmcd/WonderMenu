@@ -49,6 +49,19 @@ static bool containsPath(const std::vector<uint32_t>& hashes, const std::vector<
     return false;
 }
 
+// Alphabetical by display title (case-insensitive). mkdatabase ranks database
+// titles with the same strcasecmp, so the two orders agree when they're mixed.
+static bool compareTitles(const GameGroup& a, const GameGroup& b) {
+    int sortIndexA = a.preferredGame()->titleSortIndex();
+    int sortIndexB = b.preferredGame()->titleSortIndex();
+
+    if (sortIndexA >= 0 && sortIndexB >= 0) {
+        return sortIndexA < sortIndexB;
+    }
+
+    return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
+}
+
 GameLibrary::GameLibrary(GameDatabase& database, const char* path) :
     database(database),
     path(path) {
@@ -382,9 +395,7 @@ void GameLibrary::toggleRetailGroupings() {
     }
 
     // Sort retail games alphabetically by display title (case-insensitive)
-    std::sort(retailGroups.begin(), retailGroups.end(), [](const GameGroup& a, const GameGroup& b) {
-        return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
-    });
+    std::sort(retailGroups.begin(), retailGroups.end(), compareTitles);
 }
 
 std::vector<std::string> GameLibrary::findROMDirectories(int depth) {
@@ -679,14 +690,10 @@ void GameLibrary::loadGames() {
     std::vector<CacheResult>().swap(cache);
 
     // Sort retail games alphabetically by display title (case-insensitive)
-    std::sort(retailGroups.begin(), retailGroups.end(), [](const GameGroup& a, const GameGroup& b) {
-        return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
-    });
+    std::sort(retailGroups.begin(), retailGroups.end(), compareTitles);
 
     // Sort homebrew games alphabetically by display title (case-insensitive)
-    std::sort(homebrewGroups.begin(), homebrewGroups.end(), [](const GameGroup& a, const GameGroup& b) {
-        return strcasecmp(a.preferredGame()->title(), b.preferredGame()->title()) < 0;
-    });
+    std::sort(homebrewGroups.begin(), homebrewGroups.end(), compareTitles);
 
     auto orderIn = [](const std::vector<std::string>& paths, const GameGroup& group) {
         auto it = std::find(paths.begin(), paths.end(), group.preferredGame()->romFile.path);
