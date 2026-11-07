@@ -86,7 +86,7 @@ constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
 /**
  * Spare bytes padded to the end of every entry.
  */
-constexpr size_t DB_ENTRY_RESERVED_LENGTH = 1;
+constexpr size_t DB_ENTRY_RESERVED_LENGTH = 2;
 
 // TODO: don't hardcode
 constexpr int DB_STRINGS_START_OFFSET = 5224;
@@ -115,8 +115,9 @@ public:
 
             RegionCode regionCode;
 
-            uint8_t saveType;
-            uint8_t cicType;
+            // Share a byte: saveType in the high nibble, cicType in the low
+            uint8_t saveType : 4;
+            uint8_t cicType  : 4;
 
             uint16_t smallLabelTileIndex;
             uint16_t largeLabelTileIndex;
