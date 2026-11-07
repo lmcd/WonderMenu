@@ -80,8 +80,11 @@ struct SpeedrunDatabase {
     //   uint32_t gameCRC1
     //   uint32_t reserved1
     //   uint32_t reserved2
+    //   uint32_t reserved[2]
+    //   uint8_t  reserved
     //   uint8_t  groupCount
     //   uint8_t  speedrunCount
+    //   uint8_t  reserved
     //   SpeedrunGroup[groupCount]    { char title[50] }
     //   SpeedrunEntry[speedrunCount] { u32 m64CRC, u8 groupIndex, u32 timeInMilliseconds, bool isWorldRecord, char authors[222] }
     std::vector<uint8_t> serialize() const;
