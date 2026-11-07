@@ -111,7 +111,7 @@ void GameRowView::update(const RenderInfo&) {
 
             uint8_t version = game->version();
 
-            if (version > 1) {
+            if (version > 0) {
                 versionNumberView.setString("%s", game->versionString().c_str());
                 versionNumberView.isHidden = false;
             }

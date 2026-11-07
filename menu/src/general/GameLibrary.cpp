@@ -636,8 +636,8 @@ void GameLibrary::loadGames() {
                 bool hasHomebrewGameCode = romFile->hasHomebrewGameCode();
                 
                 if (hasHomebrewGameCode || databaseEntry == nullptr) {
-                    // Version field  for homebrew roms can't be trusted, so keep it a 1
-                    lastGame.romFile.version = 1;
+                    // Version field for homebrew roms can't be trusted, so keep it at 1.0
+                    lastGame.romFile.version = 0;
 
                     homebrewGroups.emplace_back(lastGame);
                 }
