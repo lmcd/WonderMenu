@@ -114,7 +114,7 @@ public:
             CategoryCode categoryCode;
 
             // The 2 character game ID (e.g. BK)
-            char uniqueID[2] = "0";
+            char uniqueID[2];
 
             RegionCode regionCode;
 
