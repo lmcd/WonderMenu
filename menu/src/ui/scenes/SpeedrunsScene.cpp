@@ -221,6 +221,8 @@ void SpeedrunsScene::didBeginScene(SceneEntry) {
 void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
     joypad_buttons_t btn = updateInfo.btn;
 
+    bootSession.advance();
+
     if (tableView.handleInputs(updateInfo)) {}
 
     // A: toggle expand/collapse on a group, or select/deselect a run
