@@ -69,7 +69,6 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 
     imageView.image = &logoImage;
     imageView.frame = imageSize.centeredIn(view.frame);
-    imageView.isHidden = (popoverTransitionProgress > 0);
 
     labelView.frame.origin = Vec2(0, 458);
     labelView.maxWidth = view.frame.size.width;
