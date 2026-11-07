@@ -233,6 +233,10 @@ void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
 
     // A: toggle expand/collapse on a group, or select/deselect a run
     if (btn.a && !rows.empty()) {
+        if (tableView.isHidden) {
+            return;
+        }
+        
         const int selectedIndex = tableView.selectedRowIndex;
         const RowInfo& row = rows[selectedIndex];
 

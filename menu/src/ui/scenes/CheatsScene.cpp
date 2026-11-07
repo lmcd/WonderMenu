@@ -292,6 +292,10 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
     InputWatcher::Event aButtonEvent = aButtonWatcher.update(updateInfo.joypad.btn.a);
 
     if (aButtonEvent == InputWatcher::BUTTON_UP) {
+        if (tableView.isHidden) {
+            return;
+        }
+
         const int selectedIndex = tableView.selectedRowIndex;
         RowInfo& row = rows[selectedIndex];
 
@@ -327,6 +331,10 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
         finishCheatSelection(row);
     }
     else if (aButtonEvent == InputWatcher::BUTTON_DOWN) {
+        if (tableView.isHidden) {
+            return;
+        }
+        
         const int selectedIndex = tableView.selectedRowIndex;
         const RowInfo& row = rows[selectedIndex];
         
