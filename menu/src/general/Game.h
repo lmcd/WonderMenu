@@ -142,6 +142,15 @@ public:
         return -1;
     }
 
+    int maxControllers() {
+        if (databaseEntry != nullptr) {
+            return databaseEntry->data.maxControllers;
+        }
+        else {
+            return 4;
+        }
+    }
+
     bool requiresExpansionPak() {
         if (databaseEntry != nullptr) {
             return databaseEntry->data.requiresExpansionPak;

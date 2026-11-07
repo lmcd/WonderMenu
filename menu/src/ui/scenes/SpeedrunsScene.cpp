@@ -247,17 +247,24 @@ void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
                 else {
                     tableView.isADown = false;
 
-                    Scene* baseScene = (parentScene != nullptr) ? parentScene : this;
+                    if (game->maxControllers() > 1) {
+                        Scene* baseScene = (parentScene != nullptr) ? parentScene : this;
 
-                    AlertPopover* alert = new AlertPopover(baseScene, "CREATE SPEEDRUN");
-                    alert->setButtons("1 Controller", "2 Controllers", "3 Controllers", "4 Controllers");
-                    alert->setInitialButtonIndex(std::clamp((int)numberOfControllers, 1, 4) - 1);
+                        AlertPopover* alert = new AlertPopover(baseScene, "CREATE SPEEDRUN");
+                        alert->setButtons("1 Controller", "2 Controllers", "3 Controllers", "4 Controllers");
+                        alert->setInitialButtonIndex(std::clamp((int)numberOfControllers, 1, 4) - 1);
 
-                    auto result = alert->present();
+                        auto result = alert->present();
 
-                    if (result.didSucceed()) {
-                        numberOfControllers = result.value + 1;
-
+                        if (result.didSucceed()) {
+                            numberOfControllers = result.value + 1;
+                            isRecording = true;
+                            selectedRow = -1;
+                            selectedCRC = 0;
+                        }
+                    }
+                    else {
+                        numberOfControllers = 1;
                         isRecording = true;
                         selectedRow = -1;
                         selectedCRC = 0;

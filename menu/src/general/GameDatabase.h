@@ -125,7 +125,11 @@ public:
             // 0xFFFFFFFF = no speedruns
             uint32_t speedrunsByteOffset;
 
-            bool requiresExpansionPak;
+            // Share a byte: maxControllers in the high nibble, then
+            // requiresExpansionPak, then 3 spare bits
+            uint8_t maxControllers : 4;
+            uint8_t requiresExpansionPak : 1;
+            uint8_t reserved : 3;
 
             // Position of the title in a case-insensitive sort of every title.
             // Equal titles share an index.
