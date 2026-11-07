@@ -11,7 +11,6 @@
 #include <cstddef>
 #include <vector>
 #include <cstring>
-#include <filesystem>
 #include <optional>
 #include <string>
 
@@ -156,7 +155,17 @@ private:
 
         std::string romFilePath = game->romFile.path;
 
-        std::string saveFilename = std::filesystem::path(romFilePath).filename().replace_extension(".sav").string();
+        size_t separator = romFilePath.rfind('/');
+        std::string saveFilename = (separator == std::string::npos) ? romFilePath : romFilePath.substr(separator + 1);
+
+        // A leading dot starts the name rather than an extension
+        size_t extension = saveFilename.rfind('.');
+
+        if (extension != std::string::npos && extension != 0) {
+            saveFilename.erase(extension);
+        }
+
+        saveFilename += ".sav";
         std::string saveFilePath = "sd:/saves/" + saveFilename;
 
         debugf("[BootSession] Save file %s\n", saveFilePath.c_str());

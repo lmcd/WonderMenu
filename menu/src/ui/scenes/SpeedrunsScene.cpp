@@ -5,7 +5,6 @@
 
 #include "SpeedrunsScene.h"
 
-#include <filesystem>
 #include <algorithm>
 #include <cstring>
 

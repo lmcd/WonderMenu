@@ -3,7 +3,6 @@
 * @license AGPLv3
 */
 
-#include <filesystem>
 #include <algorithm>
 #include <cstring>
 

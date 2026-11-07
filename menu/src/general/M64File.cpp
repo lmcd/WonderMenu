@@ -7,7 +7,6 @@
 #include "fatfs/ff.h"
 
 #include <algorithm>
-#include <filesystem>
 
 static M64File::Header headerBuffer;
 
@@ -124,7 +123,9 @@ bool M64File::loadHeader() {
     this->author[sizeof(this->author) - 1] = '\0';
 
     // Display name: base name (stem, extension dropped) with commas -> colons.
-    displayName = std::filesystem::path(filename).stem().string();
+    // A leading dot starts the name rather than an extension
+    size_t extension = filename.rfind('.');
+    displayName = (extension == std::string::npos || extension == 0) ? filename : filename.substr(0, extension);
     std::replace(displayName.begin(), displayName.end(), ',', ':');
 
     crc = calculateCRC32((const unsigned char*)&headerBuffer, sizeof(headerBuffer));

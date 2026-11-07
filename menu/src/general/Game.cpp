@@ -5,7 +5,6 @@
 
 #include "Game.h"
 
-#include <filesystem>
 #include <cstring>
 #include <cstdio>
 
@@ -30,7 +29,8 @@ const char* Game::title() const {
     // with a dangling pointer.
     if (!romFile.path.empty()) {
         if (fallbackTitle.empty()) {
-            fallbackTitle = std::filesystem::path(romFile.path).filename().string();
+            size_t separator = romFile.path.rfind('/');
+            fallbackTitle = (separator == std::string::npos) ? romFile.path : romFile.path.substr(separator + 1);
         }
 
         return fallbackTitle.c_str();
