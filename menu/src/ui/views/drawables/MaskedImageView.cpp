@@ -322,9 +322,6 @@ void MaskedImageView::render(const RenderInfo& renderInfo) {
             }
         rdpq_mode_end();
 
-        setPrimitiveColor(alphaColor);
-        setBlendColor(finalBlendColor);
-
         int rightS  = layout.width  - cornerSize;
         int bottomT = layout.height - cornerSize;
 
