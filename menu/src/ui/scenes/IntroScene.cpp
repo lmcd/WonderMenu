@@ -30,14 +30,6 @@
 IntroScene::IntroScene(GameLibrary* gameLibrary)
     : Scene(),
     gameLibrary(gameLibrary) {
-    
-    float seconds;
-
-    seconds = measure([&] {
-        logoImage = Image("rom:/ui/Logo.RGBA32.sprite");
-    });
-
-    debugf("[IntroScene] Loaded Logo: %.3fs\n", seconds);
 
     ownedByRenderer = true;
 
@@ -48,6 +40,24 @@ IntroScene::IntroScene(GameLibrary* gameLibrary)
 
 void IntroScene::didBeginScene(SceneEntry) {
     labelView.setString("");
+
+    float seconds = measure([&] {
+        if (is_memory_expanded()) {
+            logoImage = Image("rom:/ui/Logo.RGBA32.sprite");
+        }
+        else {
+            logoImage = Image("rom:/ui/Logo.RGBA16.sprite");
+        }
+    });
+
+    debugf("[IntroScene] Loaded Logo: %.3fs\n", seconds);
+}
+
+void IntroScene::didEndScene() {
+    // The last frame may still be drawing it
+    rspq_wait();
+
+    logoImage.reset();
 }
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
