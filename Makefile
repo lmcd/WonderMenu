@@ -60,29 +60,29 @@ menu: $(MENU_PAYLOAD_DEP)
 .PHONY: menu
 
 # Pass-throughs to menu/, but gated on a current payload asset first, so a
-# release ROM can never embed a stale payload.elf.stripped. `console` picks
-# this up transitively via its `release` prerequisite.
-release release-bundle sc64: $(MENU_PAYLOAD_DEP)
+# release ROM can never embed a stale payload.elf.stripped.
+release sc64: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu $@
-.PHONY: release release-bundle sc64
+.PHONY: release sc64
+
+# `console` and `emu` deploy the same ROM; only where it goes differs.
+MENU_ROM = menu/WonderMenu.z64
 
 # --- console ---------------------------------------------------------------
 
-SC64DEPLOYER     ?= sc64deployer
-MENU_RELEASE_ROM  = menu/WonderMenu-release.z64
+SC64DEPLOYER ?= sc64deployer
 
-# Build the release ROM, then push it to a connected SummerCart64.
-console: release
+# Build the ROM, then push it to a connected SummerCart64.
+console: all
 	@command -v $(SC64DEPLOYER) >/dev/null || { echo "console: $(SC64DEPLOYER) not found in PATH"; exit 1; }
-	@echo "    [SC64] upload $(MENU_RELEASE_ROM)"
-	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_RELEASE_ROM)" --direct
+	@echo "    [SC64] upload $(MENU_ROM)"
+	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_ROM)" --direct
 	$(SC64DEPLOYER) debug
 .PHONY: console
 
 # --- emulator --------------------------------------------------------------
 
-ARES    ?= /Applications/ares.app/Contents/MacOS/ares
-MENU_ROM = menu/WonderMenu.z64
+ARES ?= /Applications/ares.app/Contents/MacOS/ares
 
 # Build the ROM, then boot it in ares. Invoked via the binary inside the bundle
 # rather than `open -a` so that ares takes the ROM path as an argument and its

@@ -1,4 +1,4 @@
-BUILD_DIR=build/emulator
+BUILD_DIR=build/dev
 T3D_INST=$(N64_INST)
 # N64_ROM_HEADER = /Users/lee/Documents/GitHub/libdragon/boot/bin/ipl3_dev.z64
 
@@ -10,7 +10,7 @@ include $(N64_INST)/include/t3d.mk
 # not build outputs. Because they're prerequisites of the filesystem copy rule,
 # make walks that implicit chain -- v64 <- z64 <- $(BUILD_DIR)/%.elf -- and,
 # since `%.z64`'s directory is split off, tries to LINK a bogus
-# assets/sd/build/emulator/NNN.elf with no object files ([LD] error). Cancel
+# assets/sd/build/dev/NNN.elf with no object files ([LD] error). Cancel
 # the rule (redefine the pattern with no recipe) so these stay plain sources.
 %.v64: %.z64
 
@@ -30,8 +30,15 @@ N64_CFLAGS += -MP
 N64_CXXFLAGS += -MP
 N64_ASFLAGS += -MP
 
+# RELEASE=1 (passed by the release target) compiles out debugf and the asserts
+# in the menu's own code. libdragon and Tiny3D keep theirs, as they're built
+# separately.
+RELEASE ?= 0
+
+ifeq ($(RELEASE),1)
 N64_CFLAGS   += -DNDEBUG
 N64_CXXFLAGS += -DNDEBUG
+endif
 
 MKSPRITE_FLAGS=
 
@@ -202,20 +209,46 @@ $(BUILD_DIR)/$(PROJECT_NAME).msym: $(BUILD_DIR)/$(PROJECT_NAME).elf $(BUILD_DIR)
 $(PROJECT_NAME).z64: N64_ROM_TITLE="WonderMenu"
 $(PROJECT_NAME).z64: $(BUILD_DIR)/$(PROJECT_NAME).dfs $(BUILD_DIR)/$(PROJECT_NAME).msym
 
+ifeq ($(RELEASE),1)
+# n64.mk's %.z64 recipe without the backtrace symbol table (.sym), which only
+# the crash screen reads, and never into RAM. A release crash shows addresses
+# rather than function names. The .msym stays: dlopen needs it for the DSOs.
+# Keep in step with the recipe in n64.mk.
+RELEASE_ELF = $(BUILD_DIR)/$(PROJECT_NAME).elf
+
+$(PROJECT_NAME).z64: $(RELEASE_ELF)
+	@echo "    [Z64] $@"
+	cp $(RELEASE_ELF) $(RELEASE_ELF).stripped
+	$(N64_STRIP) -s $(RELEASE_ELF).stripped
+	$(N64_ELFCOMPRESS) -o $(dir $(RELEASE_ELF)) -c $(N64_ROM_ELFCOMPRESS) $(RELEASE_ELF).stripped
+	@rm -f $@
+	$(N64_TOOL) $(N64_TOOLFLAGS) --output $(BUILD_DIR)/$@.tmp \
+		--align 256 $(RELEASE_ELF).stripped \
+		$(filter %.dfs, $^) \
+		$(filter %.msym, $^) \
+		$(N64_TOOLFILES)
+	if [ ! -z "$(strip $(N64_ED64ROMCONFIGFLAGS))" ]; then \
+		$(N64_ED64ROMCONFIG) $(N64_ED64ROMCONFIGFLAGS) $(BUILD_DIR)/$@.tmp; \
+	fi
+	if [ ! -z "$(N64_ROM_METADATA)" ]; then \
+		echo "    [METADATA] $@"; \
+		$(N64_METADATA) $(N64_METADATAFLAGS) $(BUILD_DIR)/$@.tmp $(N64_ROM_METADATA); \
+	fi
+	@mv $(BUILD_DIR)/$@.tmp $@
+endif
+
 rom-with-size: $(PROJECT_NAME).z64
 	@python3 -c "import os,struct; p='$<'; s=os.path.getsize(p); \
 	f=open(p,'r+b'); f.seek(0x18); f.write(struct.pack('>I', s)); f.close(); \
 	print(f'    [SIZE] {s} bytes -> {p}')"
 
 clean:
-	rm -rf $(BUILD_DIR) *.z64
+	rm -rf $(BUILD_DIR) build/release *.z64
 	rm -rf filesystem
 
+# Its own build directory, so objects built with and without NDEBUG never mix
 release:
-	$(MAKE) all assets_n64= assets_ini= assets_bin= BUILD_DIR=build/console PROJECT_NAME=$(PROJECT_NAME)-release
-
-release-bundle:
-	$(MAKE) all BUILD_DIR=build/console PROJECT_NAME=$(PROJECT_NAME)-release-bundle
+	$(MAKE) all BUILD_DIR=build/release PROJECT_NAME=$(PROJECT_NAME)-release RELEASE=1
 
 build_lib:
 	rm -rf $(BUILD_DIR) *.z64
@@ -236,4 +269,4 @@ sc64:
 
 -include $(objs:.o=.d)
 
-.PHONY: all clean release release-bundle emu rom-with-size sc64
+.PHONY: all clean release rom-with-size sc64
