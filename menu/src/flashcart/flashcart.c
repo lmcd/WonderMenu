@@ -209,15 +209,6 @@ static void flashcart_set_fast_pi_timings (void) {
 flashcart_err_t flashcart_init (const char **storage_prefix) {
     flashcart_err_t err;
 
-    if (sys_bbplayer()) {
-        // TODO: Add iQue callbacks
-        *storage_prefix = "bbfs:/";
-        if (bbfs_init()) {
-            return FLASHCART_ERR_BBFS;
-        }
-        return FLASHCART_OK;
-    }
-
     *storage_prefix = "sd:/";
     bool sd_card_initialized = debug_init_sdfs(*storage_prefix, -1);
 
