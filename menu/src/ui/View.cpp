@@ -243,6 +243,12 @@ void View::drawOffscreen(const RenderInfo& renderInfo, const surface_t& surface)
 
     rdpq_mode_push();
 
+    // The image is only ever drawn as a texture, so antialiasing would just leave
+    // each pixel's coverage in its alpha bit.
+    rdpq_mode_antialias(AA_NONE);
+
+    rdpq_mode_push();
+
     rdpq_set_mode_fill(Color::BLACK);
 
     clearSubtree(renderInfo);
@@ -250,6 +256,8 @@ void View::drawOffscreen(const RenderInfo& renderInfo, const surface_t& surface)
     rdpq_mode_pop();
 
     render(renderInfo);
+
+    rdpq_mode_pop();
 
     rdpq_detach();
 }

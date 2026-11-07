@@ -317,6 +317,10 @@ void ScreenshotsScene::composeScreenshots(const RenderInfo& renderInfo) {
         imageView.scaleMode = ImageView::ASPECT_FILL;
         imageView.usesBilinearFiltering = true;
 
+        // Thumbnails are opaque. Some builds saved them with antialiasing
+        // coverage left in the alpha bit, which would draw as transparent rows.
+        imageView.ignoresTextureAlpha = true;
+
         cornerView.frame = frame;
         cornerView.radius = SCREENSHOT_RADIUS;
         cornerView.isSmooth = true;
