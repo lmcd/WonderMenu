@@ -17,7 +17,7 @@
  * @param a The alignment boundary (must be a power of two).
  * @return The aligned value.
  */
-#define ALIGN(x, a)     (((x) + ((typeof(x))(a) - 1)) & ~((typeof(x))(a) - 1))
+#define ALIGN(x, a)     (((x) + ((__typeof__(x))(a) - 1)) & ~((__typeof__(x))(a) - 1))
 
 /**
  * @def MAX(a, b)
@@ -29,7 +29,7 @@
  * @param b The second value.
  * @return The maximum of @p a and @p b.
  */
-#define MAX(a,b)        ({ typeof(a) _a = a; typeof(b) _b = b; _a > _b ? _a : _b; })
+#define MAX(a,b)        ({ __typeof__(a) _a = a; __typeof__(b) _b = b; _a > _b ? _a : _b; })
 
 /**
  * @def MIN(a, b)
@@ -41,7 +41,7 @@
  * @param b The second value.
  * @return The minimum of @p a and @p b.
  */
-#define MIN(a,b)        ({ typeof(a) _a = a; typeof(b) _b = b; _a < _b ? _a : _b; })
+#define MIN(a,b)        ({ __typeof__(a) _a = a; __typeof__(b) _b = b; _a < _b ? _a : _b; })
 
 /**
  * @def KiB(x)

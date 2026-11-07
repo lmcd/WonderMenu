@@ -86,13 +86,12 @@ constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
 /**
  * Spare bytes padded to the end of every entry.
  */
-constexpr size_t DB_ENTRY_RESERVED_LENGTH = 5;
+constexpr size_t DB_ENTRY_RESERVED_LENGTH = 1;
 
 // TODO: don't hardcode
-constexpr int DB_ENTRIES_START_OFFSET = 5224;
+constexpr int DB_STRINGS_START_OFFSET = 5224;
 
 constexpr int DB_DMA_SIZE = KiB(112);
-// constexpr int DB_DMA_SIZE = DB_ENTRIES_START_OFFSET + (DB_ENTRY_SIZE * 906);
 
 /**
  * Represents the WonderMenu.db database format.
@@ -104,11 +103,9 @@ public:
      */
     struct Entry {
         struct __attribute__((packed)) Data {
-            // The title of the game (e.g. Banjo Kazooie)
-            char title[DB_ENTRY_TITLE_LENGTH];
-
-            // The developer of the game (e.g. Rareware)
-            char developer[DB_ENTRY_DEVELOPER_LENGTH];
+            // Byte offsets into the string pool
+            uint16_t titleOffset;
+            uint16_t developerOffset;
 
             // An alphanumeric character that specifies the kind of media the game is stored on.
             CategoryCode categoryCode;
@@ -140,13 +137,24 @@ public:
         };
 
         Data& data;
+        const char* strings;
 
         uint32_t labelTileCluster = 0;
         uint32_t largeLabelTileCluster = 0;
         uint32_t cheatsCluster = 0;
         uint16_t entryIndex;
 
-        Entry(Data& data, uint16_t entryIndex) : data(data), entryIndex(entryIndex) {}
+        Entry(Data& data, const char* strings, uint16_t entryIndex) : data(data), strings(strings), entryIndex(entryIndex) {}
+
+        // The title of the game (e.g. Banjo Kazooie)
+        const char* title() const {
+            return strings + data.titleOffset;
+        }
+
+        // The developer of the game (e.g. Rareware)
+        const char* developer() const {
+            return strings + data.developerOffset;
+        }
 
         bool hasSpeedrunDatabase() {
             return data.speedrunsByteOffset != NO_SPEEDRUNS_DATABASE;
@@ -176,8 +184,8 @@ private:
 
     std::unordered_map<uint32_t, uint16_t> titleLookupMap;
 
-    Entry::Data placeholderData;
-    Entry placeholderEntry{placeholderData, 0};
+    Entry::Data placeholderData = {};
+    Entry placeholderEntry{placeholderData, "", 0};
 
     #ifdef N64
     // Zeroed so `obj.fs` reads as null (not open) until load() opens it
@@ -189,6 +197,10 @@ private:
      */
     uint16_t entryCount = 0;
 
+    uint16_t stringsSize = 0;
+
+    // The string pool, with the entries directly after it in the same block
+    char* strings = nullptr;
     Entry::Data* entriesData = nullptr;
 
     long entriesStartOffset;
@@ -269,7 +281,9 @@ public:
  */
 constexpr size_t DB_ENTRY_SIZE = sizeof(GameDatabase::Entry::Data);
 
-static_assert(DB_ENTRY_SIZE == 120, "DB_ENTRY_SIZE must stay at 120 bytes");
+static_assert(DB_ENTRY_SIZE == 24, "DB_ENTRY_SIZE must stay at 24 bytes");
+
+static_assert(DB_ENTRY_SIZE % 8 == 0, "DB_ENTRY_SIZE must stay a multiple of 8");
 
 // Every entry must begin on a 2-byte boundary, which single-entry PI DMA requires
 static_assert(DB_ENTRY_SIZE % 2 == 0, "DB_ENTRY_SIZE must stay even for PI DMA");

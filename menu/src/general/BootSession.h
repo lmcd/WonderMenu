@@ -149,10 +149,6 @@ private:
     }
 
     void loadSaveFile() {
-        if (game->databaseEntry == nullptr) {
-            return;
-        }
-
         std::string romFilePath = game->romFile.path;
 
         size_t separator = romFilePath.rfind('/');
@@ -170,9 +166,7 @@ private:
 
         debugf("[BootSession] Save file %s\n", saveFilePath.c_str());
 
-        flashcart_save_type_t saveType = (flashcart_save_type_t)game->databaseEntry->data.saveType;
-
-        flashcart_load_save(saveFilePath.data(), saveType);
+        flashcart_load_save(saveFilePath.data(), game->saveType());
     }
 
 public:
@@ -362,13 +356,8 @@ public:
         // Tell boot() where the first 1MB is in the Expansion Pak
         boot_params.rom_staged_memory_address = memoryWorker.hasStaged() ? GAME_STAGING_ADDRESS : 0;
 
-        if (game->databaseEntry != nullptr) {
-            boot_params.detect_cic_type = false;
-            boot_params.cic_type = (cic_type_t)game->databaseEntry->data.cicType;
-        }
-        else {
-            boot_params.detect_cic_type = true;
-        }
+        boot_params.cic_type = game->cicType();
+        boot_params.detect_cic_type = (boot_params.cic_type == CIC_UNKNOWN);
 
         if (canUseExpansionPak) {
             boot_params.cheat_list = cheatList;

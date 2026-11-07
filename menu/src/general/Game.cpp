@@ -20,8 +20,8 @@ Game::~Game() {
 
 const char* Game::title() const {
     // Prefer database title if available
-    if (databaseEntry && databaseEntry->data.title[0] != '\0') {
-        return databaseEntry->data.title;
+    if (databaseEntry && databaseEntry->title()[0] != '\0') {
+        return databaseEntry->title();
     }
 
     // Last resort: return filename. Cached on the Game rather than built into a
@@ -41,8 +41,8 @@ const char* Game::title() const {
 
 const char* Game::developer() const {
     // Return database developer if available
-    if (databaseEntry && databaseEntry->data.developer[0] != '\0') {
-        return databaseEntry->data.developer;
+    if (databaseEntry && databaseEntry->developer()[0] != '\0') {
+        return databaseEntry->developer();
     }
 
     return "Unknown";

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 
+#include "flashcart/flashcart.h"
 #include "GameDatabase.h"
 #include "M64File.h"
 #include "ROMFile.h"
@@ -138,6 +139,24 @@ public:
         }
         else {
             return true;
+        }
+    }
+
+    flashcart_save_type_t saveType() {
+        if (databaseEntry != nullptr) {
+            return (flashcart_save_type_t)databaseEntry->data.saveType;
+        }
+        else {
+            return FLASHCART_SAVE_TYPE_NONE;
+        }
+    }
+
+    cic_type_t cicType() {
+        if (databaseEntry != nullptr) {
+            return (cic_type_t)databaseEntry->data.cicType;
+        }
+        else {
+            return CIC_UNKNOWN;
         }
     }
 };

@@ -22,7 +22,7 @@
 #define ROM_ADDRESS_TILES_B  (ROM_ADDRESS_TILES_A + DB_L_LABEL_SIZE)
 #endif
 
-static unsigned char headerBuffer[DB_ENTRIES_START_OFFSET];
+static unsigned char headerBuffer[DB_STRINGS_START_OFFSET];
 
 uint32_t GameDatabase::djb2(const unsigned char* data, size_t length) {
     uint32_t hash = 5381;
@@ -93,23 +93,28 @@ bool GameDatabase::loadEntriesIntoMemory() {
         return true;
     }
 
-    if (!isOpen() || entryCount == 0) {
+    if (!isOpen() || entryCount == 0 || stringsSize == 0) {
         return false;
     }
 
-    size_t size = (size_t)entryCount * DB_ENTRY_SIZE;
+    size_t size = (size_t)stringsSize + ((size_t)entryCount * DB_ENTRY_SIZE);
 
     // PI DMA moves whole 8 byte words, so round the destination up rather than
     // let it write past the end of the block. The overread lands in the padding
     // before the labels section, which is still inside the staged chunk.
     size_t allocationSize = ALIGN(size, 8);
 
+    if (DB_STRINGS_START_OFFSET + allocationSize > (size_t)DB_DMA_SIZE) {
+        debugf("[GameDatabase] Strings and entries (%u bytes) exceed the staged chunk\n", (unsigned)allocationSize);
+        return false;
+    }
+
     // Aligned for the DMA below; plain malloc everywhere else, where the
     // alignment buys nothing
     #ifdef N64
-    Entry::Data* data = (Entry::Data*)memalign(16, allocationSize);
+    char* data = (char*)memalign(16, allocationSize);
     #else
-    Entry::Data* data = (Entry::Data*)malloc(allocationSize);
+    char* data = (char*)malloc(allocationSize);
     #endif
 
     if (data == nullptr) {
@@ -121,11 +126,26 @@ bool GameDatabase::loadEntriesIntoMemory() {
     // `load()` already staged this region in cart SDRAM, so it's one
     // transfer straight out of there
     data_cache_hit_writeback_invalidate(data, allocationSize);
-    dma_read_raw_async(data, ROM_ADDRESS_HEADER + entriesStartOffset, allocationSize);
+    dma_read_raw_async(data, ROM_ADDRESS_HEADER + DB_STRINGS_START_OFFSET, allocationSize);
     dma_wait();
     #endif
 
-    entriesData = data;
+    Entry::Data* entries = (Entry::Data*)(data + stringsSize);
+
+    bool isValid = (data[stringsSize - 1] == '\0');
+
+    for (uint16_t i = 0; isValid && i < entryCount; i++) {
+        isValid = (entries[i].titleOffset < stringsSize) && (entries[i].developerOffset < stringsSize);
+    }
+
+    if (!isValid) {
+        debugf("[GameDatabase] String pool or offsets are invalid\n");
+        free(data);
+        return false;
+    }
+
+    strings = data;
+    entriesData = entries;
 
     debugf("[GameDatabase] Cached %u entries in memory (%u bytes)\n", (unsigned)entryCount, (unsigned)allocationSize);
 
@@ -133,11 +153,12 @@ bool GameDatabase::loadEntriesIntoMemory() {
 }
 
 void GameDatabase::releaseEntriesFromMemory() {
-    if (entriesData == nullptr) {
+    if (strings == nullptr) {
         return;
     }
 
-    free(entriesData);
+    free(strings);
+    strings = nullptr;
     entriesData = nullptr;
 }
 
@@ -150,7 +171,7 @@ GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
         return nullptr;
     }
 
-    return new Entry(entriesData[index], index);
+    return new Entry(entriesData[index], strings, index);
 }
 
 RegionCode GameDatabase::readRegionCodeAtIndex(uint16_t index) {
@@ -555,7 +576,12 @@ bool GameDatabase::load(const char* filename) {
     memcpy(&cheatsTotalSize, &headerBuffer[cursor], sizeof(cheatsTotalSize));
     cursor += sizeof(cheatsTotalSize);
 
-    entriesStartOffset = DB_ENTRIES_START_OFFSET;
+    // READ STRING POOL SIZE
+    // 2 bytes
+    memcpy(&stringsSize, &headerBuffer[cursor], sizeof(stringsSize));
+    cursor += sizeof(stringsSize);
+
+    entriesStartOffset = DB_STRINGS_START_OFFSET + stringsSize;
 
     labelsStartOffset = entriesStartOffset + (entryCount * DB_ENTRY_SIZE);
 
@@ -572,6 +598,7 @@ bool GameDatabase::load(const char* filename) {
     speedrunsStartOffset = cheatsStartOffset + cheatsTotalSize;
 
     debugf("[GameDatabase] Database Entries:       %d\n", entryCount);
+    debugf("[GameDatabase] Strings Size:           %u\n", (unsigned)stringsSize);
     debugf("[GameDatabase] Entries Start Offset:   %li\n", entriesStartOffset);
     debugf("[GameDatabase] Pre-labels Padding:     %li\n", labelsPadding);
     debugf("[GameDatabase] Labels Start Offset:    %li\n", labelsStartOffset);
