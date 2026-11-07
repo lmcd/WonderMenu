@@ -81,6 +81,9 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
     }
     else {
         labelView.setString("Expansion Pak Required");
+
+        expansionPakImage = Image("rom:/ui/ExpansionPak.RGBA32.sprite");
+        expansionPakImageView.image = &expansionPakImage;
     }
 
     tableView.rowCount = rows.size();
@@ -215,6 +218,10 @@ int SpeedrunsScene::selectionKey(const RowInfo& row) const {
 void SpeedrunsScene::didBeginScene(SceneEntry) {
     view.addSubview(&tableView);
     view.addSubview(&labelView);
+
+    if (expansionPakImage.isValid()) {
+        view.addSubview(&expansionPakImageView);
+    }
 }
 
 void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
@@ -315,6 +322,27 @@ void SpeedrunsScene::updateViews(const RenderInfo&) {
 
     labelView.maxWidth = view.frame.size.width;
     labelView.isHidden = !tableIsHidden;
+
+    if (expansionPakImage.isValid()) {
+        // Centred together on where the label sits alone, so the label's own
+        // height cancels out and only the image and gap shift them
+        constexpr int labelY = 250;
+        constexpr int imageSpacing = 36;
+
+        Size imageSize = expansionPakImage.size();
+
+        expansionPakImageView.frame = Rect(
+            Vec2(
+                view.frame.size.width / 2 - imageSize.midX(),
+                labelY - (imageSize.height + imageSpacing) / 2
+            ),
+            imageSize
+        );
+
+        labelView.frame.origin.y = expansionPakImageView.frame.maxY() + imageSpacing;
+    }
+
+    expansionPakImageView.isHidden = labelView.isHidden;
 
     if (!labelView.isHidden) {
         // This is a hack for a compositing issue (cart drawing over text)

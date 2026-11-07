@@ -35,12 +35,22 @@ CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game
     if (game->requiresExpansionPak()) {
         labelView.setString("Not Supported for this Game");
     }
+    else if (is_memory_expanded()) {
+        labelView.setString("No Cheats Found");
+    }
     else {
-        labelView.setString(is_memory_expanded() ? "No Cheats Found" : "Expansion Pak Required");
+        labelView.setString("Expansion Pak Required");
+
+        expansionPakImage = Image("rom:/ui/ExpansionPak.RGBA32.sprite");
+        expansionPakImageView.image = &expansionPakImage;
     }
 
     view.addSubview(&tableView);
     view.addSubview(&labelView);
+
+    if (expansionPakImage.isValid()) {
+        view.addSubview(&expansionPakImageView);
+    }
 
     if (rows.size() > 0) {
         mainContentView = &tableView;
@@ -175,6 +185,27 @@ void CheatsScene::updateViews(const RenderInfo&) {
     
     labelView.maxWidth = view.frame.size.width;
     labelView.isHidden = !tableIsHidden;
+
+    if (expansionPakImage.isValid()) {
+        // Centred together on where the label sits alone, so the label's own
+        // height cancels out and only the image and gap shift them
+        constexpr int labelY = 250;
+        constexpr int imageSpacing = 36;
+
+        Size imageSize = expansionPakImage.size();
+
+        expansionPakImageView.frame = Rect(
+            Vec2(
+                view.frame.size.width / 2 - imageSize.midX(),
+                labelY - (imageSize.height + imageSpacing) / 2
+            ),
+            imageSize
+        );
+
+        labelView.frame.origin.y = expansionPakImageView.frame.maxY() + imageSpacing;
+    }
+
+    expansionPakImageView.isHidden = labelView.isHidden;
 
     if (!labelView.isHidden) {
         // This is a hack for a compositing issue (cart drawing over text)

@@ -13,7 +13,9 @@
 #include "collections/StaticMap.h"
 #include "collections/StaticSet.h"
 #include "ui/scenes/GameInfoTabScene.h"
+#include "ui/Image.h"
 #include "ui/views/TableView.h"
+#include "ui/views/drawables/ImageView.h"
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/rows/CheatRowView.h"
 
@@ -60,6 +62,10 @@ private:
 
     TableView<CheatRowView> tableView;
     LabelView<64> labelView;
+
+    // Only loaded when the Expansion Pak is missing
+    Image expansionPakImage;
+    ImageView expansionPakImageView;
 
     InputWatcher aButtonWatcher;
 
