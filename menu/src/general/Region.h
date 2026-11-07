@@ -7,17 +7,6 @@
 
 #include <cstdint>
 
-enum class SaveType : uint8_t {
-    SAVE_TYPE_NONE           = 0,  /**< No expected save type */
-    SAVE_TYPE_EEPROM_4KBIT   = 1,  /**< EEPROM 4Kbit */
-    SAVE_TYPE_EEPROM_16KBIT  = 2,  /**< EEPROM 16Kbit */
-    SAVE_TYPE_SRAM_256KBIT   = 3,  /**< SRAM 256Kbit */
-    SAVE_TYPE_SRAM_BANKED    = 4,  /**< SRAM Banked */
-    SAVE_TYPE_SRAM_1MBIT     = 5,  /**< SRAM 1Mbit */
-    SAVE_TYPE_FLASHRAM_1MBIT = 6,  /**< FlashRAM 1Mbit */
-    SAVE_TYPE_FLASHRAM_PKST2 = 7,  /**< FlashRAM PKST2 */
-};
-
 enum class CategoryCode : uint8_t {
     CATEGORY_GAMEPAK         = 'N', // Game Pak
     CATEGORY_64DD_DISK       = 'D', // 64DD Disk

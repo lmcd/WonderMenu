@@ -115,8 +115,7 @@ public:
 
             RegionCode regionCode;
 
-            SaveType saveType;
-
+            uint8_t saveType;
             uint8_t cicType;
 
             uint16_t smallLabelTileIndex;
