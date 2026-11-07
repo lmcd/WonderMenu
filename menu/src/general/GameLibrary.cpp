@@ -16,10 +16,6 @@
 #include "utils/fs.h"
 #include "utils/utils.h"
 
-CacheResult cache[MAX_NUMBER_OF_FILES] = {0};
-
-static GameIDMap<int, -1> entryIndexMap;
-
 // The cache records a djb2 hash of each ROM's filename rather than its path,
 // so recents and favourites are matched by hashing their own filename the
 // same way. Hashed up front: otherwise it would be every path, every entry.
@@ -132,10 +128,12 @@ bool GameLibrary::loadCache() {
         return false;
     }
 
-    // Don't read past the bounds of the cache array
-    size_t bytesToRead = std::min(fileSize - entriesOffset, sizeof(cache));
+    allocateCache();
 
-    if (f_read(&cacheFile, cache, bytesToRead, &bytesRead) != FR_OK || bytesRead != bytesToRead) {
+    // Don't read past the bounds of the cache array
+    size_t bytesToRead = std::min(fileSize - entriesOffset, cache.size() * sizeof(CacheResult));
+
+    if (f_read(&cacheFile, cache.data(), bytesToRead, &bytesRead) != FR_OK || bytesRead != bytesToRead) {
         debugf("[GameLibrary] Failed to read cache file (read %u of %zu bytes)\n", (unsigned)bytesRead, bytesToRead);
         f_close(&cacheFile);
         return false;
@@ -183,7 +181,7 @@ bool GameLibrary::writeCache() {
 
     size_t entriesToWrite = std::min((size_t)cachedFileCount, (size_t)MAX_NUMBER_OF_FILES);
 
-    size_t entriesWritten = fwrite(cache, sizeof(CacheResult), entriesToWrite, cacheFile);
+    size_t entriesWritten = fwrite(cache.data(), sizeof(CacheResult), entriesToWrite, cacheFile);
 
     fclose(cacheFile);
 
@@ -351,10 +349,9 @@ void GameLibrary::toggleRetailGroupings() {
 
     retailGroups.clear();
 
-    static GameIDMap<int, -1> entryIndexMap2;
-    // Reset to the -1 "unset" sentinel (memset 0 would leave cells reading as a
-    // valid index 0, sending the first game down the .at() path on empty data).
-    entryIndexMap2.reset();
+    GameIDMap<int16_t, -1> entryIndexMap;
+    // Reset to the -1 "unset" sentinel.
+    entryIndexMap.reset();
 
     int entryIndex = 0;
 
@@ -366,14 +363,14 @@ void GameLibrary::toggleRetailGroupings() {
         ROMFile& romFile = game.romFile;
 
         char* uniqueID = romFile.uniqueID;
-        int foundRetailEntryIndex = entryIndexMap2[uniqueID];
+        int foundRetailEntryIndex = entryIndexMap[uniqueID];
 
         if (!groupRetailGames) {
             foundRetailEntryIndex = -1;
         }
 
         if (foundRetailEntryIndex == -1) {
-            entryIndexMap2[uniqueID] = entryIndex;
+            entryIndexMap[uniqueID] = entryIndex;
 
             retailGroups.emplace_back(game);
             entryIndex++;
@@ -490,7 +487,13 @@ void GameLibrary::loadGames() {
     
     retailGroups.clear();
 
+    // On the stack, as it's only needed here. 16 bits is plenty for an index
+    // into retailGroups, and halves it to 2.5 KB.
+    GameIDMap<int16_t, -1> entryIndexMap;
     entryIndexMap.reset();
+
+    // Already allocated if loadCache() found a cache file
+    allocateCache();
 
     DirectoryScanner scanner;
 
@@ -668,9 +671,12 @@ void GameLibrary::loadGames() {
     // fileIndex is the last 0-based index; the count is one more than that
     cachedFileCount = fileIndex + 1;
 
-    if (!readFromCache) {
+    if (!readFromCache && database.isOpen()) {
         writeCache();
     }
+
+    // Swapped with an empty vector, as clear() alone keeps the allocation
+    std::vector<CacheResult>().swap(cache);
 
     // Sort retail games alphabetically by display title (case-insensitive)
     std::sort(retailGroups.begin(), retailGroups.end(), [](const GameGroup& a, const GameGroup& b) {

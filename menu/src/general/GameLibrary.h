@@ -49,7 +49,10 @@ struct __attribute__((packed)) CacheResult {
     int16_t entryIndex = -1;
     uint8_t version = 0;
     uint32_t crc1 = 0;
+    uint8_t reserved = 0;
 };
+
+static_assert(sizeof(CacheResult) == 16, "CacheResult must be 16 bytes");
 
 class GameLibrary {
 private:
@@ -57,8 +60,18 @@ private:
     // This can get set to `false` mid-read if it's detected as stale
     bool readFromCache = false;
 
-    // Number of populated entries in the global cache array after a load()
+    // Number of populated entries in `cache` after a load()
     int cachedFileCount = 0;
+
+    // Only needed while the library loads, from loadCache() to the end of
+    // loadGames(), so it's freed then rather than held for the whole session
+    std::vector<CacheResult> cache;
+
+    void allocateCache() {
+        if (cache.empty()) {
+            cache.resize(MAX_NUMBER_OF_FILES);
+        }
+    }
 
     // loadCache() returns early in non-release builds and on any read
     // failure, but loadGames() still reads directoryCount back out of this,
