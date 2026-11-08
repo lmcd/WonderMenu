@@ -123,6 +123,43 @@ protected:
 
     bool lastIsAnimating = false;
 
+    Color lastTextColor = {};
+    Color lastAlternateColor = {};
+
+    void updateTextColors() {
+        if (textColor != lastTextColor || alternateColor != lastAlternateColor) {
+            invalidateRaster();
+
+            lastTextColor = textColor;
+            lastAlternateColor = alternateColor;
+        }
+    }
+
+    // Where the layout is drawn from, relative to the frame. Floored rather
+    // than truncated with the frame's position, so it's the same wherever the
+    // label is placed (as rasterizing needs).
+    int layoutOffsetX() const {
+        return (int)floorf(layout->x0);
+    }
+
+    int layoutOffsetY() const {
+        return (int)floorf(layout->y0);
+    }
+
+    Rect renderBounds() const override {
+        // Scrolling draws the label differently on every render
+        if (isAnimating || layout == nullptr || layout->nchars == 0) {
+            return Rect();
+        }
+
+        return Rect(
+            layoutOffsetX() + (int)floorf(layout->bbox.x0),
+            layoutOffsetY() + (int)floorf(layout->bbox.y0),
+            (int)ceilf(layout->bbox.x1 - layout->bbox.x0) + 1,
+            (int)ceilf(layout->bbox.y1 - layout->bbox.y0) + 1
+        );
+    }
+
     void updateAnimation() {
         if (isAnimating != lastIsAnimating) {
             setNeedsClear();
@@ -156,6 +193,8 @@ protected:
         _layout->capacity = n + 1;
 
         layout = __rdpq_paragraph_build(&params, fontID, stringReference, &n, _layout);
+
+        invalidateRaster();
     }
 
 public:
@@ -243,6 +282,7 @@ public:
         }
 
         updateAnimation();
+        updateTextColors();
     }
 
     void clear(const RenderInfo& renderInfo) {
@@ -276,10 +316,14 @@ public:
             return;
         }
 
+        if (renderRasterizedView(renderInfo)) {
+            return;
+        }
+
         int bufferIndex = renderInfo.bufferIndex;
 
-        int x0 = finalFrame.origin.x + layout->x0;
-        int y0 = finalFrame.origin.y + layout->y0;
+        int x0 = finalFrame.origin.x + layoutOffsetX();
+        int y0 = finalFrame.origin.y + layoutOffsetY();
 
         int textY = y0 + (int)floorf(layout->bbox.y0);
         int textHeight = (int)ceilf(layout->bbox.y1 - layout->bbox.y0) + 1;

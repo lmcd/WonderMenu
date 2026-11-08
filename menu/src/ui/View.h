@@ -70,6 +70,16 @@ protected:
         return scissorStack.back();
     }
 
+    // Set while a view is being rasterized
+    inline static bool isRasterizing = false;
+
+    /**
+     * Attach `surface` for a view to be rasterized into, with the screen's
+     * scissors set aside until endRasterizing()
+     */
+    static void beginRasterizing(const surface_t& surface);
+    static void endRasterizing();
+
     float lastFinalOpacity = 0.0f;
     bool lastFinalIsHidden = false;
     Rect lastFinalFrame = {};
@@ -139,6 +149,23 @@ protected:
 
     void updateSubtree(const RenderInfo& renderInfo, float finalOpacity = 1.0f, bool finalIsHidden = false, Vec2 finalPosition = Vec2::ZERO, Color finalBlendColor = Color::BLACK, bool finalIsOpaque = true);
 
+    // Derives `subview`'s final values from its superview's
+    static void computeFinalValues(View* subview, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsOpaque);
+
+    /**
+     * Re-derive the subtree's final values from this view's, as updateSubtree()
+     * would but without updating any view. Lets a view be drawn as if it were
+     * elsewhere (e.g. when rasterized), then put back exactly.
+     */
+    void refreshSubtreeFinalValues();
+
+    /**
+     * Move what was last drawn in `bufferIndex` by `offset`, for a view drawn
+     * somewhere other than where it ends up (e.g. when rasterized)
+     */
+    virtual void offsetDrawnRect(int, Vec2) {}
+    void offsetSubtreeDrawnRects(int bufferIndex, Vec2 offset);
+
     /**
      * Erase this view's drawn pixels unconditionally
      */
@@ -202,6 +229,23 @@ public:
     static bool isPendingRemoval(const View* view);
 
     /**
+     * Turn rasterized views on, allocating one framebuffer's worth of scratch
+     * memory for them. While they're on, each Drawable with `shouldRasterize`
+     * set draws itself into that memory once, then is copied from it on each
+     * render until what it draws changes, e.g. while it only moves during an
+     * animation.
+     *
+     * Ignored without the Expansion Pak.
+     */
+    static void enableRasterizedViews();
+
+    /**
+     * Turn rasterized views off and free their memory, once the RDP has
+     * finished with it
+     */
+    static void disableRasterizedViews();
+
+    /**
      * Name of the concrete view class, for debugging
      */
     virtual const char* name() const;
@@ -224,6 +268,16 @@ public:
 };
 
 class Drawable: public View {
+private:
+    // This view's space in the raster scratch memory, and what was last
+    // rasterized into it
+    surface_t raster = {};
+    int rasterVersion = -1;
+    Rect rasteredBounds = {};
+    bool rasterIsValid = false;
+
+    bool rasterizeView(const RenderInfo& renderInfo, Rect bounds);
+
 protected:
     enum Blender {
         WITH_FRAMEBUFFER,
@@ -285,7 +339,43 @@ protected:
 
     void clearRect(const Rect& rect, Color clearColor = Color::BLACK);
 
+    /**
+     * Everything render() draws, relative to `finalFrame.origin`. Empty when
+     * the view can't be rasterized as it is (e.g. it changes on every render).
+     */
+    virtual Rect renderBounds() const {
+        return Rect(Vec2::ZERO, finalFrame.size);
+    }
+
+    /**
+     * Something render() draws has changed, so the view is rasterized again
+     * next time.
+     */
+    void invalidateRaster() {
+        rasterIsValid = false;
+    }
+
+    /**
+     * Render the rasterized view.
+     */
+    bool renderRasterizedView(const RenderInfo& renderInfo);
+
+    void offsetDrawnRect(int bufferIndex, Vec2 offset) override {
+        Rect& rect = drawnBoundingBox[bufferIndex];
+
+        if (rect.size.width > 0 && rect.size.height > 0) {
+            rect.origin = rect.origin + offset;
+        }
+    }
+
 public:
+    /**
+     * Should the view be rasterized to a surface, which is then blitted to
+     * the screen? If a view is expensive to render, this can allow a view to
+     * be rendered once, and
+     */
+    bool shouldRasterize = false;
+
     /**
      * Forget what was drawn in every buffer, so nothing is left for clear() to
      * erase.

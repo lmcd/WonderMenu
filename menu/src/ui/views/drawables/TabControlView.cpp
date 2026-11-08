@@ -334,6 +334,10 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         return;
     }
 
+    if (renderRasterizedView(renderInfo)) {
+        return;
+    }
+
     int bufferIndex = renderInfo.bufferIndex;
 
     float lLabelOpacity = finalOpacity;
@@ -426,7 +430,9 @@ void TabControlView::render(const RenderInfo& renderInfo) {
     // Draw the main bar area
     drawFilledRect(barRect);
 
-    if (finalOpacity == 1.0f && scrollAnimation == nullptr) {
+    // The block is recorded at the view's place on screen, so it can't be used
+    // for (or recorded from) rasterizing
+    if (finalOpacity == 1.0f && scrollAnimation == nullptr && !isRasterizing) {
         if (labelsBlock == nullptr) {
             rspq_block_begin();
             renderLabels(renderInfo);

@@ -17,6 +17,10 @@ GameInfoScene::GameInfoScene(GameInfoState& state, Game& game, GameDatabase& dat
       game(game),
       database(database),
       currentTab(state.currentTab) {
+    // Only fades during GameInfoTransitionScene, so it's rasterized and copied
+    // rather than redrawn each frame
+    tabControlView.shouldRasterize = true;
+
     view.addSubview(&tabControlView);
     view.addSubview(&tabContainerView);
     view.addSubview(&scrollbarView);

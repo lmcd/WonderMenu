@@ -13,6 +13,7 @@
 #include "general/SceneStates.h"
 #include "ui/scenes/GameInfoScene.h"
 #include "ui/scenes/GameLaunchScene.h"
+#include "utils/a3d.h"
 
 GameInfoTransitionScene::GameInfoTransitionScene(GameLaunchScene* gameLaunchScene, GameInfoScene* gameInfoScene)
     : Scene(),
@@ -32,9 +33,13 @@ GameInfoTransitionScene::~GameInfoTransitionScene() {
 
 void GameInfoTransitionScene::didEndScene(){
     gameLaunchScene->view.scissorRect = Rect();
+
+    View::disableRasterizedViews();
 }
 
 void GameInfoTransitionScene::didBeginScene(SceneEntry entry) {
+    View::enableRasterizedViews();
+
     if (entry == SCENE_PUSH) {
         transition.direction = Transition::FORWARDS;
 

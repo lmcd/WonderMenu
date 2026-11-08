@@ -11,6 +11,7 @@ CheatRowView::CheatRowView() {
     titleView.maxWidth = 300;
     titleView.fontID = FONT_ID;
     titleView.align = ALIGN_LEFT;
+    titleView.shouldRasterize = true;
 
     subtitleView.maxWidth = 350;
     subtitleView.fontID = FONT_ID;

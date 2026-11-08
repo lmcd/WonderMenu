@@ -230,10 +230,10 @@ void SceneRenderer::render(int frameNumber) {
         rootView.clearRecursive(renderInfo);
         rootView.render(renderInfo);
 
-        // rdpq_mode_push();
-        //     rdpq_set_prim_color(Color::WHITE);
-        //     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, 8, 8, "%.1f", display_get_fps());
-        // rdpq_mode_pop();
+        rdpq_mode_push();
+            rdpq_set_prim_color(Color::WHITE);
+            rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, 8, 8, "%.1f", display_get_fps());
+        rdpq_mode_pop();
 
         // Swap buffers
         rdpq_detach_show();
