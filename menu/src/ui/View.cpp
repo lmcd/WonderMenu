@@ -571,12 +571,8 @@ bool Drawable::renderRasterizedView(const RenderInfo& renderInfo) {
             setPrimitiveColor(alphaColor);
             setBlendColor(finalBlendColor);
         }
-        else if (true) {
-            rdpq_set_mode_copy(false);
-        }
         else {
-            rdpq_set_mode_standard();
-            rdpq_mode_combiner(RDPQ_COMBINER_TEX);
+            rdpq_set_mode_copy(false);
         }
 
         rdpq_tex_blit(&raster, rect.minX(), rect.minY(), NULL);

@@ -38,7 +38,9 @@ void GameInfoTransitionScene::didEndScene(){
 }
 
 void GameInfoTransitionScene::didBeginScene(SceneEntry entry) {
-    View::enableRasterizedViews();
+    if (!is_analogue_3d()) {
+        View::enableRasterizedViews();
+    }
 
     if (entry == SCENE_PUSH) {
         transition.direction = Transition::FORWARDS;
