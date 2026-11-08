@@ -86,7 +86,7 @@ constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
 // TODO: don't hardcode
 constexpr int DB_STRINGS_START_OFFSET = 5224;
 
-constexpr int DB_DMA_SIZE = KiB(112);
+constexpr int DB_DMA_SIZE = KiB(44);
 
 /**
  * Represents the WonderMenu.db database format.
