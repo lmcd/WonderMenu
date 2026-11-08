@@ -5,6 +5,7 @@
 
 #include "M64File.h"
 #include "fatfs/ff.h"
+#include "../../shared/src/PayloadData.h"
 
 #include <algorithm>
 
@@ -147,6 +148,13 @@ bool M64File::stageInputsTable(uint32_t stagingAddress) {
 
     if (dataSize <= 0) {
         debugf("[M64File] File too small (%ld bytes)\n", size);
+
+        f_close(&file);
+        return false;
+    }
+
+    if (dataSize > M64_INPUTS_MAX_SIZE) {
+        debugf("[M64File] Inputs too large (%i bytes, max %i)\n", dataSize, M64_INPUTS_MAX_SIZE);
 
         f_close(&file);
         return false;

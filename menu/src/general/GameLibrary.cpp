@@ -772,9 +772,9 @@ bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint
     // the payload clamps to the same range, so this only guards a bad readback.
     controllerCount = std::clamp(controllerCount, (uint32_t)1, (uint32_t)4);
 
-    // The payload only ever records into the 0x80600000-0x80700000 table, so
+    // The payload only ever records into the M64_INPUTS_MAX_SIZE table, so
     // clamp a count that would run past it rather than trusting it
-    sampleCount = std::min(sampleCount, (uint32_t)(MiB(1) / (sizeof(uint32_t) * controllerCount)));
+    sampleCount = std::min(sampleCount, (uint32_t)(M64_INPUTS_MAX_SIZE / (sizeof(uint32_t) * controllerCount)));
 
     if (sampleCount == 0) {
         return false;

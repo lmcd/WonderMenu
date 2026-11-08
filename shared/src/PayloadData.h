@@ -10,12 +10,22 @@
 
 #define ROM_ADDRESS               0x10000000  // Cartridge Space - where a loaded game/ROM lives
 
-#define PAYLOAD_ADDRESS           0xA0700000  // @7MB (Expansion Pak, Uncached)
-#define GAME_STAGING_ADDRESS      0x80500000  // @5MB (Expansion Pak)
-#define M64_INPUTS_ADDRESS        0x80600000  // @6MB (Expansion Pak)
-#define FRAMEBUFFER_COPY_ADDRESS  0x80500000  // @5MB (Expansion Pak)
+#define FRAMEBUFFER_COPY_ADDRESS  0x80400000  // @4MB (Expansion Pak, used in payload)
+#define GAME_STAGING_ADDRESS      0x80400000  // @4MB (Expansion Pak, used in menu)
+#define M64_INPUTS_ADDRESS        0x80500000  // @5MB (Expansion Pak, used in payload)
+#define PAYLOAD_ADDRESS           0xA0700000  // @7MB (Expansion Pak, used in payload, uncached)
 
+#define GAME_STAGING_SIZE         0x00100000  // MiB(1)
 #define FRAMEBUFFER_COPY_MAX_SIZE 0x00100000  // MiB(1)
+#define M64_INPUTS_MAX_SIZE       0x00200000  // MiB(2), up to the payload
+
+// Physical addresses, so cached and uncached views compare
+static_assert((GAME_STAGING_ADDRESS & 0x1FFFFFFF) + GAME_STAGING_SIZE <= (M64_INPUTS_ADDRESS & 0x1FFFFFFF),
+    "The staged first MiB runs into the M64 inputs table");
+static_assert((FRAMEBUFFER_COPY_ADDRESS & 0x1FFFFFFF) + FRAMEBUFFER_COPY_MAX_SIZE <= (M64_INPUTS_ADDRESS & 0x1FFFFFFF),
+    "The framebuffer copy runs into the M64 inputs table");
+static_assert((M64_INPUTS_ADDRESS & 0x1FFFFFFF) + M64_INPUTS_MAX_SIZE <= (PAYLOAD_ADDRESS & 0x1FFFFFFF),
+    "The M64 inputs table runs into the payload");
 
 #define ROM_SCREENSHOT_MAGIC      1093627481  // Just a random number
 #define ROM_SPEEDRUN_MAGIC        3412958702  // Just a random number
