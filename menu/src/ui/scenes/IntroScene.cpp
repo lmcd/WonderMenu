@@ -41,6 +41,11 @@ IntroScene::IntroScene(GameLibrary* gameLibrary)
 void IntroScene::didBeginScene(SceneEntry) {
     labelView.setString("");
 
+    // Still loaded when returning from `ScreenshotsImportScene`
+    if (logoImage.isValid()) {
+        return;
+    }
+
     float seconds = measure([&] {
         if (is_memory_expanded()) {
             logoImage = Image("rom:/ui/Logo.RGBA32.sprite");
@@ -51,13 +56,6 @@ void IntroScene::didBeginScene(SceneEntry) {
     });
 
     debugf("[IntroScene] Loaded Logo: %.3fs\n", seconds);
-}
-
-void IntroScene::didEndScene() {
-    // The last frame may still be drawing it
-    rspq_wait();
-
-    logoImage.reset();
 }
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
@@ -232,6 +230,12 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
     }
 
     if (updateInfo.sceneFrameNumber >= 9) {
+        // Freed here rather than in didEndScene(), as `ScreenshotsImportScene`
+        // still draws this scene's view after being pushed over it.
+        // The last frame may still be drawing it.
+        rspq_wait();
+        logoImage.reset();
+
         ListScene* listScene;
 
         seconds = measure([&] {
