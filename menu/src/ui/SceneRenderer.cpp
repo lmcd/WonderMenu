@@ -164,36 +164,6 @@ void SceneRenderer::collectGarbageScenes() {
 }
 
 void SceneRenderer::render(int frameNumber) {
-    // if (frameNumber % 5 == 0) {
-    //     int fps = ceil(display_get_fps());
-
-    //     const char* dot = (fps == 60) ? "🟢" : (fps >= 55) ? "🟡" : "🔴";
-
-    //     if (false) {
-    //         debugf("%s FPS: %i\n", dot, fps);
-    //     }
-    //     else {
-    //         heap_stats_t heapStats;
-    //         sys_get_heap_stats(&heapStats);
-
-    //         // How far the heap reaches, used or not: where it ends, and its size
-    //         // from the end of BSS, where it starts
-    //         extern char __bss_end[];
-    //         char* heapEnd = (char*)sbrk(0);
-
-    //         // The most the heap can reach without an Expansion Pak: up to the
-    //         // 64 KiB stack at the top of 4 MiB, as libdragon lays it out
-    //         char* heapLimit4MiB = (char*)0x80000000 + MiB(4) - KiB(64);
-    //         float percentOf4MiB = 100.0f * (heapEnd - __bss_end) / (float)(heapLimit4MiB - __bss_end);
-
-    //         // if (fps < 60) {
-    //             debugf("%s FPS: %i | %.5fMB | heap %.5fMB (%.1f%% of 4MiB max) | %08d | %s\n", dot, fps, heapStats.used / 1000000.0f,
-    //                 (heapEnd - __bss_end) / 1000000.0f, percentOf4MiB,
-    //                 frameNumber, currentScene ? currentScene->name() : "(no scene)");
-    //         // }
-    //     }
-    // }
-    
     // A nested render loop (e.g. a modal popover) must only start a frame once
     // the enclosing one has been detached
     assertf(!rdpq_is_attached(), "Frame started while attached");
@@ -230,10 +200,9 @@ void SceneRenderer::render(int frameNumber) {
         rootView.clearRecursive(renderInfo);
         rootView.render(renderInfo);
 
-        rdpq_mode_push();
-            rdpq_set_prim_color(Color::WHITE);
-            rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, 8, 8, "%.1f", display_get_fps());
-        rdpq_mode_pop();
+        #ifndef NDEBUG
+        printDebugMetrics();
+        #endif
 
         // Swap buffers
         rdpq_detach_show();
@@ -252,6 +221,43 @@ void SceneRenderer::render(int frameNumber) {
     }
 
     sceneFrameNumber++;
+}
+
+void SceneRenderer::printDebugMetrics() {
+    rdpq_mode_push();
+        rdpq_set_prim_color(Color::WHITE);
+        rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, 12, 12, "%.1f", display_get_fps());
+    rdpq_mode_pop();
+
+    if (false && frameNumber % 5 == 0) {
+        int fps = ceil(display_get_fps());
+
+        const char* dot = (fps == 60) ? "🟢" : (fps >= 55) ? "🟡" : "🔴";
+
+        if (false) {
+            debugf("%s FPS: %i\n", dot, fps);
+        }
+        else {
+            heap_stats_t heapStats;
+            sys_get_heap_stats(&heapStats);
+
+            // How far the heap reaches, used or not: where it ends, and its size
+            // from the end of BSS, where it starts
+            extern char __bss_end[];
+            char* heapEnd = (char*)sbrk(0);
+
+            // The most the heap can reach without an Expansion Pak: up to the
+            // 64 KiB stack at the top of 4 MiB, as libdragon lays it out
+            char* heapLimit4MiB = (char*)0x80000000 + MiB(4) - KiB(64);
+            float percentOf4MiB = 100.0f * (heapEnd - __bss_end) / (float)(heapLimit4MiB - __bss_end);
+
+            // if (fps < 60) {
+                debugf("%s FPS: %i | %.5fMB | heap %.5fMB (%.1f%% of 4MiB max) | %08d | %s\n", dot, fps, heapStats.used / 1000000.0f,
+                    (heapEnd - __bss_end) / 1000000.0f, percentOf4MiB,
+                    frameNumber, currentScene ? currentScene->name() : "(no scene)");
+            // }
+        }
+    }
 }
 
 Size SceneRenderer::displaySize() {

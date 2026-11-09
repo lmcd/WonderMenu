@@ -58,6 +58,12 @@ private:
      */
     void collectGarbageScenes();
 
+    /**
+     * Draw debug metrics (currently the frame rate) over the frame. Call while
+     * the frame is attached, after everything else is drawn.
+     */
+    void printDebugMetrics();
+
 public:
     /*
      * The framebuffer most recently rendered into and queued for display.
