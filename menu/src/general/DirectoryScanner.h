@@ -9,7 +9,7 @@
 #include <fatfs/ff.h>
 
 #include <dir.h>
-#include <malloc.h>
+#include <scratch.h>
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
@@ -133,8 +133,10 @@ private:
             return false;
         }
 
-        // 8-byte aligned, as the sector reads filling it go over the PI bus
-        void* buffer = memalign(8, BULK_SECTORS * FF_MAX_SS);
+        // 8-byte aligned, as the sector reads filling it go over the PI bus.
+        // Freed before this returns, so it comes from the scratch heap rather
+        // than leaving a 32 KiB hole in the main one.
+        void* buffer = scratch_memalign(8, BULK_SECTORS * FF_MAX_SS);
 
         if (buffer == nullptr) {
             debugf("[DirectoryScanner] Failed to allocate the read-ahead buffer\n");
@@ -156,7 +158,7 @@ private:
         debugf("[DirectoryScanner] Read %i entries from %s in %.3fms\n",
             (int)records.size(), path, TICKS_TO_US(elapsedTicks) / 1000.0f);
 
-        free(buffer);
+        scratch_free(buffer);
         f_closedir(&directory);
 
         if (result != FR_OK) {
