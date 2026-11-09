@@ -105,11 +105,11 @@ namespace {
     }
 }
 
-ScreenshotsScene::ScreenshotsScene(Game* game)
+ScreenshotsScene::ScreenshotsScene(Game& game)
     : GameInfoTabScene(),
       game(game) {
 
-    dso.open(game->romFile.uniqueID);
+    dso.open(game.romFile.uniqueID);
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
@@ -209,7 +209,7 @@ std::string ScreenshotsScene::pathForScreenshot(int number, bool isThumbnail) co
 }
 
 void ScreenshotsScene::findThumbnails() {
-    directoryPath = "sd:/screenshots/" + game->directoryName() + "/";
+    directoryPath = "sd:/screenshots/" + game.directoryName() + "/";
 
     static constexpr uint32_t EXTENSION_LENGTH = sizeof(SCREENSHOT_EXTENSION) - 1;
 

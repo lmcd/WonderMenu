@@ -62,7 +62,7 @@ private:
     static constexpr int STICK_PRESS_THRESHOLD   = 32;
     static constexpr int STICK_RELEASE_THRESHOLD = 20;
 
-    Game* game;
+    Game& game;
 
     // The game's state DSO, for the game state in each full size screenshot.
     // Not open if the game has none.
@@ -220,7 +220,7 @@ private:
 public:
     const char* name() override { return "ScreenshotsScene"; }
 
-    ScreenshotsScene(Game* game);
+    ScreenshotsScene(Game& game);
     ~ScreenshotsScene();
 
     void didBeginScene(SceneEntry entry);

@@ -15,14 +15,14 @@ class Game;
 
 class SettingsScene : public GameInfoTabScene {
 private:
-    Game* game;
+    Game& game;
 
     LabelView<64> labelView;
 
 public:
     const char* name() override { return "SettingsScene"; }
 
-    SettingsScene(Game* game);
+    SettingsScene(Game& game);
 
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;

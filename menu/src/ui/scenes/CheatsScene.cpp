@@ -18,7 +18,7 @@
 #include "ui/Theme.h"
 #include "ui/views/ScrollbarView.h"
 
-CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game* game)
+CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game& game)
     : GameInfoTabScene(),
       cheatsDatabase(cheatsDatabase),
       game(game),
@@ -32,7 +32,7 @@ CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
     labelView.textColor = Theme::emptyListLabelColor;
 
-    if (game->requiresExpansionPak()) {
+    if (game.requiresExpansionPak()) {
         labelView.setString("Not Supported for this Game");
     }
     else if (is_memory_expanded()) {
@@ -175,7 +175,7 @@ void CheatsScene::updateViews(const RenderInfo&) {
 
     int yPosition = 84;
 
-    bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded() || game->requiresExpansionPak();
+    bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded() || game.requiresExpansionPak();
 
     tableView.rowCount = rows.size();
     tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);

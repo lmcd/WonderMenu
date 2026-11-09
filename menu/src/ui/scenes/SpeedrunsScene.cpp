@@ -16,7 +16,7 @@
 #include "ui/scenes/GameLaunchScene.h"
 #include "ui/views/ScrollbarView.h"
 
-SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game* game)
+SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game& game)
     : GameInfoTabScene(),
       speedrunDatabase(speedrunDatabase),
       game(game),
@@ -54,7 +54,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
 
             // An entry is only shown if the recording it names is actually here,
             // matched on the CRC32 of the .m64 header
-            for (M64File* m64File : game->m64Files) {
+            for (M64File* m64File : game.m64Files) {
                 if (m64File->crc == entry.m64CRC) {
                     entryM64Files[i] = m64File;
                     break;
@@ -62,7 +62,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
             }
         }
 
-        for (M64File* m64File : game->m64Files) {
+        for (M64File* m64File : game.m64Files) {
             if (std::find(entryM64Files.begin(), entryM64Files.end(), m64File) == entryM64Files.end()) {
                 uncategorisedM64Files.push_back(m64File);
             }
@@ -77,7 +77,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
     labelView.textColor = Theme::emptyListLabelColor;
 
     if (is_memory_expanded()) {
-        labelView.setString(game->hasSpeedrunDatabase() ? "No Speedruns Found" : "Not Supported for this Game");
+        labelView.setString(game.hasSpeedrunDatabase() ? "No Speedruns Found" : "Not Supported for this Game");
     }
     else {
         labelView.setString("Expansion Pak Required");
@@ -251,7 +251,7 @@ void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
                 else {
                     tableView.isADown = false;
 
-                    int maxControllers = game->maxControllers();
+                    int maxControllers = game.maxControllers();
 
                     if (maxControllers > 1) {
                         Scene* baseScene = (parentScene != nullptr) ? parentScene : this;

@@ -101,25 +101,25 @@ void GameInfoScene::setCurrentTab(Tab _currentTab, bool force) {
 
     switch (currentTab) {
         case TAB_CHEATS: {
-            CheatsScene* newScene = new CheatsScene(state.cheatsState, database.loadCheatDatabase(game.databaseEntry), &game);
+            CheatsScene* newScene = new CheatsScene(state.cheatsState, database.loadCheatDatabase(game.databaseEntry), game);
             currentTabScene = newScene;
             break;
         }
 
         case TAB_SCREENSHOTS: {
-            ScreenshotsScene* newScene = new ScreenshotsScene(&game);
+            ScreenshotsScene* newScene = new ScreenshotsScene(game);
             currentTabScene = newScene;
             break;
         }
 
         case TAB_SPEEDRUNS: {
-            SpeedrunsScene* newScene = new SpeedrunsScene(state.speedrunsState, database.loadSpeedrunDatabase(game.databaseEntry), &game);
+            SpeedrunsScene* newScene = new SpeedrunsScene(state.speedrunsState, database.loadSpeedrunDatabase(game.databaseEntry), game);
             currentTabScene = newScene;
             break;
         }
 
         case TAB_SETTINGS: {
-            SettingsScene* newScene = new SettingsScene(&game);
+            SettingsScene* newScene = new SettingsScene(game);
             currentTabScene = newScene;
             break;
         }

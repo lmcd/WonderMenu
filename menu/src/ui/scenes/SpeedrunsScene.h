@@ -56,7 +56,7 @@ private:
     };
 
     SpeedrunDatabase* speedrunDatabase;
-    Game* game;
+    Game& game;
 
     // Flat list of currently visible items (re-built on expand/collapse)
     std::vector<RowInfo> rows;
@@ -101,7 +101,7 @@ private:
 public:
     const char* name() override { return "SpeedrunsScene"; }
 
-    SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game* game);
+    SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game& game);
     ~SpeedrunsScene();
 
     void didBeginScene(SceneEntry entry);

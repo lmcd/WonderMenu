@@ -11,7 +11,7 @@
 #include "ui/Theme.h"
 #include "ui/views/ScrollbarView.h"
 
-SettingsScene::SettingsScene(Game* game)
+SettingsScene::SettingsScene(Game& game)
     : GameInfoTabScene(),
       game(game) {
 

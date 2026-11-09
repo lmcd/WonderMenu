@@ -51,7 +51,7 @@ private:
     };
 
     CheatDatabase* cheatsDatabase;
-    Game* game;
+    Game& game;
 
     // Flat list of currently visible items (re-built on expand/collapse)
     std::vector<RowInfo> rows;
@@ -95,7 +95,7 @@ private:
 public:
     const char* name() override { return "CheatsScene"; }
 
-    CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game* game);
+    CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game& game);
     ~CheatsScene();
 
     void updateViews(const RenderInfo& renderInfo) override;
