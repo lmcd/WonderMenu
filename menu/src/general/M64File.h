@@ -93,6 +93,12 @@ struct M64File {
 
     bool loadHeader();
 
+    /**
+     * Set what loadHeader() would from values it found earlier (e.g. in the
+     * library cache), without opening the file. `filename` must be set first.
+     */
+    void loadCachedHeader(uint32_t romCRC, uint32_t crc, AuthoringProgram authoringProgram, uint8_t controllerCount);
+
     bool stageInputsTable(uint32_t stagingAddress);
 
     // Display name: the file's base name (path stem, extension dropped), with
@@ -103,4 +109,8 @@ struct M64File {
 
 private:
     std::string displayName;
+
+    // What loadHeader() and loadCachedHeader() work out from the size,
+    // filename and controller count
+    void updateDerivedValues();
 };

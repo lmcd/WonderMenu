@@ -150,18 +150,43 @@ bool GameLibrary::loadCache() {
 
     allocateCache();
 
-    // Don't read past the bounds of the cache array
-    size_t bytesToRead = std::min(fileSize - entriesOffset, cache.size() * sizeof(CacheResult));
+    // Don't read past the bounds of the cache array, or the end of the file
+    size_t romFileCount = temporaryCacheHeader.romFileCount;
+    size_t availableEntries = (fileSize - entriesOffset) / sizeof(ROMCacheResult);
+    size_t bytesToRead = std::min({romFileCount, romCache.size(), availableEntries}) * sizeof(ROMCacheResult);
 
-    if (f_read(&cacheFile, cache.data(), bytesToRead, &bytesRead) != FR_OK || bytesRead != bytesToRead) {
+    if (f_read(&cacheFile, romCache.data(), bytesToRead, &bytesRead) != FR_OK || bytesRead != bytesToRead) {
         debugf("[GameLibrary] Failed to read cache file (read %u of %zu bytes)\n", (unsigned)bytesRead, bytesToRead);
         f_close(&cacheFile);
         return false;
     }
 
-    f_close(&cacheFile);
-
     readFromCache = true;
+
+    // The M64 entries follow every ROM entry. A cache cut short before them
+    // just has none, so each M64 file is read again.
+    size_t m64EntriesOffset = entriesOffset + (romFileCount * sizeof(ROMCacheResult));
+    size_t availableM64Entries = (fileSize > m64EntriesOffset) ? (fileSize - m64EntriesOffset) / sizeof(M64CacheResult) : 0;
+
+    m64Cache.resize(std::min((size_t)temporaryCacheHeader.m64FileCount, availableM64Entries));
+
+    bytesToRead = m64Cache.size() * sizeof(M64CacheResult);
+
+    readM64sFromCache = true;
+
+    if (bytesToRead > 0) {
+        if (f_lseek(&cacheFile, m64EntriesOffset) != FR_OK
+            || f_read(&cacheFile, m64Cache.data(), bytesToRead, &bytesRead) != FR_OK
+            || bytesRead != bytesToRead
+        ) {
+            debugf("[GameLibrary] Failed to read M64 cache entries\n");
+
+            m64Cache.clear();
+            readM64sFromCache = false;
+        }
+    }
+
+    f_close(&cacheFile);
 
     return !romDirectoryPaths.empty();
 }
@@ -178,9 +203,13 @@ bool GameLibrary::writeCache() {
         return false;
     }
 
+    size_t romEntriesToWrite = std::min((size_t)cachedROMFileCount, (size_t)MAX_NUMBER_OF_FILES);
+    size_t m64EntriesToWrite = std::min((size_t)cachedM64FileCount, m64Cache.size());
+
     CacheHeader header = {};
-    header.romFileCount = cachedFileCount;
     header.directoryCount = directoryCount();
+    header.romFileCount = romEntriesToWrite;
+    header.m64FileCount = m64EntriesToWrite;
 
     if (fwrite(&header, 1, sizeof(CacheHeader), cacheFile) != sizeof(CacheHeader)) {
         debugf("[GameLibrary] Failed to write blank cache header\n");
@@ -199,19 +228,21 @@ bool GameLibrary::writeCache() {
         }
     }
 
-    size_t entriesToWrite = std::min((size_t)cachedFileCount, (size_t)MAX_NUMBER_OF_FILES);
-
-    size_t entriesWritten = fwrite(cache.data(), sizeof(CacheResult), entriesToWrite, cacheFile);
+    size_t romEntriesWritten = fwrite(romCache.data(), sizeof(ROMCacheResult), romEntriesToWrite, cacheFile);
+    size_t m64EntriesWritten = fwrite(m64Cache.data(), sizeof(M64CacheResult), m64EntriesToWrite, cacheFile);
 
     fclose(cacheFile);
 
-    if (entriesWritten != entriesToWrite) {
-        debugf("[GameLibrary] Failed to write cache file (wrote %zu of %zu entries)\n", entriesWritten, entriesToWrite);
+    bool didWriteROMEntries = (romEntriesWritten == romEntriesToWrite);
+    bool didWriteM64Entries = (m64EntriesWritten == m64EntriesToWrite);
+
+    if (!didWriteROMEntries || !didWriteM64Entries) {
+        debugf("[GameLibrary] Failed to write cache file (wrote %zu of %zu entries, %zu of %zu M64 entries)\n", romEntriesWritten, romEntriesToWrite, m64EntriesWritten, m64EntriesToWrite);
 
         return false;
     }
     else {
-        debugf("[GameLibrary] Wrote cache file. Entries: %i\n", entriesWritten);
+        debugf("[GameLibrary] Wrote cache file. Entries: %zu, M64 entries: %zu\n", romEntriesWritten, m64EntriesWritten);
 
         return true;
     }
@@ -589,7 +620,7 @@ void GameLibrary::loadGames() {
 
             fileIndex++;
 
-            CacheResult cacheResult = cache[fileIndex];
+            ROMCacheResult cacheResult = romCache[fileIndex];
 
             if (readFromCache) {
                 if (cacheResult.hash != hash || cacheResult.fileSize != fileSize) {
@@ -608,12 +639,12 @@ void GameLibrary::loadGames() {
                 romFile.version = cacheResult.version;
                 romFile.crc1 = cacheResult.crc1;
 
-                cache[fileIndex].entryIndex = cacheResult.entryIndex;
-                cache[fileIndex].version = cacheResult.version;
-                cache[fileIndex].crc1 = cacheResult.crc1;
+                romCache[fileIndex].entryIndex = cacheResult.entryIndex;
+                romCache[fileIndex].version = cacheResult.version;
+                romCache[fileIndex].crc1 = cacheResult.crc1;
             }
             else {
-                cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
+                romCache[fileIndex] = ROMCacheResult(hash, fileSize, 0, 0);
                 
                 if (romFile.loadHeader()) {
                     int16_t databaseIndex = database.indexForROMFile(romFile);
@@ -622,9 +653,9 @@ void GameLibrary::loadGames() {
                         databaseEntry = database.readEntryAtIndex(databaseIndex);
                     }
 
-                    cache[fileIndex].entryIndex = databaseIndex;
-                    cache[fileIndex].version = romFile.version;
-                    cache[fileIndex].crc1 = romFile.crc1;
+                    romCache[fileIndex].entryIndex = databaseIndex;
+                    romCache[fileIndex].version = romFile.version;
+                    romCache[fileIndex].crc1 = romFile.crc1;
                 }
                 else {
                     debugf("[GameLibrary] Failed to load ROM file: %s\n", filename);
@@ -632,9 +663,9 @@ void GameLibrary::loadGames() {
                     // Failed to load, clean up
                     delete &romFile;
 
-                    cache[fileIndex].entryIndex = -1;
-                    cache[fileIndex].version = 0;
-                    cache[fileIndex].crc1 = 0;
+                    romCache[fileIndex].entryIndex = -1;
+                    romCache[fileIndex].version = 0;
+                    romCache[fileIndex].crc1 = 0;
 
                     continue;
                 }
@@ -692,14 +723,7 @@ void GameLibrary::loadGames() {
     }
 
     // fileIndex is the last 0-based index; the count is one more than that
-    cachedFileCount = fileIndex + 1;
-
-    if (!readFromCache && database.isOpen()) {
-        writeCache();
-    }
-
-    // Swapped with an empty vector, as clear() alone keeps the allocation
-    std::vector<CacheResult>().swap(cache);
+    cachedROMFileCount = fileIndex + 1;
 
     // Sort retail games alphabetically by display title (case-insensitive)
     std::sort(retailGroups.begin(), retailGroups.end(), compareTitles);
@@ -742,6 +766,8 @@ void GameLibrary::loadM64Files() {
 
     debugf("[GameLibrary] Reading M64 files in %s\n", m64sPath);
 
+    int m64FileIndex = -1;
+
     // Only proceed if folder exists
     if (scanner.open(m64sPath)) {
         do {
@@ -760,20 +786,87 @@ void GameLibrary::loadM64Files() {
             M64File* m64File = new M64File(scanner.fileObject);
             m64File->filename = filename;
 
-            if (m64File->loadHeader()) {
-                uint32_t crc = m64File->romCRC;
+            uint32_t hash = GameDatabase::djb2((const unsigned char*)filename, scanner.nameLength);
+            uint32_t fileSize = scanner.size;
 
-                // Attach this recording to the first loaded speedrun game whose
-                // ROM CRC matches it.
-                for (Game* game : speedrunGames) {
-                    if (game->romFile.crc1 == crc) {
-                        game->m64Files.push_back(m64File);
-                        break;
-                    }
+            m64FileIndex++;
+
+            // A file past the end of the cache gets a blank entry, which can't
+            // match it
+            if (m64FileIndex >= (int)m64Cache.size()) {
+                m64Cache.resize(m64FileIndex + 1);
+            }
+
+            M64CacheResult cacheResult = m64Cache[m64FileIndex];
+
+            if (readM64sFromCache) {
+                if (cacheResult.hash != hash || cacheResult.fileSize != fileSize) {
+                    readM64sFromCache = false;
+
+                    debugf("[GameLibrary] Hash mismatch for M64 file: %s\n", filename);
+                    debugf("[GameLibrary] Abandoning M64 cache.\n");
+                }
+            }
+
+            bool isLoaded;
+
+            if (readM64sFromCache) {
+                isLoaded = cacheResult.isLoaded;
+
+                if (isLoaded) {
+                    m64File->loadCachedHeader(cacheResult.romCRC, cacheResult.crc, cacheResult.authoringProgram, cacheResult.controllerCount);
+                }
+            }
+            else {
+                isLoaded = m64File->loadHeader();
+
+                M64CacheResult& newCacheResult = m64Cache[m64FileIndex];
+
+                newCacheResult = M64CacheResult();
+                newCacheResult.hash = hash;
+                newCacheResult.fileSize = fileSize;
+                newCacheResult.isLoaded = isLoaded;
+
+                if (isLoaded) {
+                    newCacheResult.romCRC = m64File->romCRC;
+                    newCacheResult.crc = m64File->crc;
+                    newCacheResult.authoringProgram = m64File->authoringProgram;
+                    newCacheResult.controllerCount = m64File->controllerCount;
+                }
+            }
+
+            if (!isLoaded) {
+                debugf("[GameLibrary] Failed to load M64 file: %s\n", filename);
+
+                // Failed to load, clean up
+                delete m64File;
+
+                continue;
+            }
+
+            uint32_t crc = m64File->romCRC;
+
+            // Attach this recording to the first loaded speedrun game whose
+            // ROM CRC matches it.
+            for (Game* game : speedrunGames) {
+                if (game->romFile.crc1 == crc) {
+                    game->m64Files.push_back(m64File);
+                    break;
                 }
             }
         } while (scanner.next());
     }
+
+    // m64FileIndex is the last 0-based index; the count is one more than that
+    cachedM64FileCount = m64FileIndex + 1;
+
+    if ((!readFromCache || !readM64sFromCache) && database.isOpen()) {
+        writeCache();
+    }
+
+    // Swapped with empty vectors, as clear() alone keeps the allocation
+    std::vector<ROMCacheResult>().swap(romCache);
+    std::vector<M64CacheResult>().swap(m64Cache);
 
     // debugf("[GameLibrary] Loaded %i M64 Files\n", allM64Files.size());
     debugf("[GameLibrary] Loaded %i Speedrun Games\n", speedrunGames.size());

@@ -52,7 +52,7 @@ struct __attribute__((packed)) CacheHeader {
 
 static_assert(sizeof(CacheHeader) == 8, "CacheHeader must be 8 bytes");
 
-struct __attribute__((packed)) CacheResult {
+struct __attribute__((packed)) ROMCacheResult {
     uint32_t hash = 0;
     uint32_t fileSize = 0;
     int16_t entryIndex = -1;
@@ -61,7 +61,24 @@ struct __attribute__((packed)) CacheResult {
     uint8_t reserved = 0;
 };
 
-static_assert(sizeof(CacheResult) == 16, "CacheResult must be 16 bytes");
+static_assert(sizeof(ROMCacheResult) == 16, "ROMCacheResult must be 16 bytes");
+
+// What M64File::loadHeader() found in a .m64 file, so it needn't be read again
+struct __attribute__((packed)) M64CacheResult {
+    uint32_t hash = 0;
+    uint32_t fileSize = 0;
+    uint32_t romCRC = 0;
+    uint32_t crc = 0;
+    M64File::AuthoringProgram authoringProgram = {};
+    uint8_t controllerCount = 0;
+
+    // False if loadHeader() failed, so the file is skipped again
+    bool isLoaded = false;
+
+    uint8_t reserved[2] = {0};
+};
+
+static_assert(sizeof(M64CacheResult) == 24, "M64CacheResult must be 24 bytes");
 
 class GameLibrary {
 private:
@@ -69,16 +86,24 @@ private:
     // This can get set to `false` mid-read if it's detected as stale
     bool readFromCache = false;
 
-    // Number of populated entries in `cache` after a load()
-    int cachedFileCount = 0;
+    // As `readFromCache`, for the M64 files
+    bool readM64sFromCache = false;
+
+    // Number of populated entries in `romCache` after a load()
+    int cachedROMFileCount = 0;
+
+    // Number of populated entries in `m64Cache` after loadM64Files()
+    int cachedM64FileCount = 0;
 
     // Only needed while the library loads, from loadCache() to the end of
-    // loadGames(), so it's freed then rather than held for the whole session
-    std::vector<CacheResult> cache;
+    // loadM64Files(), so they're freed then rather than held for the whole
+    // session
+    std::vector<ROMCacheResult> romCache;
+    std::vector<M64CacheResult> m64Cache;
 
     void allocateCache() {
-        if (cache.empty()) {
-            cache.resize(MAX_NUMBER_OF_FILES);
+        if (romCache.empty()) {
+            romCache.resize(MAX_NUMBER_OF_FILES);
         }
     }
 
@@ -152,6 +177,10 @@ public:
      */
     void loadGames();
 
+    /**
+     * Load the .m64 files in the speedruns directory, attaching each to its
+     * game. Must follow loadGames(), as it writes the cache for both.
+     */
     void loadM64Files();
 
     /**
