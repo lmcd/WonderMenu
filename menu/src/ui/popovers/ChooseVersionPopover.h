@@ -22,9 +22,9 @@ protected:
     Game* selectedValue() override;
 
 public:
-    const char* name() { return "ChooseVersionPopover"; }
+    const char* name() override { return "ChooseVersionPopover"; }
 
     ChooseVersionPopover(Scene* baseScene, GameGroup* gameGroup);
 
-    void updateViews(const RenderInfo& renderInfo);
+    void updateViews(const RenderInfo& renderInfo) override;
 };

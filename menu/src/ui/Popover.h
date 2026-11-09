@@ -60,7 +60,7 @@ protected:
 public:
     using PopoverResult = Result<Value>;
 
-    const char* name() { return "Popover"; }
+    const char* name() override { return "Popover"; }
 
     Popover(Scene* baseScene) : Scene(), baseScene(baseScene) {
         ownedByRenderer = true;
@@ -149,7 +149,7 @@ private:
     }
 
 public:
-    void didBeginScene(SceneEntry) {
+    void didBeginScene(SceneEntry) override {
         contentView.addSubview(&rectView);
         contentView.addSubview(&titleLabelView);
         contentView.addSubview(&tableView);
@@ -175,7 +175,7 @@ public:
         }
     }
 
-    void updateViews(const RenderInfo& renderInfo) {
+    void updateViews(const RenderInfo& renderInfo) override {
         Color backgroundColor = Theme::popoverBackgroundColor;
         Color titleColor = Theme::accentColor;
 

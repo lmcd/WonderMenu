@@ -23,10 +23,10 @@ protected:
     int selectedValue() override { return tableView.selectedRowIndex; }
 
 public:
-    const char* name() { return "ChooseCheatOptionPopover"; }
+    const char* name() override { return "ChooseCheatOptionPopover"; }
 
     ChooseCheatOptionPopover(Scene* baseScene, CheatWildcardOption* firstOption, int wildcardCount, int selectedIndex = 0);
 
-    void updateViews(const RenderInfo& renderInfo);
+    void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

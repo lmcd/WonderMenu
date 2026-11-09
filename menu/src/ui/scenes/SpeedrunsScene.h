@@ -104,7 +104,7 @@ public:
     SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game& game);
     ~SpeedrunsScene();
 
-    void didBeginScene(SceneEntry entry);
+    void didBeginScene(SceneEntry entry) override;
     void update(const UpdateInfo& updateInfo) override;
     void updateViews(const RenderInfo& renderInfo) override;
 };

@@ -142,7 +142,7 @@ private:
     Vec3f rotationForFrame(int frameNumber);
 
 public:
-    const char* name() { return "ListScene"; }
+    const char* name() override { return "ListScene"; }
 
     enum Tab {
         TAB_RETAIL,
@@ -174,7 +174,7 @@ public:
 
     void setCurrentTab(Tab _currentTab);
 
-    void didBeginScene(SceneEntry entry);
+    void didBeginScene(SceneEntry entry) override;
     void update(const UpdateInfo& updateInfo) override;
     void updateViews(const RenderInfo& renderInfo) override;
 };

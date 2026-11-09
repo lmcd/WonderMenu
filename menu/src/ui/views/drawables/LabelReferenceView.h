@@ -285,7 +285,7 @@ public:
         updateTextColors();
     }
 
-    void clear(const RenderInfo& renderInfo) {
+    void clear(const RenderInfo& renderInfo) override {
         int bufferIndex = renderInfo.bufferIndex;
 
         clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);

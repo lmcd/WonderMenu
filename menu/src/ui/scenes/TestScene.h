@@ -31,7 +31,7 @@ private:
     float transitionDirection = 1.0;
 
 public:
-    const char* name() { return "TestScene"; }
+    const char* name() override { return "TestScene"; }
 
     TestScene();
     ~TestScene();

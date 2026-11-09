@@ -53,7 +53,7 @@ public:
         setCurrentTab(currentTab, true);
     }
 
-    void didBeginScene(SceneEntry entry);
+    void didBeginScene(SceneEntry entry) override;
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

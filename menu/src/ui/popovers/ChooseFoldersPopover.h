@@ -32,7 +32,7 @@ protected:
     std::vector<std::string> selectedValue() override;
 
 public:
-    const char* name() { return "ChooseFoldersPopover"; }
+    const char* name() override { return "ChooseFoldersPopover"; }
 
     ImageView imageView;
     LabelView<64> messageLabel;
@@ -41,5 +41,5 @@ public:
 
     void didBeginScene(SceneEntry entry) override;
     void update(const UpdateInfo& updateInfo) override;
-    void updateViews(const RenderInfo& renderInfo);
+    void updateViews(const RenderInfo& renderInfo) override;
 };

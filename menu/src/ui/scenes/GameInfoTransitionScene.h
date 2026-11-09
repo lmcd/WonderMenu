@@ -21,13 +21,13 @@ private:
     int isFinishedCount = 0;
 
 public:
-    const char* name() { return "GameInfoTransitionScene"; }
+    const char* name() override { return "GameInfoTransitionScene"; }
 
     GameInfoTransitionScene(GameLaunchScene* gameLaunchScene, GameInfoScene* gameInfoScene);
     ~GameInfoTransitionScene();
 
-    void didEndScene();
-    void didBeginScene(SceneEntry entry);
+    void didEndScene() override;
+    void didBeginScene(SceneEntry entry) override;
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

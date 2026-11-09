@@ -93,12 +93,12 @@ private:
     bool writeThumbnail();
 
 public:
-    const char* name() { return "ScreenshotsImportScene"; }
+    const char* name() override { return "ScreenshotsImportScene"; }
 
     ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, int count, ScreenshotsSDRAMReader& reader);
     ~ScreenshotsImportScene();
 
-    void didBeginScene(SceneEntry entry);
+    void didBeginScene(SceneEntry entry) override;
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

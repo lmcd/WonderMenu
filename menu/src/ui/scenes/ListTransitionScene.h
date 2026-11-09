@@ -31,12 +31,12 @@ private:
     float fadeProgress = 0.0f;
 
 public:
-    const char* name() { return "ListTransitionScene"; }
+    const char* name() override { return "ListTransitionScene"; }
 
     ListTransitionScene(IntroScene* IntroScene, ListScene* listScene);
 
-    void didBeginScene(SceneEntry entry);
-    void didEndScene();
+    void didBeginScene(SceneEntry entry) override;
+    void didEndScene() override;
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

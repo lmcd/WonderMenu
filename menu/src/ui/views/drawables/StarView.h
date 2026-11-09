@@ -43,6 +43,6 @@ public:
     StarView();
 
     void update(const RenderInfo& renderInfo) override;
-    void clear(const RenderInfo& renderInfo);
+    void clear(const RenderInfo& renderInfo) override;
     void render(const RenderInfo& renderInfo) override;
 };

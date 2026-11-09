@@ -43,7 +43,7 @@ private:
     bool hasInitiatedLaunch = false;
 
 public:
-    const char* name() { return "GameLaunchScene"; }
+    const char* name() override { return "GameLaunchScene"; }
 
     GameInfoState& state = warmResetState.sceneStates.gameInfoState;
     Game& game;

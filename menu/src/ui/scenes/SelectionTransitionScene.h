@@ -23,12 +23,12 @@ private:
     bool isZQueued = false;
 
 public:
-    const char* name() { return "SelectionTransitionScene"; }
+    const char* name() override { return "SelectionTransitionScene"; }
 
     SelectionTransitionScene(ListScene* listScene, GameLaunchScene* gameLaunchScene);
     ~SelectionTransitionScene();
 
-    void didBeginScene(SceneEntry entry);
+    void didBeginScene(SceneEntry entry) override;
     void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

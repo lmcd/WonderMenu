@@ -22,7 +22,7 @@ protected:
     }
 
 public:
-    const char* name() { return "AlertPopover"; }
+    const char* name() override { return "AlertPopover"; }
 
     std::vector<std::string> buttons;
     int destructiveButtonIndex = -1;
@@ -49,6 +49,6 @@ public:
         initialSelectedRowIndex = index;
     }
 
-    void updateViews(const RenderInfo& renderInfo);
+    void updateViews(const RenderInfo& renderInfo) override;
     void update(const UpdateInfo& updateInfo) override;
 };

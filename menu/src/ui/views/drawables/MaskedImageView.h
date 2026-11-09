@@ -73,6 +73,6 @@ public:
     uint32_t imageVersion = 0;
 
     void update(const RenderInfo& renderInfo) override;
-    void clear(const RenderInfo& renderInfo);
+    void clear(const RenderInfo& renderInfo) override;
     void render(const RenderInfo& renderInfo) override;
 };

@@ -46,6 +46,6 @@ public:
     int radius = 0;
     bool isSmooth = false;
 
-    void clear(const RenderInfo& renderInfo);
+    void clear(const RenderInfo& renderInfo) override;
     void render(const RenderInfo& renderInfo) override;
 };

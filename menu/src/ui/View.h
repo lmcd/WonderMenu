@@ -392,10 +392,10 @@ public:
      */
     virtual void setNeedsDisplay(Rect dirtyRect);
 
-    virtual void update(const RenderInfo& renderInfo);
+    void update(const RenderInfo& renderInfo) override;
 
     /**
      * Use draw calls to render view content onto the screen.
      */
-    virtual void render(const RenderInfo& renderInfo) = 0;
+    void render(const RenderInfo& renderInfo) override = 0;
 };

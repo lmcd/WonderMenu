@@ -38,7 +38,7 @@ public:
     BaseRowView(const BaseRowView&) = delete;
     BaseRowView& operator=(const BaseRowView&) = delete;
 
-    void update(const RenderInfo&) {
+    void update(const RenderInfo&) override {
         if (isSelected != lastIsSelected) {
             for (View* subview : subviews) {
                 static_cast<Drawable*>(subview)->setNeedsDisplay();
@@ -73,7 +73,7 @@ public:
         return !finalIsHidden && finalFrame.intersects(renderInfo.screenRect);
     }
 
-    void render(const RenderInfo& renderInfo) {
+    void render(const RenderInfo& renderInfo) override {
         if (!isVisible(renderInfo)) {
             return;
         }

@@ -31,7 +31,7 @@ private:
     float totalSeconds = 0;
 
 public:
-    const char* name() { return "IntroScene"; }
+    const char* name() override { return "IntroScene"; }
 
     LabelView<32> labelView;
 
