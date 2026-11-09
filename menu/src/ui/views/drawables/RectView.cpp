@@ -233,15 +233,12 @@ void RectView::clear(const RenderInfo& renderInfo) {
     }
     else {
         for (int i = 0; i < 4; i++) {
-            Rect rect = rectsToClear[i];
+            Rect& rect = rectsToClear[i];
 
             clearRect(rect, finalBlendColor);
-        }
 
-        rectsToClear[0].size.width = 0;
-        rectsToClear[1].size.width = 0;
-        rectsToClear[2].size.width = 0;
-        rectsToClear[3].size.width = 0;
+            rect.size.width = 0;
+        }
 
         needsPartialClear = false;
     }
