@@ -72,6 +72,7 @@ void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
     listScene->selectionRectView.opacity = lowerHalfOpacity;
     listScene->tabControlView.opacity = lowerHalfOpacity;
     listScene->scrollbarView.opacity = lowerHalfOpacity;
+    listScene->view.isHidden = (lowerHalfOpacity == 0.0f);
 
     uint8_t flags = CART_RENDER_DEFAULT;
     Game* gameShown = listScene->cart3DView.game;
