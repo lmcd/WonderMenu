@@ -6,6 +6,11 @@
 #include "SpeedrunDatabase.h"
 
 #ifndef N64
+static void writeU16BE(std::vector<uint8_t>& out, uint16_t v) {
+    out.push_back((uint8_t)(v >> 8));
+    out.push_back((uint8_t)v);
+}
+
 static void writeU32BE(std::vector<uint8_t>& out, uint32_t v) {
     out.push_back((uint8_t)(v >> 24));
     out.push_back((uint8_t)(v >> 16));
@@ -17,15 +22,10 @@ std::vector<uint8_t> SpeedrunDatabase::serialize() const {
     std::vector<uint8_t> out;
 
     writeU32BE(out, gameCRC1);
-    writeU32BE(out, reserved1);
-    writeU32BE(out, reserved2);
-    writeU32BE(out, 0);
-    writeU32BE(out, 0);
+    writeU16BE(out, reserved);
 
-    out.push_back(0);
     out.push_back((uint8_t)groups.size());
     out.push_back((uint8_t)entries.size());
-    out.push_back(0);
 
     for (const SpeedrunGroup& group : groups) {
         out.insert(out.end(), group.title, group.title + sizeof(group.title));

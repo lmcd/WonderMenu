@@ -373,34 +373,32 @@ SpeedrunDatabase* GameDatabase::loadSpeedrunDatabase(Entry* entry) {
         return nullptr;
     }
 
-    uint32_t addresses[5] = {};
+    // Big-endian on disk, as on the N64, so it's read as is
+    struct __attribute__((packed)) {
+        uint32_t gameCRC1;
+        uint16_t reserved;
+        uint8_t groupCount;
+        uint8_t speedrunCount;
+    } header;
 
-    // TODO: Read straight into database header instead
-    if (!readBytes(addresses, sizeof(addresses))) {
-        debugf("[GameDatabase] Failed to read speedrun addresses\n");
+    static_assert(sizeof(header) == SpeedrunDatabase::HEADER_SIZE);
+
+    if (!readBytes(&header, sizeof(header))) {
+        debugf("[GameDatabase] Failed to read speedrun header\n");
         return nullptr;
     }
-
-    uint8_t counts[4] = {};
-
-    if (!readBytes(counts, sizeof(counts))) {
-        debugf("[GameDatabase] Failed to read speedrun counts\n");
-        return nullptr;
-    }
-
-    uint8_t groupCount = counts[1];
-    uint8_t speedrunCount = counts[2];
 
     SpeedrunDatabase* speedrunDatabase = new SpeedrunDatabase();
 
-    speedrunDatabase->gameCRC1 = addresses[0];
+    speedrunDatabase->gameCRC1 = header.gameCRC1;
+    speedrunDatabase->reserved = header.reserved;
 
-    speedrunDatabase->groups.resize(groupCount);
-    speedrunDatabase->entries.resize(speedrunCount);
+    speedrunDatabase->groups.resize(header.groupCount);
+    speedrunDatabase->entries.resize(header.speedrunCount);
 
     bool didReadAll =
-        readBytes(speedrunDatabase->groups.data(),  sizeof(SpeedrunGroup) * groupCount)
-     && readBytes(speedrunDatabase->entries.data(), sizeof(SpeedrunEntry) * speedrunCount)
+        readBytes(speedrunDatabase->groups.data(),  sizeof(SpeedrunGroup) * header.groupCount)
+     && readBytes(speedrunDatabase->entries.data(), sizeof(SpeedrunEntry) * header.speedrunCount)
     ;
 
     if (!didReadAll) {
