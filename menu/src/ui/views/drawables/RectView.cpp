@@ -97,6 +97,11 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
 
         setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, PRIM)));
 
+        // Middle-areas that are known to be opaque should not blend with framebuffer
+        if (!finalIsOpaque && finalOpacity == 1.0f && fillColor.a == 255) {
+            setBlender(WITH_BLEND_COLOR);
+        }
+
         drawFilledRect(leftRect);
         drawFilledRect(middleRect);
         drawFilledRect(rightRect);
