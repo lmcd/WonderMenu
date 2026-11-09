@@ -27,18 +27,27 @@
 #define MAX_NUMBER_OF_FAVOURITES 16
 
 struct __attribute__((packed)) CacheHeader {
-    uint8_t empty1[1] = {0};
+    static constexpr uint8_t CURRENT_VERSION = 1;
 
-    uint16_t romFileCount;
+    // Identifies the file as a WonderMenu cache
+    char magic[2] = {'W', 'M'};
 
-    /**
-     * The number of ROM directories the user has chosen to load ROMs from.
-     */
+    // Bumped whenever the cache's layout changes, so an older cache is
+    // rebuilt rather than misread.
+    uint8_t version = CURRENT_VERSION;
+
+    // The number of ROM directories the user has chosen to load ROMs from.
     uint8_t directoryCount;
 
+    // The last-known number of ROM files. 
+    uint16_t romFileCount;
+
+    // The last-known number of M64 files.
     uint16_t m64FileCount;
 
-    uint16_t empty2;
+    bool isValid() const {
+        return magic[0] == 'W' && magic[1] == 'M' && version == CURRENT_VERSION;
+    }
 };
 
 static_assert(sizeof(CacheHeader) == 8, "CacheHeader must be 8 bytes");

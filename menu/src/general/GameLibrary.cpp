@@ -107,6 +107,13 @@ bool GameLibrary::loadCache() {
         return false;
     }
 
+    if (!temporaryCacheHeader.isValid()) {
+        debugf("[GameLibrary] Cache file isn't a version %i cache\n", CacheHeader::CURRENT_VERSION);
+        readFromCache = false;
+        f_close(&cacheFile);
+        return false;
+    }
+
     int directoryCount = temporaryCacheHeader.directoryCount;
 
     if (directoryCount > 0) {
