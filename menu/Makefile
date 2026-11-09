@@ -1,4 +1,4 @@
-BUILD_DIR=build/dev
+BUILD_DIR=build/debug
 T3D_INST=$(N64_INST)
 # N64_ROM_HEADER = /Users/lee/Documents/GitHub/libdragon/boot/bin/ipl3_dev.z64
 
@@ -10,7 +10,7 @@ include $(N64_INST)/include/t3d.mk
 # not build outputs. Because they're prerequisites of the filesystem copy rule,
 # make walks that implicit chain -- v64 <- z64 <- $(BUILD_DIR)/%.elf -- and,
 # since `%.z64`'s directory is split off, tries to LINK a bogus
-# assets/sd/build/dev/NNN.elf with no object files ([LD] error). Cancel
+# assets/sd/build/debug/NNN.elf with no object files ([LD] error). Cancel
 # the rule (redefine the pattern with no recipe) so these stay plain sources.
 %.v64: %.z64
 

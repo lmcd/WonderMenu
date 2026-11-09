@@ -59,21 +59,33 @@ menu: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu
 .PHONY: menu
 
+# The debug build is the menu's default one
+debug: menu
+.PHONY: debug
+
 # Pass-throughs to menu/, but gated on a current payload asset first, so a
 # release ROM can never embed a stale payload.elf.stripped.
 release sc64: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu $@
 .PHONY: release sc64
 
-# `console` and `emu` deploy the same ROM; only where it goes differs.
+# `console` and `emu` deploy whichever build is named alongside them (e.g.
+# `make release emu`), or the debug build when none is. Each goal is only made
+# once, so the build named first isn't made again.
+ifneq ($(filter release,$(MAKECMDGOALS)),)
+MENU_BUILD = release
+MENU_ROM = menu/WonderMenu-release.z64
+else
+MENU_BUILD = debug
 MENU_ROM = menu/WonderMenu.z64
+endif
 
 # --- console ---------------------------------------------------------------
 
 SC64DEPLOYER ?= sc64deployer
 
 # Build the ROM, then push it to a connected SummerCart64.
-console: all
+console: $(MENU_BUILD)
 	@command -v $(SC64DEPLOYER) >/dev/null || { echo "console: $(SC64DEPLOYER) not found in PATH"; exit 1; }
 	@echo "    [SC64] upload $(MENU_ROM)"
 	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_ROM)" --direct
@@ -87,7 +99,7 @@ ARES ?= /Applications/ares.app/Contents/MacOS/ares
 # Build the ROM, then boot it in ares. Invoked via the binary inside the bundle
 # rather than `open -a` so that ares takes the ROM path as an argument and its
 # stdout/stderr stay attached to this terminal.
-emu: all
+emu: $(MENU_BUILD)
 	@test -x "$(ARES)" || { echo "emu: ares not found at $(ARES)"; exit 1; }
 	@echo "    [ARES] $(MENU_ROM)"
 	"$(ARES)" "$(CURDIR)/$(MENU_ROM)"
