@@ -2,6 +2,11 @@ BUILD_DIR=build/debug
 T3D_INST=$(N64_INST)
 # N64_ROM_HEADER = /Users/lee/Documents/GitHub/libdragon/boot/bin/ipl3_dev.z64
 
+# Unlock libdragon's preview APIs (scratch memory, rdpq_call_deferred, a3d)
+# without warnings. Set here rather than left to n64.mk's default, which isn't
+# 2 in every libdragon. Must come before n64.mk is included.
+LIBDRAGON_PREVIEW = 2
+
 include $(N64_INST)/include/n64.mk
 include $(N64_INST)/include/t3d.mk
 
