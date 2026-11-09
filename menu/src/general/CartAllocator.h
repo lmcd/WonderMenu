@@ -81,7 +81,7 @@ struct CartAllocator {
 
         void invalidate() {
             isValid = false;
-        };
+        }
     };
 
     static constexpr int SDRAM_CAPACITY = MiB(64) - KiB(128);

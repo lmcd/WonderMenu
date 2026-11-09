@@ -29,7 +29,7 @@ private:
     virtual void render(const RenderInfo& renderInfo) {
         view.clearRecursive(renderInfo);
         view.render(renderInfo);
-    };
+    }
 
     /**
      * Set the scene renderer.

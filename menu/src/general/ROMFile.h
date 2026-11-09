@@ -124,7 +124,7 @@ struct ROMFile {
 
     u_int16_t id() {
         return _id;
-    };
+    }
 
     bool loadHeader();
 };
