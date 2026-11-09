@@ -5,6 +5,8 @@
 
 #include "CheckboxView.h"
 
+#include <span>
+
 CheckboxView::CheckboxView() {
     frame.size = Size(16, 16);
 }
@@ -14,8 +16,16 @@ void CheckboxView::uploadSprite() {
         sprite = sprite_load("rom:/ui/TableCheckbox.IA16.sprite");
     }
 
+    static const rdpq_texparms_t texparms = {};
+
     rdpq_sync_tile();
-    rdpq_sprite_upload(TILE0, sprite, NULL);
+
+    rdpq_tex_multi_begin();
+        rdpq_sprite_upload(TILE1, sprite, &texparms);
+        rdpq_tex_reuse(TILE3, NULL);
+        rdpq_tex_reuse_sub(TILE0, &texparms, 16, 0, sprite->width, sprite->height);
+        rdpq_tex_reuse_sub(TILE2, &texparms, 0, 0, 1, 1);
+    rdpq_tex_multi_end();
 }
 
 void CheckboxView::update(const RenderInfo& renderInfo) {
@@ -35,7 +45,7 @@ void CheckboxView::clear(const RenderInfo& renderInfo) {
     drawnBoundingBox[bufferIndex] = Rect();
 }
 
-void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
+void CheckboxView::renderCheckbox(const RenderInfo& renderInfo, std::optional<bool>& modeIsOpaque) {
     if (!needsRenderIn(renderInfo.bufferIndex)) {
         return;
     }
@@ -46,12 +56,24 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    rdpq_mode_push();
+    if (!modeIsOpaque.has_value()) {
+        rdpq_mode_push();
 
-    rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
+        rdpq_mode_begin();
+            setCombiner(RDPQ_COMBINER2(
+                (ENV, PRIM, TEX0_ALPHA, PRIM), (1, TEX0, TEX1, TEX0),
+                (0, 0, 0, COMBINED),          (COMBINED, 0, PRIM, 0)
+            ));
+            setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
+        rdpq_mode_end();
+
+        modeIsOpaque = finalIsOpaque;
+    }
+    else if (*modeIsOpaque != finalIsOpaque) {
         setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
-    rdpq_mode_end();
+
+        modeIsOpaque = finalIsOpaque;
+    }
 
     Color currentFillColor = isOn ? onFillColor : offFillColor;
     currentFillColor.a *= finalOpacity;
@@ -59,25 +81,15 @@ void CheckboxView::renderCheckbox(const RenderInfo& renderInfo) {
     setPrimitiveColor(currentFillColor);
     setBlendColor(finalBlendColor);
 
+    if (isOn) {
+        setEnvironmentColor(checkColor);
+    }
+
     int s0 = isRadio ? 32 : 0;
 
     Rect rect = finalFrame;
 
-    drawTexturedRect(TILE0, rect, s0);
-
-    if (isOn) {
-        s0 += finalFrame.size.width;
-
-        Color checkColor = DEFAULT_CHECK_COLOR;
-        checkColor.a *= finalOpacity;
-
-        setPrimitiveColor(checkColor);
-        setBlender(WITH_FRAMEBUFFER);
-
-        drawTexturedRect(TILE0, rect, s0);
-    }
-
-    rdpq_mode_pop();
+    drawTexturedRect(isOn ? TILE0 : TILE2, rect, s0);
 
     if (hasScissor) {
         rect = rect.intersection(currentScissor());
@@ -95,8 +107,5 @@ void CheckboxView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    uploadSprite();
-    renderCheckbox(renderInfo);
-
-    finishRender(renderInfo.bufferIndex);
+    renderGroup(renderInfo, std::span<CheckboxView>(this, 1));
 }

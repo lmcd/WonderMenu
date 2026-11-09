@@ -4,6 +4,11 @@
 */
 
 #include "ui/View.h"
+#include "ui/Image.h"
+#include "ui/RasterScratch.h"
+#include "ui/Theme.h"
+#include "util/Color.h"
+#include "util/Size.h"
 
 View::~View() {
     if (superview) {
@@ -61,6 +66,41 @@ void View::popScissor() {
         rdpq_set_scissor(0, 0, display_get_width(), display_get_height());
     }
     else {
+        applyScissor(currentScissor());
+    }
+}
+
+static RasterScratch rasterScratch;
+
+void View::enableRasterizedViews() {
+    rasterScratch.allocate();
+}
+
+void View::disableRasterizedViews() {
+    rasterScratch.free();
+}
+
+void View::beginRasterizing(const surface_t& surface) {
+    rasterScratch.screenScissorStack.swap(scissorStack);
+    hasScissor = false;
+
+    isRasterizing = true;
+
+    rdpq_attach(&surface, NULL);
+}
+
+void View::endRasterizing() {
+    rdpq_detach();
+
+    isRasterizing = false;
+
+    scissorStack.swap(rasterScratch.screenScissorStack);
+    rasterScratch.screenScissorStack.clear();
+
+    // Reattaching the screen reset its scissor to the whole screen
+    hasScissor = !scissorStack.empty();
+
+    if (hasScissor) {
         applyScissor(currentScissor());
     }
 }
@@ -168,34 +208,39 @@ bool View::isPendingRemoval(const View* view) {
 void View::updateRecursive(const RenderInfo& renderInfo) {
     finalFrame = frame;
 
-    updateSubtree(renderInfo, 1.0f, isHidden, frame.origin);
+    updateSubtree(renderInfo, 1.0f, isHidden, frame.origin, backgroundColor);
+}
+
+void View::computeFinalValues(View* subview, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsOpaque) {
+    Color finalBlendColor2 = finalBlendColor;
+
+    if (subview->usesMultipliedOpacity) {
+        subview->finalOpacity = finalOpacity * subview->opacity;
+    }
+    else {
+        subview->finalOpacity = subview->opacity;
+    }
+
+    if (subview->backgroundColor.a == 255) {
+        // The subview's background fades with the subview itself, towards
+        // whatever is behind it (not the theme background, which is only
+        // right at the root, and not the superview's opacity, which misses
+        // the subview's own fade)
+        finalBlendColor2 = subview->backgroundColor;
+        finalBlendColor2.rgb = finalBlendColor2.rgb.lerpTo(finalBlendColor.rgb, 1.0f - subview->finalOpacity);
+    }
+
+    subview->finalBlendColor = finalBlendColor2;
+
+    subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
+    subview->finalFrame.origin = finalPosition + subview->frame.origin;
+    subview->finalFrame.size   = subview->frame.size;
+    subview->finalIsOpaque = finalIsOpaque && subview->isOpaque;
 }
 
 void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool finalIsHidden, Vec2 finalPosition, Color finalBlendColor, bool finalIsOpaque) {
     for (View* subview : subviews) {
-        Color finalBlendColor2 = finalBlendColor;
-
-        if (subview->usesMultipliedOpacity) {
-            subview->finalOpacity = finalOpacity * subview->opacity;
-        }
-        else {
-            subview->finalOpacity = subview->opacity;
-        }
-
-        if (subview->backgroundColor.a == 255) {
-            finalBlendColor2 = subview->backgroundColor;
-
-            finalBlendColor2.rgb *= subview->finalOpacity;
-            subview->finalBlendColor   = finalBlendColor2;
-        }
-        else {
-            subview->finalBlendColor = finalBlendColor2;
-        }
-        
-        subview->finalIsHidden     = finalIsHidden ? true : subview->isHidden;
-        subview->finalFrame.origin = finalPosition + subview->frame.origin;
-        subview->finalFrame.size   = subview->frame.size;
-        subview->finalIsOpaque = finalIsOpaque && subview->isOpaque;
+        computeFinalValues(subview, finalOpacity, finalIsHidden, finalPosition, finalBlendColor, finalIsOpaque);
 
         subview->update(renderInfo);
 
@@ -204,20 +249,35 @@ void View::updateSubtree(const RenderInfo& renderInfo, float finalOpacity, bool 
             subview->finalOpacity,
             subview->finalIsHidden,
             subview->finalFrame.origin,
-            finalBlendColor2,
+            subview->finalBlendColor,
             subview->finalIsOpaque
         );
     }
 }
 
-surface_t View::renderToSurface(const RenderInfo& renderInfo) {
+void View::refreshSubtreeFinalValues() {
+    for (View* subview : subviews) {
+        computeFinalValues(subview, finalOpacity, finalIsHidden, finalFrame.origin, finalBlendColor, finalIsOpaque);
+
+        subview->refreshSubtreeFinalValues();
+    }
+}
+
+void View::offsetSubtreeDrawnRects(int bufferIndex, Vec2 offset) {
+    for (View* subview : subviews) {
+        subview->offsetDrawnRect(bufferIndex, offset);
+        subview->offsetSubtreeDrawnRects(bufferIndex, offset);
+    }
+}
+
+void View::prepareOffscreenRender(const RenderInfo& renderInfo) {
     // The view is rendered detached from its superview and the rest of the
     // view hierachy, so reset all final render values.
     finalOpacity  = 1.0f;
     finalIsHidden = isHidden;
     finalFrame    = Rect(Vec2::ZERO, frame.size);
     finalIsOpaque = isOpaque;
-    finalBlendColor = (backgroundColor.a == 255) ? backgroundColor : Color::BLACK;
+    finalBlendColor = (backgroundColor.a == 255) ? backgroundColor : Theme::backgroundColor;
 
     update(renderInfo);
 
@@ -229,25 +289,21 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
         finalBlendColor,
         finalIsOpaque
     );
+}
 
-    int width  = finalFrame.size.width;
-    int height = finalFrame.size.height;
-
-    if (width <= 0 || height <= 0) {
-        return (surface_t){};
-    }
-
-    surface_t surface = surface_alloc(FMT_RGBA16, width, height);
-
-    if (surface.buffer == nullptr) {
-        return (surface_t){};
-    }
-
+void View::drawOffscreen(const RenderInfo& renderInfo, const surface_t& surface) {
     setSubtreeNeedsFullRender();
 
     rdpq_attach(&surface, NULL);
 
     rdpq_mode_push();
+
+    // The image is only ever drawn as a texture, so antialiasing would just leave
+    // each pixel's coverage in its alpha bit.
+    rdpq_mode_antialias(AA_NONE);
+
+    rdpq_mode_push();
+
     rdpq_set_mode_fill(Color::BLACK);
 
     clearSubtree(renderInfo);
@@ -256,9 +312,30 @@ surface_t View::renderToSurface(const RenderInfo& renderInfo) {
 
     render(renderInfo);
 
-    rdpq_detach();
+    rdpq_mode_pop();
 
-    return surface;
+    rdpq_detach();
+}
+
+Image* View::renderToImage(const RenderInfo& renderInfo) {
+    prepareOffscreenRender(renderInfo);
+
+    Size size = finalFrame.size;
+
+    if (size.width <= 0 || size.height <= 0) {
+        return nullptr;
+    }
+
+    Image* image = new Image(size);
+
+    if (!image->isValid()) {
+        delete image;
+        return nullptr;
+    }
+
+    drawOffscreen(renderInfo, image->surface());
+
+    return image;
 }
 
 void View::clearSubtree(const RenderInfo& renderInfo, bool force) {
@@ -336,6 +413,10 @@ void Drawable::setBlendColor(Color color) {
     rdpq_set_blend_color(color);
 }
 
+void Drawable::setEnvironmentColor(Color color) {
+    rdpq_set_env_color(color);
+}
+
 void Drawable::drawFilledRect(Rect rect) {
     rdpq_fill_rectangle(
         rect.minX(),
@@ -345,37 +426,12 @@ void Drawable::drawFilledRect(Rect rect) {
     );
 }
 
-void Drawable::drawSprite(sprite_t* sprite, Vec2 position, const rdpq_blitparms_t* params) {
-    rdpq_sprite_blit(
-        sprite,
+void Drawable::drawImage(Image* image, Vec2 position, const rdpq_blitparms_t* params) {
+    rdpq_tex_blit(
+        &image->surface(),
         position.x,
         position.y,
-        params)
-    ;
-}
-
-void Drawable::drawTexturedRect(rdpq_tile_t tile, Rect screenRect, Rect spriteRect) {
-    rdpq_texture_rectangle_scaled(
-        tile,
-        screenRect.minX(),
-        screenRect.minY(),
-        screenRect.maxX(),
-        screenRect.maxY(),
-        spriteRect.minX(),
-        spriteRect.minY(),
-        spriteRect.maxX(),
-        spriteRect.maxY()
-    );
-}
-
-void Drawable::drawTexturedRect(rdpq_tile_t tile, Rect rect, int s, int t) {
-    rdpq_texture_rectangle(
-        tile,
-        rect.minX(),
-        rect.minY(),
-        rect.maxX(),
-        rect.maxY(),
-        s, t
+        params
     );
 }
 
@@ -409,13 +465,138 @@ void Drawable::clearRect(const Rect& rect, Color clearColor) {
     }
 }
 
+bool Drawable::rasterizeView(const RenderInfo& renderInfo, Rect bounds) {
+    Size size = bounds.size;
+
+    // Space from an earlier version went with the old buffer, and a new size
+    // takes new space
+    bool isRasterReusable = rasterVersion == rasterScratch.version
+        && size.width == raster.width
+        && size.height == raster.height;
+
+    if (!isRasterReusable) {
+        raster = rasterScratch.take(size);
+
+        if (raster.buffer == nullptr) {
+            return false;
+        }
+
+        rasterVersion = rasterScratch.version;
+    }
+
+    int bufferIndex = renderInfo.bufferIndex;
+
+    beginRasterizing(raster);
+
+    // Pushed once, as the mode stack is shallow and render() pushes its own
+    rdpq_mode_push();
+
+    rdpq_set_mode_fill(Color::BLACK);
+    clearRect(Rect(Vec2::ZERO, size), finalBlendColor);
+
+    // As drawOffscreen()
+    rdpq_set_mode_standard();
+    rdpq_mode_antialias(AA_NONE);
+
+    // Drawn opaque at the raster's origin, along with its subviews. The opacity
+    // is applied when it's copied out instead, so fading leaves it rasterized.
+    Vec2 savedPosition = finalFrame.origin;
+    float savedOpacity = finalOpacity;
+
+    finalFrame.origin = -bounds.origin;
+    finalOpacity = 1.0f;
+    refreshSubtreeFinalValues();
+
+    setNeedsFullRender(bufferIndex);
+    render(renderInfo);
+
+    // Where the subviews drew is copied to the screen along with the rest, so
+    // that's where clear() needs to erase
+    offsetSubtreeDrawnRects(bufferIndex, savedPosition + bounds.origin);
+
+    finalFrame.origin = savedPosition;
+    finalOpacity = savedOpacity;
+    refreshSubtreeFinalValues();
+
+    rdpq_mode_pop();
+
+    endRasterizing();
+
+    rasteredBounds = bounds;
+    rasterIsValid = true;
+
+    return true;
+}
+
+bool Drawable::renderRasterizedView(const RenderInfo& renderInfo) {
+    // Translucent views blend with whatever is behind them, which the raster
+    // doesn't have
+    if (!shouldRasterize || !rasterScratch.isAllocated() || isRasterizing || !finalIsOpaque) {
+        return false;
+    }
+
+    Rect bounds = renderBounds();
+
+    if (bounds.size.width <= 0 || bounds.size.height <= 0) {
+        return false;
+    }
+
+    // The most the RDP can draw into, with its auto-scissor
+    if (bounds.size.width > 1023 || bounds.size.height > 1023) {
+        return false;
+    }
+
+    bool isRasterCurrent = rasterIsValid
+        && rasterVersion == rasterScratch.version
+        && rasteredBounds == bounds;
+
+    if (!isRasterCurrent && !rasterizeView(renderInfo, bounds)) {
+        return false;
+    }
+
+    int bufferIndex = renderInfo.bufferIndex;
+
+    Rect rect = Rect(finalFrame.origin + bounds.origin, bounds.size);
+
+    rdpq_mode_push();
+        if (finalOpacity < 1.0f) {
+            // Fades towards the blend colour, as the view itself would
+            Color alphaColor = Color::WHITE;
+            alphaColor.a *= finalOpacity;
+
+            rdpq_set_mode_standard();
+            setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (0, 0, 0, PRIM)));
+            setBlender(WITH_BLEND_COLOR);
+
+            setPrimitiveColor(alphaColor);
+            setBlendColor(finalBlendColor);
+        }
+        else {
+            rdpq_set_mode_copy(false);
+        }
+
+        rdpq_tex_blit(&raster, rect.minX(), rect.minY(), NULL);
+    rdpq_mode_pop();
+
+    drawnBoundingBox[bufferIndex] = hasScissor ? rect.intersection(currentScissor()) : rect;
+
+    finishRender(bufferIndex);
+
+    return true;
+}
+
 void Drawable::clearDrawnBoxes() {
-    for (int i = 0; i < BUFF_COUNT; i++) {
+    for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
         drawnBoundingBox[i] = Rect();
     }
 }
 
 void Drawable::addPendingRenderRect(int bufferIndex, Rect dirtyRect) {
+    // Nothing to redraw, and rendering it would set an empty scissor
+    if (dirtyRect.size.width <= 0 || dirtyRect.size.height <= 0) {
+        return;
+    }
+
     uint8_t bit = bufferBit(bufferIndex);
 
     renderMask |= bit;
@@ -451,6 +632,8 @@ void Drawable::finishRender(int bufferIndex) {
 }
 
 void Drawable::setNeedsDisplay() {
+    invalidateRaster();
+
     if (finalIsHidden) {
         return;
     }
@@ -463,11 +646,13 @@ void Drawable::setNeedsDisplay() {
 }
 
 void Drawable::setNeedsDisplay(Rect dirtyRect) {
+    invalidateRaster();
+
     if (finalIsHidden) {
         return;
     }
 
-    for (int i = 0; i < BUFF_COUNT; i++) {
+    for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
         addPendingRenderRect(i, dirtyRect);
     }
 }
@@ -475,13 +660,19 @@ void Drawable::setNeedsDisplay(Rect dirtyRect) {
 void Drawable::update(const RenderInfo&) {
     if (finalBlendColor != lastFinalBlendColor) {
         setNeedsRender();
+        setNeedsClear();
+        invalidateRaster();
         lastFinalBlendColor = finalBlendColor;
     }
 
     if (finalOpacity != lastFinalOpacity) {
         setNeedsRender();
-        setNeedsClear();
+
         lastFinalOpacity = finalOpacity;
+
+        if (!finalIsOpaque || finalOpacity == 0.0f) {
+            setNeedsClear();
+        }
     }
 
     if (finalIsHidden != lastFinalIsHidden) {
@@ -498,6 +689,12 @@ void Drawable::update(const RenderInfo&) {
     if (finalFrame != lastFinalFrame) {
         setNeedsRender();
         setNeedsClear();
+
+        // Moving alone leaves the raster as it is
+        if (finalFrame.size != lastFinalFrame.size) {
+            invalidateRaster();
+        }
+
         lastFinalFrame = finalFrame;
     }
 }

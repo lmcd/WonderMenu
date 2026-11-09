@@ -4,6 +4,8 @@
 */
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <ctype.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -28,7 +30,7 @@ ScreenshotsImportScene::~ScreenshotsImportScene() {
     debugf("[%s] Destruct\n", name());
 
     // Writers first: they hold FILs opened inside screenshotDir.
-    screenshotWriter.close();
+    screenshotSDWriter.close();
     thumbnailWriter.close();
     closeScreenshotDir();
 
@@ -118,20 +120,41 @@ int ScreenshotsImportScene::nextScreenshotIndex() {
 // When the main screenshot has been saved, we reuse it's space in cart SDRAM
 // to store the thumbnail, which we've already rendered
 void ScreenshotsImportScene::beginThumbnailWrite() {
-    sprite_t* thumbnailSprite = screenshotThumbnailView.imageView1.sprite;
+    const Image* thumbnailImage = screenshotThumbnailView.thumbnailImage();
 
-    if (thumbnailSprite == nullptr || thumbnailWriter.hasSession()) {
+    if (thumbnailImage == nullptr) {
         return;
     }
 
-    uint32_t thumbnailSize =
-        (uint32_t)sizeof(sprite_t) +
-        (uint32_t)thumbnailSprite->width * thumbnailSprite->height * 2;
+    // hasSession() stays true once a writer has been used, so it can't tell
+    // whether the previous thumbnail is still being written. Finish that one
+    // off rather than skipping this thumbnail.
+    if (thumbnailWriter.hasSession() && !thumbnailWriter.isFinished()) {
+        thumbnailWriter.write();
+    }
 
-    uint32_t thumbnailRecordSize = (thumbnailSize + 511u) & ~511u;
+    Size size = thumbnailImage->size();
 
-    data_cache_hit_writeback(thumbnailSprite, thumbnailRecordSize);
-    dma_write_raw_async(thumbnailSprite, screenshotRecordOffset, thumbnailRecordSize);
+    // The Image's sprite is only a header pointing at its pixels, so the file's
+    // header is built here and written in front of them
+    alignas(8) sprite_t header = {};
+    header.width   = size.width;
+    header.height  = size.height;
+    header.flags   = FMT_RGBA16 & SPRITE_FLAGS_TEXFORMAT;
+    header.hslices = 1;
+    header.vslices = 1;
+
+    uint32_t pixelsSize = (uint32_t)size.width * size.height * 2;
+    uint32_t thumbnailSize = (uint32_t)sizeof(sprite_t) + pixelsSize;
+
+    uint32_t thumbnailRecordSize = ALIGN(thumbnailSize, 512);
+
+    data_cache_hit_writeback(&header, sizeof(header));
+    dma_write_raw_async(&header, screenshotRecordOffset, sizeof(header));
+    dma_wait();
+
+    // surface_alloc() pixels are uncached, so need no writeback
+    dma_write_raw_async(thumbnailImage->surface().buffer, screenshotRecordOffset + sizeof(sprite_t), pixelsSize);
     dma_wait();
 
     thumbnailWriter.begin(
@@ -197,18 +220,17 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
         return;
     }
 
-    // Frame 0 is an import frame too, so the interval lands `count + 1` times
-    // before maxFrameNumber; without this the last one would read a screenshot
-    // that isn't there.
-    if (currentScreenshotIndex >= count) {
-        return;
-    }
-
     int cycleFrameNumber = updateInfo.sceneFrameNumber % screenshotFrameInterval;
 
-    // Proceed to the next screenshot every 10 frames
-    if (cycleFrameNumber != 0) {
-        if (screenshotWriter.isFinished()) {
+    // Frame 0 is an import frame too, so the interval lands `count + 1` times
+    // before maxFrameNumber; once every screenshot has been started, the
+    // remaining frames just finish writing the last one (and its thumbnail)
+    // rather than reading a screenshot that isn't there.
+    bool startsNextScreenshot = (cycleFrameNumber == 0) && (currentScreenshotIndex < count);
+
+    // Proceed to the next screenshot every `screenshotFrameInterval` frames
+    if (!startsNextScreenshot) {
+        if (screenshotSDWriter.isFinished()) {
             if (thumbnailWriter.hasSession()) {
                 float seconds = measure([&] {
                     thumbnailWriter.advance();
@@ -217,14 +239,14 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
                 debugf("[ScreenshotsImportScene] thumbnailWriter.advance: %.3fs\n", seconds);
             }
         }
-        else if (screenshotWriter.hasSession()) {
+        else if (screenshotSDWriter.hasSession()) {
             float seconds = measure([&] {
-                screenshotWriter.advance();
+                screenshotSDWriter.advance();
             });
 
-            debugf("[ScreenshotsImportScene] screenshotWriter.advance: %.3fs\n", seconds);
+            debugf("[ScreenshotsImportScene] screenshotSDWriter.advance: %.3fs\n", seconds);
 
-            if (screenshotWriter.isFinished()) {
+            if (screenshotSDWriter.isFinished()) {
                 beginThumbnailWrite();
             }
         }
@@ -243,7 +265,8 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
 
     screenshotThumbnailView.setFullSizeScreenshotSurface(reader.surfaceForSprite(screenshotSprite));
 
-    screenshotWriter.begin(
+    // The record is the .SPR as is, game state included
+    screenshotSDWriter.begin(
         &screenshotDir,
         filenameForScreenshot(currentScreenshotIndex, false),
         (const void*)(uintptr_t)reader.recordOffset,

@@ -131,15 +131,14 @@ void BottomShadowView::clear(const RenderInfo& renderInfo) {
     }
     else {
         for (int i = 0; i < 4; i++) {
-            Rect rect = rectsToClear[i];
+            Rect& rect = rectsToClear[i];
 
             clearRect(rect, finalBlendColor);
+
+            rect.size.width = 0;
         }
 
-        rectsToClear[0].size.width = 0;
-        rectsToClear[1].size.width = 0;
-        rectsToClear[2].size.width = 0;
-        rectsToClear[3].size.width = 0;
+        needsPartialClear = false;
     }
 
     drawnBoundingBox[bufferIndex] = Rect();

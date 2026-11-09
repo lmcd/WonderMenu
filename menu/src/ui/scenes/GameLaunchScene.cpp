@@ -13,27 +13,18 @@
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 #include "general/CartRenderer.h"
+#include "main.h"
 #include "ui/SceneRenderer.h"
 #include "ui/scenes/GameInfoScene.h"
 #include "ui/scenes/GameInfoTransitionScene.h"
 
-SceneRenderer* GameLaunchScene::currentRenderer = nullptr;
-
-/** The DMA engines address RDRAM with the low 24 bits. */
-#define RDRAM_ADDRESS_MASK (0x00FFFFFF)
-
-void GameLaunchScene::romLoadProgressHandler(float) {
-    currentRenderer->advance();
-}
-
 GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database)
     : Scene(),
-    romWorker(game.romFile),
     game(game),
     cartRenderer(cartRenderer),
     database(database) {
 
-    transition.speed = 0.03;
+    transition.speed = 0.035;
     transition.direction = Transition::IDLE;
 
     cart3DView.cartRenderer = cartRenderer;
@@ -42,11 +33,15 @@ GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDat
     view.addSubview(&labelView);
     view.addSubview(&cart3DView);
 
-    bootSession.game = &game;
+    bootSession.start(game);
 
     if (game.id() != state.gameID) {
         state.gameID = game.id();
         state.clear();
+    }
+
+    if (state.romIsLoaded) {
+        bootSession.markEndChunksLoaded();
     }
 }
 
@@ -59,6 +54,10 @@ Vec3f GameLaunchScene::rotationForFrame(int frameNumber) {
     float rotZ = fm_sinf(time * 0.5f) * 0.02f;
 
     return Vec3f(rotX, HOUR_ANGLE(12.0f) + rotY, rotZ);
+}
+
+Vec3f GameLaunchScene::rotationForLaunch() {
+    return Vec3f(0.0f, HOUR_ANGLE(12.0f), 0.0f);
 }
 
 void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
@@ -81,23 +80,19 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
     if (hasInitiatedLaunch) {
         if (progressBarShouldTrackTransition) {
             progressBarView.progress = transition.progress;
+            progressBarView.isHidden = true;
         }
         else {
-            progressBarView.progress = romWorker.progress();
+            progressBarView.progress = bootSession.progress();
+            progressBarView.isHidden = false;
         }
-
-        progressBarView.isHidden = false;
     }
     else {
         progressBarView.isHidden = true;
     }
 
-    // Floating animation: gentle bob and tumble
-    float time = frameNumber / 60.0f;
-    time *= 2.0f;
-
     Vec3f srcRotation = rotationForFrame(frameNumber);
-    Vec3f dstRotation = Vec3f(0.0f, HOUR_ANGLE(12.0f), 0.0f);
+    Vec3f dstRotation = rotationForLaunch();
 
     Vec3f rotation = lerp(srcRotation, dstRotation, value);
 
@@ -147,18 +142,17 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
 }
 
 void GameLaunchScene::update(const UpdateInfo& updateInfo) {
-    if (isFinalisingROMLoad) {
-        return;
-    }
-
     if (transition.direction == Transition::IDLE) {
         joypad_buttons_t btn = updateInfo.btn;
 
         if (btn.a) {
             transition.direction = Transition::FORWARDS;
-            progressBarShouldTrackTransition = (romWorker.framesRemaining() < 34);
+            progressBarShouldTrackTransition = (bootSession.framesRemaining() < 34);
 
             hasInitiatedLaunch = true;
+
+            bootSession.applyUserChoices(state, database);
+            bootSession.commitToLaunch();
         }
         else if (btn.b) {
             popScene();
@@ -177,80 +171,41 @@ void GameLaunchScene::update(const UpdateInfo& updateInfo) {
         transition.direction = Transition::IDLE;
     }
     else if (transition.didReachEnd()) {
-        // Lets the boot path copy the game's opening MiB out of RDRAM rather
-        // than fetching it from the cart again.
-        bootSession.hasStagedFirstMB = romWorker.hasStagedFirstMB();
-        bootSession.applyUserChoices(state, database);
-        bootSession.loadSpeedrunFile();
-        bootSession.loadSaveFile();
+        if (bootSession.hasLoadedToCart()) {
+            clearProgressBarArea();
 
-        isFinalisingROMLoad = true;
+            state.romIsLoaded = true;
 
-        currentRenderer = renderer;
-        romWorker.finish(romLoadProgressHandler);
-        currentRenderer = nullptr;
+            renderer->end();
 
-        clearProgressBarArea();
-
-        renderer->end();
-
-        return;
+            return;
+        }
     }
 
     transition.advance();
 
-    advanceWorkers();
-}
-
-void GameLaunchScene::advanceWorkers() {
-    // Only pull the game's opening chunks forward once the launch is committed;
-    // before that the worker keeps streaming the tail.
-    romWorker.loadBeginningChunks = hasInitiatedLaunch;
-    romWorker.advance();
+    bootSession.advance();
 }
 
 void GameLaunchScene::clearProgressBarArea() {
-    // Wait for the start of the next frame by watching for the scanline to wrap,
-    // rather than using vi_wait_vblank(). Without the kernel that polls for the
-    // exact vblank line, which is also when the VI interrupt fires -- if the
-    // handler outlasts that line, the poll never sees it and spins forever.
-    int lastLine = vi_get_scanline(NULL);
+    // A little margin for the antialiased edges of the rounded corners
+    Rect frame = progressBarView.worldFrame().insetBy(Vec2(-2, -2));
 
-    while (true) {
-        int line = vi_get_scanline(NULL);
-
-        if (line < lastLine) {
-            break;
+    // Queued behind the frame, so there's no need to wait for it first
+    for (surface_t* surface : renderer->framebuffers) {
+        if (surface == nullptr) {
+            continue;
         }
 
-        lastLine = line;
+        rdpq_attach(surface, NULL);
+        rdpq_set_mode_fill(Color::BLACK);
+        rdpq_fill_rectangle(frame.minX(), frame.minY(), frame.maxX(), frame.maxY());
+        rdpq_detach();
     }
 
-    uint32_t origin = vi_read(VI_ORIGIN);
-
-    if (origin == 0) {
-        return;
-    }
-
-    const uint32_t stride = display_get_width() * sizeof(uint16_t);
-
-    Rect frame = progressBarView.frame.insetBy(Vec2(0, -2));
-
-    int minRow = frame.minY();
-    int maxRow = frame.maxY();
-
-    if (maxRow <= minRow) {
-        return;
-    }
-
-    uint8_t* rows = (uint8_t *)VirtualUncachedAddr(origin & RDRAM_ADDRESS_MASK) + (minRow * stride);
-    uint32_t length = (maxRow - minRow) * stride;
-
-    // Drop any dirty lines covering the rows first, then write uncached, so
-    // nothing can be written back over the fill afterwards.
-    data_cache_hit_writeback_invalidate(rows, length);
-
-    memset(rows, 0, length);
+    // The game takes over the framebuffers' memory, so the fills must have
+    // landed before it boots
+    rspq_wait();
 }
 
 void GameLaunchScene::showGameInfo() {

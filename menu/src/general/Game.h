@@ -7,6 +7,7 @@
 
 #include <algorithm>
 
+#include "flashcart/flashcart.h"
 #include "GameDatabase.h"
 #include "M64File.h"
 #include "ROMFile.h"
@@ -129,6 +130,51 @@ public:
         }
         else {
             return romFile.hasHomebrewGameCode();
+        }
+    }
+
+    // `sortIndex` when title() comes from the database, -1 otherwise
+    int titleSortIndex() const {
+        if (databaseEntry != nullptr && databaseEntry->title()[0] != '\0') {
+            return databaseEntry->data.sortIndex;
+        }
+
+        return -1;
+    }
+
+    int maxControllers() {
+        if (databaseEntry != nullptr) {
+            return databaseEntry->data.maxControllers;
+        }
+        else {
+            return 4;
+        }
+    }
+
+    bool requiresExpansionPak() {
+        if (databaseEntry != nullptr) {
+            return databaseEntry->data.requiresExpansionPak;
+        }
+        else {
+            return true;
+        }
+    }
+
+    flashcart_save_type_t saveType() {
+        if (databaseEntry != nullptr) {
+            return (flashcart_save_type_t)databaseEntry->data.saveType;
+        }
+        else {
+            return FLASHCART_SAVE_TYPE_NONE;
+        }
+    }
+
+    cic_type_t cicType() {
+        if (databaseEntry != nullptr) {
+            return (cic_type_t)databaseEntry->data.cicType;
+        }
+        else {
+            return CIC_UNKNOWN;
         }
     }
 };

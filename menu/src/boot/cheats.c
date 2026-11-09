@@ -22,11 +22,13 @@
 
 #define RELOCATED_EXCEPTION_HANDLER_ADDRESS (0x80000120)
 #define EXCEPTION_HANDLER_ADDRESS (0x80000180)
-#define PATCHER_ADDRESS (0x80700000)
-#define ENGINE_TEMPORARY_ADDRESS (PATCHER_ADDRESS + 0x10000)
+// The patcher gets 32 KiB, after the payload's 32 KiB at 0x80700000-0x80707FFF
+// (PAYLOAD_ADDRESS)
+#define PATCHER_ADDRESS (0x80708000)
+#define ENGINE_TEMPORARY_ADDRESS (0x80710000)
 #define DEFAULT_ENGINE_ADDRESS (0x807C5C00)
 
-// The payload reserves the first 64 bytes at 0x80400000 (payload_settings /
+// The payload reserves the first 64 bytes at 0x80700000 (payload_settings /
 // PayloadData) for its own settings. The resume trampoline's game_ctx snapshot
 // buffer -- and every O_* offset / flag the engine writes into it -- therefore
 // sits this many bytes higher. MUST match the payload_settings size in resume.S.
@@ -39,6 +41,20 @@
 
 // TEST: 0 jumps on every exception that shows Cause.IP4, ignoring the flag above
 #define PRE_NMI_FIRE_ONCE (0)
+
+// Most SPECIAL_JAL_HOOK cheats one engine can carry
+#define MAX_JAL_HOOKS (16)
+
+/** @brief A SPECIAL_JAL_HOOK cheat whose stub is emitted after the engine body */
+typedef struct {
+    uint16_t value; /**< Cheat value, handed to jal_hook_c() */
+    io32_t *compare_hi; /**< `lui k0` of our `jal` word, for the already-hooked test */
+    io32_t *compare_lo; /**< `ori k0` of our `jal` word */
+    io32_t *slot_hi; /**< `lui k0` of the slot address */
+    io32_t *slot_lo; /**< `sw k1` into the slot */
+    io32_t *write_hi; /**< `lui k1` of our `jal` word, for the patch write */
+    io32_t *write_lo; /**< `ori k1` of our `jal` word */
+} jal_hook_t;
 
 /** @brief Cheat structure */
 typedef struct {
@@ -63,12 +79,9 @@ typedef enum {
     SPECIAL_WRITE_SHORT_ON_BOOT = 0xF1, /**< Write short on boot */
     SPECIAL_SET_STORE_LOCATION = 0xFF, /**< Set store location */
     SPECIAL_JUMP = 0xBD, /**< Unconditionally jump to the resident payload (every frame) */
-    SPECIAL_GUARDED_JUMP = 0xBF, /**< Edge-detected jump to the resident payload (once per press) */
     SPECIAL_JUMP_ON_PRE_NMI = 0xBE, /**< Jump to the resident payload once when the reset button is pressed */
-    SPECIAL_SET_BITS = 0x40, /**< [addr] |= value mask   (0x40 byte, 0x41 halfword) */
-    SPECIAL_CLEAR_BITS = 0x42, /**< [addr] &= ~value mask (0x42 byte, 0x43 halfword) */
-    SPECIAL_BIT_TEST_CLEAR = 0x60, /**< run sub if (addr & mask)==0 (0x60 byte, 0x61 halfword) */
-    SPECIAL_BIT_TEST_SET = 0x62, /**< run sub if (addr & mask)!=0 (0x62 byte, 0x63 halfword) */
+    SPECIAL_JAL_HOOK = 0xBC, /**< Redirect the game's `jal` at the address through the payload's jal_hook_c(value) */
+    SPECIAL_SET_JAL_HOOK_ENTRY = 0xBB, /**< Set where SPECIAL_JAL_HOOK stubs jump to (the payload's jal_hook_entry) */
 } cheat_type_special_t;
 
 #define IS_WIDTH_16(t) ((t) & (1 << 0))
@@ -78,16 +91,8 @@ typedef enum {
 #define IS_TYPE_REPEATER(t) ((t) == 0x50)
 #define IS_TYPE_WRITE(t) ((((t)&0xF0) == 0x80) || (((t)&0xF0) == 0xA0))
 #define IS_TYPE_CONDITIONAL(t) (((t)&0xF0) == 0xD0)
-// Read-modify-write bitmask ops. Low bit selects width (IS_WIDTH_16), so each is
-// a pair: 0x40/0x41 set (|= mask), 0x42/0x43 clear (&= ~mask).
-#define IS_TYPE_SET_BITS(t) (((t)&0xFE) == 0x40)
-#define IS_TYPE_CLEAR_BITS(t) (((t)&0xFE) == 0x42)
-// Bit-test conditional: gate the sub-cheat on (mem & mask) vs 0. bit0 = width,
-// bit1 = IS_CONDITION_NOT_EQUAL, so 0x62/0x63 run the sub when the masked bits
-// are SET and 0x60/0x61 when they are CLEAR.
-#define IS_TYPE_BIT_COND(t) (((t)&0xF0) == 0x60)
 
-#define IS_DOUBLE_ENTRY(t) (IS_TYPE_CONDITIONAL(t) || IS_TYPE_REPEATER(t) || IS_TYPE_BIT_COND(t))
+#define IS_DOUBLE_ENTRY(t) (IS_TYPE_CONDITIONAL(t) || IS_TYPE_REPEATER(t))
 
 #define X106_XOR_CONSTANT (0x0260BCD5)
 #define X106_ENC_START (0x13C)
@@ -238,6 +243,26 @@ static bool cheats_get_pre_nmi_jump (uint32_t *cheat_list, uint32_t *target) {
 }
 
 /**
+ * @brief Find the JAL hook entry address in the cheat list.
+ *
+ * @param cheat_list Pointer to the cheat list.
+ * @param address Receives the entry address (cached KSEG0) when one is found.
+ * @return true if the list contains a SPECIAL_SET_JAL_HOOK_ENTRY cheat.
+ */
+static bool cheats_get_jal_hook_entry (uint32_t *cheat_list, uint32_t *address) {
+    cheat_entry_t cheat;
+    while (cheats_get_next(&cheat_list, &cheat)) {
+        if (cheat.main.type == SPECIAL_SET_JAL_HOOK_ENTRY) {
+            // Same KSEG0 forcing as SPECIAL_JUMP: the 0xBB type byte leaks
+            // bits 31/29 into the masked address.
+            *address = (cheat.main.address & 0x007FFFFF) | 0x80000000;
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * @brief Update the cache for the specified memory range.
  * 
  * @param start The start address.
@@ -277,6 +302,10 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
     uint32_t pre_nmi_target = 0;
     bool has_pre_nmi_jump = cheats_get_pre_nmi_jump(cheat_list, &pre_nmi_target);
 
+    // Without it SPECIAL_JAL_HOOK cheats have nowhere to go, so they're skipped
+    uint32_t jal_hook_entry = 0;
+    bool has_jal_hook_entry = cheats_get_jal_hook_entry(cheat_list, &jal_hook_entry);
+
     // Original watch exception handler code written by Jay Oster 'Parasyte'
     // https://github.com/parasyte/alt64/blob/master/utils.c#L1024-L1054
 
@@ -293,10 +322,8 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
     if (has_pre_nmi_jump) {
         debugf("Had pre-NMI cheat\n");
         // Reset button pressed: jump to the resident payload once. k1 still
-        // holds Cause & IP4 from above. The jump skips the suspend-point gate
-        // the guarded jump uses -- waiting for a clean VI boundary could eat
-        // into the ~0.5s before the NMI -- and trampoline_enter already waits
-        // for the RDP to drain before it suspends.
+        // holds Cause & IP4 from above. trampoline_enter waits for the RDP to
+        // drain before it suspends.
         io32_t *not_nmi_branch = engine_p;
         *engine_p++ = I_NOP();                                              // patched: BEQ k1,0,not_nmi
         *engine_p++ = I_NOP();
@@ -304,7 +331,7 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
         // IP4 stays set until the NMI, so every later exception lands here
         // too. The flag lives in game_ctx (zero after staging) and is reached
         // uncached so it's coherent on the next exception.
-        *engine_p++ = I_LUI(REG_K0, 0xA040);
+        *engine_p++ = I_LUI(REG_K0, 0xA070);                                // PAYLOAD_ADDRESS
         *engine_p++ = I_LW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
         io32_t *fired_branch = engine_p;
         *engine_p++ = I_NOP();                                              // patched: BNE k1,0,not_nmi
@@ -364,6 +391,9 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
 
     cheat_entry_t cheat;
 
+    jal_hook_t jal_hooks[MAX_JAL_HOOKS];
+    int jal_hook_count = 0;
+
     while (cheats_get_next(&cheat_list, &cheat)) {
         cheat_t *c = &cheat.main;
 
@@ -395,7 +425,8 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
             case SPECIAL_SET_ENTRYPOINT_ADDR:
             // already handled
             case SPECIAL_SET_STORE_LOCATION:
-            case SPECIAL_JUMP_ON_PRE_NMI: {
+            case SPECIAL_JUMP_ON_PRE_NMI:
+            case SPECIAL_SET_JAL_HOOK_ENTRY: {
                 // do nothing
                 break;
             }
@@ -432,9 +463,9 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
                 }
 
                 if (IS_TYPE_CONDITIONAL(c->type)) {
-                    // if ((!IS_TYPE_WRITE(cheat.sub.type)) || IS_CONDITION_GS_BUTTON(cheat.sub.type)) {
-                    //     continue;
-                    // }
+                    if ((!IS_TYPE_WRITE(cheat.sub.type)) || IS_CONDITION_GS_BUTTON(cheat.sub.type)) {
+                        continue;
+                    }
                     
                     *engine_p++ = I_LUI(REG_K0, A_BASE(c->address));
                     *engine_p++ = IS_WIDTH_16(c->type) ? I_LHU(REG_K0, A_OFFSET(c->address), REG_K0)
@@ -449,120 +480,98 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
                     c = &cheat.sub;
                 }
 
-                if (IS_TYPE_BIT_COND(c->type)) {
-                    // Bit-test conditional: gate the sub-cheat on whether the bits
-                    // in `value` (the mask) are set at [address], ignoring all other
-                    // bits. e.g. type 0x62 (byte, set) value 0x20 -> sub runs while
-                    // the N64 L button is held, regardless of other buttons.
-                    // Compute k0 = mem & mask, k1 = 0, then let the shared sub-cheat
-                    // back-patch emit the skip branch: for 0x62/0x63 (NOT_EQUAL) that
-                    // is BEQ k0,k1 -> skip when mask clear; for 0x60/0x61 it is BNE
-                    // -> skip when mask set. Force cached KSEG0 like the other 0x4x/
-                    // 0x6x types (their type byte doesn't carry the 0x80 base).
-                    uint32_t target = (c->address & 0x007FFFFF) | 0x80000000;
-                    uint16_t width_mask = IS_WIDTH_16(c->type) ? 0xFFFF : 0xFF;
-                    uint16_t mask = c->value & width_mask;
+                if (c->type == SPECIAL_JAL_HOOK) {
+                    if (!has_jal_hook_entry || jal_hook_count == MAX_JAL_HOOKS) {
+                        continue;
+                    }
 
-                    *engine_p++ = I_LUI(REG_K0, A_BASE(target));
-                    *engine_p++ = IS_WIDTH_16(c->type) ? I_LHU(REG_K0, A_OFFSET(target), REG_K0)
-                                                       : I_LBU(REG_K0, A_OFFSET(target), REG_K0);
-                    *engine_p++ = I_ANDI(REG_K0, REG_K0, mask);   // k0 = mem & mask
-                    *engine_p++ = I_ORI(REG_K1, REG_ZERO, 0);     // k1 = 0 for the skip compare
+                    // Rewrites the game's `jal original` at the cheat address to
+                    // `jal stub`, where stub is a few instructions emitted after
+                    // the engine body (below the loop) that pass this hook's slot
+                    // and value on to the payload's jal_hook_entry. That calls
+                    // jal_hook_c(value), then tail-jumps to the original target,
+                    // which returns straight to the game.
+                    //
+                    // Done every exception rather than once at boot, as the call
+                    // site may not be loaded yet (or may be reloaded later):
+                    //  - already our `jal`: nothing to do
+                    //  - some other `jal`: save it in the slot (the stub reads
+                    //    the original target from it), then write ours
+                    //  - anything else: not code we can hook (yet), leave it
+                    // Every `jal` word and slot address is a placeholder here,
+                    // back-patched once the stub's final address is known.
+                    //
+                    // KSEG0 call sites only: a `jal` can't leave its 256 MB
+                    // region, so one in TLB-mapped code can't reach the stub.
+                    jal_hook_t *hook = &jal_hooks[jal_hook_count++];
+                    hook->value = c->value;
 
-                    cond_branch = engine_p;
+                    uint32_t site = (c->address & 0x007FFFFF) | 0x80000000;
+
+                    *engine_p++ = I_LUI(REG_K0, A_BASE(site));
+                    *engine_p++ = I_LW(REG_K1, A_OFFSET(site), REG_K0);  // k1 = instruction at the call site
+
+                    hook->compare_hi = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: LUI k0, our jal hi
+                    hook->compare_lo = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: ORI k0, our jal lo
+
+                    io32_t *hooked_branch = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: BEQ k1,k0,end (already hooked)
+                    *engine_p++ = I_SRL(REG_K0, REG_K1, 26);            // k0 = opcode (harmless if taken)
+                    *engine_p++ = I_ADDIU(REG_K0, REG_K0, -OP_JAL);
+
+                    io32_t *not_jal_branch = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: BNE k0,0,end (not a jal)
                     *engine_p++ = I_NOP();
 
-                    c = &cheat.sub;
+                    hook->slot_hi = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: LUI k0, slot base
+                    hook->slot_lo = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: SW k1, slot offset(k0)
+
+                    hook->write_hi = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: LUI k1, our jal hi
+                    hook->write_lo = engine_p;
+                    *engine_p++ = I_NOP();                              // patched: ORI k1, our jal lo
+
+                    // Write our jal over the original, and push it through to
+                    // the instruction stream
+                    *engine_p++ = I_LUI(REG_K0, A_BASE(site));
+                    *engine_p++ = I_SW(REG_K1, A_OFFSET(site), REG_K0);
+                    *engine_p++ = I_CACHE(HIT_WRITE_BACK_D, A_OFFSET(site), REG_K0);
+                    *engine_p++ = I_CACHE(HIT_INVALIDATE_I, A_OFFSET(site), REG_K0);
+
+                    *hooked_branch = I_BEQ(REG_K1, REG_K0, (engine_p - hooked_branch) - 1);
+                    *not_jal_branch = I_BNE(REG_K0, REG_ZERO, (engine_p - not_jal_branch) - 1);
+
+                    // Back-patch the outer conditional's skip branch (if any).
+                    if (cond_branch) {
+                        int off = (engine_p - cond_branch) - 1;
+                        *cond_branch = IS_CONDITION_NOT_EQUAL(cheat.main.type)
+                            ? I_BEQ(REG_K0, REG_K1, off)
+                            : I_BNE(REG_K0, REG_K1, off);
+                    }
+
+                    continue;
                 }
 
-                if (c->type == SPECIAL_JUMP || c->type == SPECIAL_GUARDED_JUMP) {
-                    bool guarded = (c->type == SPECIAL_GUARDED_JUMP);
-
-                    // Jump target comes from the cheat address (e.g. 0x80400240).
+                if (c->type == SPECIAL_JUMP) {
+                    // Jump target comes from the cheat address.
                     // Force cached KSEG0: cheats_get_next masks raw[0] with
-                    // 0xA07FFFFF, so the 0xBD/0xBF type byte's bits 31/29 leak in
-                    // and would otherwise yield an UNCACHED 0xA04xxxxx target.
+                    // 0xA07FFFFF, so the 0xBD type byte's bits 31/29 leak in and
+                    // would otherwise yield an UNCACHED 0xA04xxxxx target.
                     uint32_t jump_target = (c->address & 0x007FFFFF) | 0x80000000;
 
-                    // Suspend-point gate: only fire the jump at a clean frame
-                    // boundary -- when a VI (vblank) interrupt is pending AND no
-                    // device completion (SP/PI/DP) is co-pending. Suspending across
-                    // an unserviced RSP/RDP/PI completion (very common at vblank, as
-                    // the frame's gfx task finishes just before VI) is the residual
-                    // freeze window. Both checks branch past the whole block (back-
-                    // patched below) so control chains on to the game handler
-                    // unchanged. Clobbering k0/k1 is safe: any outer conditional
-                    // already compared them, and the guarded path reloads k0.
-                    // MI_INTR bits: SP=0x01 SI=0x02 AI=0x04 VI=0x08 PI=0x10 DP=0x20.
-                    //
-                    // GUARDED JUMPS ONLY. This gate exists for the suspend
-                    // (0x80400240 -> trampoline_enter), which must land at a clean
-                    // boundary. A plain SPECIAL_JUMP is the per-frame m64 input
-                    // injection (0x80400248 -> m64_inject), which has to run on
-                    // EVERY frame and doesn't suspend anything -- gating it means
-                    // the VI check drops it to at most once per frame, and the
-                    // SP/PI/DP check then drops most of those too (the comment
-                    // above: completions are common right at vblank), so inputs
-                    // stop reaching the game and playback does nothing.
-                    io32_t *busy_branch = NULL;
-                    io32_t *vi_branch = NULL;
-
-                    if (guarded) {
-                        *engine_p++ = I_LUI(REG_K0, 0xA430);           // k0 = MI base (0xA4300000)
-                        *engine_p++ = I_LW(REG_K1, 0x0008, REG_K0);    // k1 = MI_INTR
-
-                        *engine_p++ = I_ANDI(REG_K0, REG_K1, 0x0031);  // k0 = MI_INTR & (SP|PI|DP)
-                        busy_branch = engine_p;
-                        *engine_p++ = I_NOP();                          // patched: BNE k0,0,end (completion co-pending)
-                        *engine_p++ = I_NOP();                          // branch delay slot
-
-                        *engine_p++ = I_ANDI(REG_K1, REG_K1, 0x0008);  // k1 = MI_INTR & VI
-                        vi_branch = engine_p;
-                        *engine_p++ = I_NOP();                          // patched: BEQ k1,0,end (VI not pending)
-                        *engine_p++ = I_NOP();                          // branch delay slot
-                    }
-
-                    // NOTE: the RDP-idle requirement is NOT enforced here (it would
-                    // drop invocations, since the RDP is busy for much of gameplay).
-                    // Instead trampoline_enter spins until the RDP drains before it
-                    // suspends -- so the jump always fires and the wait is bounded.
-
-                    io32_t *guard_branch = NULL;
-                    if (guarded) {
-                        // Edge-detect guard, independent of game memory. A flag
-                        // word in game_ctx (offset 284, i.e. 0x80400040 + 284,
-                        // reached below as 0xA0400000 + GAME_CTX_OFFSET + 284 via
-                        // the UNCACHED mirror so it's coherent a frame later) records
-                        // whether we've already fired for the CURRENT press. It's
-                        // 0 after staging.
-                        //  - condition true, flag clear -> set flag, fire (below)
-                        //  - condition true, flag set   -> already fired this
-                        //    press; the guard branch skips the block, leaving the
-                        //    flag set
-                        //  - condition false            -> the outer conditional
-                        //    branch lands on the clear-flag stub and re-arms it
-                        // Both branches are back-patched, so no hand-counted
-                        // offsets. k0 here is also the outer BNE's delay slot:
-                        // harmless if that branch was taken.
-                        *engine_p++ = I_LUI(REG_K0, 0xA040);       // k0 = 0xA0400000 (uncached)
-                        *engine_p++ = I_LW(REG_K1, GAME_CTX_OFFSET + 284, REG_K0);   // k1 = "already fired" flag
-                        guard_branch = engine_p;                   // patched after the block
-                        *engine_p++ = I_NOP();                     // placeholder: BNE k1,0,end
-                        *engine_p++ = I_NOP();                     // guard BNE delay slot
-                        *engine_p++ = I_ORI(REG_K1, REG_ZERO, 1);  // flag = 1
-                        *engine_p++ = I_SW(REG_K1, GAME_CTX_OFFSET + 284, REG_K0);
-                    }
-
-                    // Jump to the resident payload. For SPECIAL_JUMP with no outer
-                    // conditional this fires every frame; the payload takes over so
-                    // control never returns. k0 is also the outer BNE's delay slot
-                    // when a conditional gates this: harmless if that branch taken.
+                    // Jump to the resident payload. With no outer conditional this
+                    // fires every frame; the payload takes over so control never
+                    // returns. k0 is also the outer BNE's delay slot when a
+                    // conditional gates this: harmless if that branch taken.
                     //
                     // The cheat's 16-bit value rides into the payload in k1, set
                     // from the jump's delay slot so it only runs on the fire path.
-                    // k1 is dead here (the gates and the guard flag store are all
-                    // done with it), and k0/k1 are the kernel-reserved pair, so no
-                    // game state is at risk. The payload MUST consume k1 before
+                    // k1 is dead here, and k0/k1 are the kernel-reserved pair, so
+                    // no game state is at risk. The payload MUST consume k1 before
                     // anything re-enables interrupts or takes an exception --
                     // either would clobber it with no visible failure.
                     *engine_p++ = I_LUI(REG_K0, jump_target >> 16);        // k0 = target hi
@@ -570,48 +579,13 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
                     *engine_p++ = I_JR(REG_K0);
                     *engine_p++ = I_ORI(REG_K1, REG_ZERO, c->value);       // k1 = cheat value
 
-                    if (guarded) {
-                        // Clear-flag stub: the outer conditional branches here when
-                        // its condition is FALSE, re-arming the cheat for the next
-                        // press. (The fire path above never reaches here -- it
-                        // jumps into the payload.) k0 is already 0xA0400000 from
-                        // the outer BNE's delay slot, but we reload it so this
-                        // doesn't depend on that.
-                        io32_t *clear_flag = engine_p;
-                        *engine_p++ = I_LUI(REG_K0, 0xA040);
-                        *engine_p++ = I_SW(REG_ZERO, GAME_CTX_OFFSET + 284, REG_K0);  // flag = 0
-
-                        // Guard branch (flag already set, condition still true):
-                        // skip to the END, past the clear-flag stub, so the flag
-                        // stays set until the condition actually goes false.
-                        *guard_branch = I_BNE(REG_K1, REG_ZERO,
-                                              (engine_p - guard_branch) - 1);
-
-                        // Outer conditional (condition false): branch to the stub.
-                        if (cond_branch) {
-                            int off = (clear_flag - cond_branch) - 1;
-                            *cond_branch = IS_CONDITION_NOT_EQUAL(cheat.main.type)
-                                ? I_BEQ(REG_K0, REG_K1, off)
-                                : I_BNE(REG_K0, REG_K1, off);
-                        }
-                    } else if (cond_branch) {
-                        // Ungated: an outer conditional simply skips past the jump
-                        // block when its condition is false.
+                    // An outer conditional skips past the jump block when its
+                    // condition is false.
+                    if (cond_branch) {
                         int off = (engine_p - cond_branch) - 1;
                         *cond_branch = IS_CONDITION_NOT_EQUAL(cheat.main.type)
                             ? I_BEQ(REG_K0, REG_K1, off)
                             : I_BNE(REG_K0, REG_K1, off);
-                    }
-
-                    // Gate back-patches: skip the whole block (chain to the game
-                    // handler untouched) if a completion was co-pending, or if VI
-                    // wasn't pending, at the top of the block. Only emitted for
-                    // guarded jumps, so only patched for those.
-                    if (busy_branch) {
-                        *busy_branch = I_BNE(REG_K0, REG_ZERO, (engine_p - busy_branch) - 1);
-                    }
-                    if (vi_branch) {
-                        *vi_branch = I_BEQ(REG_K1, REG_ZERO, (engine_p - vi_branch) - 1);
                     }
 
                     continue;
@@ -637,45 +611,40 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
 
                     continue;
                 }
-
-                if (IS_TYPE_SET_BITS(c->type) || IS_TYPE_CLEAR_BITS(c->type)) {
-                    // Bitmask read-modify-write: change only the bits in `value`,
-                    // leaving the rest of the target untouched. SET does |= mask,
-                    // CLEAR does &= ~mask. The value is the mask -- e.g. type 0x43
-                    // (clear, halfword) with value 0x0020 forces the N64 L button
-                    // off without disturbing the other button bits.
-                    // Force cached KSEG0: unlike 0x8x writes, these type bytes don't
-                    // set bit 31, so the 0xA07FFFFF parse leaves the target outside
-                    // KSEG0 (same normalization the jump/indexed handlers do).
-                    bool set = IS_TYPE_SET_BITS(c->type);
-                    uint32_t target = (c->address & 0x007FFFFF) | 0x80000000;
-                    uint16_t width_mask = IS_WIDTH_16(c->type) ? 0xFFFF : 0xFF;
-                    uint16_t mask = c->value & width_mask;
-
-                    *engine_p++ = I_LUI(REG_K0, A_BASE(target));
-                    *engine_p++ = IS_WIDTH_16(c->type) ? I_LHU(REG_K1, A_OFFSET(target), REG_K0)
-                                                       : I_LBU(REG_K1, A_OFFSET(target), REG_K0);
-                    *engine_p++ = set ? I_ORI(REG_K1, REG_K1, mask)
-                                      : I_ANDI(REG_K1, REG_K1, (~mask) & width_mask);
-                    *engine_p++ = IS_WIDTH_16(c->type) ? I_SH(REG_K1, A_OFFSET(target), REG_K0)
-                                                       : I_SB(REG_K1, A_OFFSET(target), REG_K0);
-
-                    // Back-patch the outer conditional's skip branch (if any).
-                    if (cond_branch) {
-                        int off = (engine_p - cond_branch) - 1;
-                        *cond_branch = IS_CONDITION_NOT_EQUAL(cheat.main.type)
-                            ? I_BEQ(REG_K0, REG_K1, off)
-                            : I_BNE(REG_K0, REG_K1, off);
-                    }
-
-                    continue;
-                }
             }
         }
     }
 
     *engine_p++ = I_J(RELOCATED_EXCEPTION_HANDLER_ADDRESS);
     *engine_p++ = I_NOP();
+
+    // SPECIAL_JAL_HOOK stubs. Past the jump above, so the engine never runs into
+    // them; they're reached only from the game's rewritten `jal`, and are copied
+    // to the final engine address along with everything else. Each hands its
+    // slot (the game's original `jal`, saved by the engine) and its cheat value
+    // to the payload's jal_hook_entry in t9/t8 -- caller-saved registers, dead
+    // at any call site.
+    for (int i = 0; i < jal_hook_count; i++) {
+        jal_hook_t *hook = &jal_hooks[i];
+
+        uint32_t stub_address = (uint32_t)(final_engine_address + (engine_p - engine_start));
+        uint32_t slot_address = stub_address + (4 * sizeof(uint32_t));
+
+        *engine_p++ = I_LUI(REG_T9, A_BASE(slot_address));
+        *engine_p++ = I_ADDIU(REG_T9, REG_T9, A_OFFSET(slot_address));   // t9 = slot
+        *engine_p++ = I_J(jal_hook_entry);
+        *engine_p++ = I_ORI(REG_T8, REG_ZERO, hook->value);              // t8 = cheat value
+        *engine_p++ = 0;                                                 // slot: the original jal
+
+        uint32_t jal_stub = I_JAL(stub_address);
+
+        *hook->compare_hi = I_LUI(REG_K0, jal_stub >> 16);
+        *hook->compare_lo = I_ORI(REG_K0, REG_K0, jal_stub & 0xFFFF);
+        *hook->slot_hi = I_LUI(REG_K0, A_BASE(slot_address));
+        *hook->slot_lo = I_SW(REG_K1, A_OFFSET(slot_address), REG_K0);
+        *hook->write_hi = I_LUI(REG_K1, jal_stub >> 16);
+        *hook->write_lo = I_ORI(REG_K1, REG_K1, jal_stub & 0xFFFF);
+    }
 
     uint32_t j_engine_from_handler = I_J((uint32_t)(final_engine_address));
 

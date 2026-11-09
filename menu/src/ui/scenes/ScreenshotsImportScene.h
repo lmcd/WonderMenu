@@ -9,8 +9,9 @@
 #include <fatfs/ff.h>
 #include <string>
 
+#include "general/GameDSO.h"
 #include "general/ScreenshotsSDRAMReader.h"
-#include "general/ScreenshotWriter.h"
+#include "general/ScreenshotSDWriter.h"
 #include "ui/Scene.h"
 #include "ui/views/ProgressBarView.h"
 #include "ui/views/ScreenshotThumbnailView.h"
@@ -64,8 +65,8 @@ private:
      */
     DIR screenshotDir = {};
 
-    ScreenshotWriter screenshotWriter;
-    ScreenshotWriter thumbnailWriter;
+    ScreenshotSDWriter screenshotSDWriter;
+    ScreenshotSDWriter thumbnailWriter;
 
     bool isScreenshotDirOpen() const {
         return screenshotDir.obj.fs != nullptr;

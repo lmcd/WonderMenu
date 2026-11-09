@@ -5,9 +5,9 @@
 
 #include "M64File.h"
 #include "fatfs/ff.h"
+#include "../../shared/src/PayloadData.h"
 
 #include <algorithm>
-#include <filesystem>
 
 static M64File::Header headerBuffer;
 
@@ -92,6 +92,8 @@ bool M64File::loadHeader() {
     romCRC = headerBuffer.romCRC32;
     countryCode = headerBuffer.countryCode;
     authoringProgram = headerBuffer.extAuthorship;
+    controllerCount = headerBuffer.controllerCount;
+
     memcpy(author, &headerBuffer.author, sizeof(headerBuffer.author));
     author[sizeof(author) - 1] = '\0';
 
@@ -115,13 +117,38 @@ bool M64File::loadHeader() {
     strncpy(this->author, normalized.c_str(), sizeof(this->author) - 1);
     this->author[sizeof(this->author) - 1] = '\0';
 
-    // Display name: base name (stem, extension dropped) with commas -> colons.
-    displayName = std::filesystem::path(filename).stem().string();
-    std::replace(displayName.begin(), displayName.end(), ',', ':');
-
     crc = calculateCRC32((const unsigned char*)&headerBuffer, sizeof(headerBuffer));
 
+    updateDerivedValues();
+
     return true;
+}
+
+void M64File::loadCachedHeader(uint32_t romCRC, uint32_t crc, AuthoringProgram authoringProgram, uint8_t controllerCount) {
+    this->romCRC = romCRC;
+    this->crc = crc;
+    this->authoringProgram = authoringProgram;
+    this->controllerCount = controllerCount;
+
+    // Not cached, as nothing reads them after loading
+    countryCode = 0;
+    author[0] = '\0';
+
+    updateDerivedValues();
+}
+
+void M64File::updateDerivedValues() {
+    // After the header, each sample is one 4-byte input per controller
+    int dataSize = (int)size - (int)sizeof(headerBuffer);
+    int bytesPerSample = 4 * std::max<int>(controllerCount, 1);
+
+    sampleCount = (dataSize > 0) ? (uint32_t)(dataSize / bytesPerSample) : 0;
+
+    // Display name: base name (stem, extension dropped) with commas -> colons.
+    // A leading dot starts the name rather than an extension
+    size_t extension = filename.rfind('.');
+    displayName = (extension == std::string::npos || extension == 0) ? filename : filename.substr(0, extension);
+    std::replace(displayName.begin(), displayName.end(), ',', ':');
 }
 
 bool M64File::stageInputsTable(uint32_t stagingAddress) {
@@ -138,6 +165,13 @@ bool M64File::stageInputsTable(uint32_t stagingAddress) {
 
     if (dataSize <= 0) {
         debugf("[M64File] File too small (%ld bytes)\n", size);
+
+        f_close(&file);
+        return false;
+    }
+
+    if (dataSize > M64_INPUTS_MAX_SIZE) {
+        debugf("[M64File] Inputs too large (%i bytes, max %i)\n", dataSize, M64_INPUTS_MAX_SIZE);
 
         f_close(&file);
         return false;

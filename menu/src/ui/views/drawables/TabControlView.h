@@ -46,6 +46,11 @@ private:
 	void renderLabels(const RenderInfo& renderInfo);
 	void drawMirroredSlice(Rect rect, int s, int capWidth);
 
+protected:
+	// Rect renderBounds() const override {
+	// 	return Rect(Vec2::ZERO, finalFrame.size).insetBy(Vec2(-3, -3));
+	// }
+
 public:
 	const char* name() const override { return "TabControlView"; }
 

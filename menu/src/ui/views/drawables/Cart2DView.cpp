@@ -45,7 +45,7 @@ void Cart2DView::update(const RenderInfo&) {
 void Cart2DView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRect(drawnBoundingBox[bufferIndex]);
+    clearRect(drawnBoundingBox[bufferIndex], finalBlendColor);
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -60,12 +60,20 @@ void Cart2DView::renderCartSide(const RenderInfo& renderInfo, int spriteIndex) {
     }
 
     Size size = cartRenderer->sizeForScale(scale);
-    Vec2 sizeMidpoint = size.mid();
+
+    Size sideSize = size;
+    sideSize.width /= 2;
+
+    Vec2 sidePosition = finalFrame.origin - size.mid();
+    sidePosition.x += (spriteIndex * sideSize.width);
+
+    Rect rect(sidePosition, sideSize);
 
     rdpq_mode_push();
 
     if (finalOpacity == 1.0f) {
-        rdpq_set_mode_copy(false);
+        // Not COPY mode: Analogue 3D's 32-bit colour mode renders it incorrectly
+        rdpq_set_mode_standard();
     }
     else {
         rdpq_mode_begin();
@@ -78,13 +86,6 @@ void Cart2DView::renderCartSide(const RenderInfo& renderInfo, int spriteIndex) {
 
         setPrimitiveColor(color);
     }
-
-    Vec2 sidePosition = finalFrame.origin - sizeMidpoint;
-    Size sideSize(size.width / 2, size.height);
-
-    sidePosition.x += (spriteIndex * sideSize.width);
-
-    Rect rect(sidePosition, sideSize);
 
     drawTexturedRect(TILE0, rect);
 

@@ -10,6 +10,7 @@
 #include <cmath>
 
 #include "../libdragon/rdpq_font_internal.h"
+#include "rdpq_mode.h"
 #include "ui/Fonts.h"
 #include "ui/View.h"
 
@@ -49,16 +50,25 @@ private:
         Color color = textColor;
         color.a *= finalOpacity;
 
-        Color blendColor = finalBlendColor;
-        blendColor.a = 0;
-
         const rdpq_font_t* font = nullptr;
 
         uint8_t currentFontID = 0;
         int currentAtlas = -1;
         int currentStyleID = -1;
 
+        Color blendColor = finalBlendColor;
+        blendColor.a = 0;
+
         rdpq_mode_push();
+
+        rdpq_mode_begin();
+            rdpq_set_mode_standard();
+            setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
+            setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
+            rdpq_mode_alphacompare(1);
+        rdpq_mode_end();
+
+        setBlendColor(blendColor);
 
         const rdpq_paragraph_char_t* character = layout->chars;
 
@@ -81,14 +91,6 @@ private:
 
                 atlas_t* atlas = &font->atlases[currentAtlas];
                 rspq_block_run(atlas->up);
-
-                rdpq_mode_begin();
-                    setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (TEX0, 0, PRIM, 0)));
-                    setBlender(finalIsOpaque ? WITH_BLEND_COLOR: WITH_FRAMEBUFFER);
-                    rdpq_mode_alphacompare(1);
-                rdpq_mode_end();
-
-                setBlendColor(blendColor);
             }
 
             if (character->style_id != currentStyleID) {
@@ -120,6 +122,43 @@ protected:
     rdpq_paragraph_t* layout = nullptr;
 
     bool lastIsAnimating = false;
+
+    Color lastTextColor = {};
+    Color lastAlternateColor = {};
+
+    void updateTextColors() {
+        if (textColor != lastTextColor || alternateColor != lastAlternateColor) {
+            invalidateRaster();
+
+            lastTextColor = textColor;
+            lastAlternateColor = alternateColor;
+        }
+    }
+
+    // Where the layout is drawn from, relative to the frame. Floored rather
+    // than truncated with the frame's position, so it's the same wherever the
+    // label is placed (as rasterizing needs).
+    int layoutOffsetX() const {
+        return (int)floorf(layout->x0);
+    }
+
+    int layoutOffsetY() const {
+        return (int)floorf(layout->y0);
+    }
+
+    Rect renderBounds() const override {
+        // Scrolling draws the label differently on every render
+        if (isAnimating || layout == nullptr || layout->nchars == 0) {
+            return Rect();
+        }
+
+        return Rect(
+            layoutOffsetX() + (int)floorf(layout->bbox.x0),
+            layoutOffsetY() + (int)floorf(layout->bbox.y0),
+            (int)ceilf(layout->bbox.x1 - layout->bbox.x0) + 1,
+            (int)ceilf(layout->bbox.y1 - layout->bbox.y0) + 1
+        );
+    }
 
     void updateAnimation() {
         if (isAnimating != lastIsAnimating) {
@@ -154,6 +193,8 @@ protected:
         _layout->capacity = n + 1;
 
         layout = __rdpq_paragraph_build(&params, fontID, stringReference, &n, _layout);
+
+        invalidateRaster();
     }
 
 public:
@@ -241,6 +282,7 @@ public:
         }
 
         updateAnimation();
+        updateTextColors();
     }
 
     void clear(const RenderInfo& renderInfo) {
@@ -274,10 +316,14 @@ public:
             return;
         }
 
+        if (renderRasterizedView(renderInfo)) {
+            return;
+        }
+
         int bufferIndex = renderInfo.bufferIndex;
 
-        int x0 = finalFrame.origin.x + layout->x0;
-        int y0 = finalFrame.origin.y + layout->y0;
+        int x0 = finalFrame.origin.x + layoutOffsetX();
+        int y0 = finalFrame.origin.y + layoutOffsetY();
 
         int textY = y0 + (int)floorf(layout->bbox.y0);
         int textHeight = (int)ceilf(layout->bbox.y1 - layout->bbox.y0) + 1;

@@ -13,4 +13,7 @@ class GameInfoTabScene : public Scene {
 public:
     ScrollbarView* scrollbarView = nullptr;
     View* mainContentView = nullptr;
+
+    // GameInfoScene is being moved back out of view (see GameInfoScene)
+    bool isAnimatingOut = false;
 };

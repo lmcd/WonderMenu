@@ -32,13 +32,26 @@ public:
     // Accepts any range of FlagView& (C array or std::views::transform projection).
     template<typename Range>
     static void renderGroup(const RenderInfo& renderInfo, Range&& views) {
-		uploadSprite(0);
+        // Flags are split between two sprite sheets, so render each sheet's
+        // flags in their own pass, uploading a sheet only if a flag uses it
+        for (int sheetIndex = 0; sheetIndex < 2; sheetIndex++) {
+            bool hasUploaded = false;
 
-        for (FlagView& view : views) {
-            view.renderIcon(renderInfo);
+            for (FlagView& view : views) {
+                if (view.spriteIndex() != sheetIndex) {
+                    continue;
+                }
 
-            if (!view.finalIsHidden) {
-                view.finishRender(renderInfo.bufferIndex);
+                if (!hasUploaded) {
+                    uploadSprite(sheetIndex);
+                    hasUploaded = true;
+                }
+
+                view.renderIcon(renderInfo);
+
+                if (!view.finalIsHidden) {
+                    view.finishRender(renderInfo.bufferIndex);
+                }
             }
         }
     }

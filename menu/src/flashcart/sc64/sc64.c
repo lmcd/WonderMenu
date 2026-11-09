@@ -81,43 +81,53 @@ static const uint8_t vzone_to_pzone[DISK_TYPES][DISK_ZONES] = {
 static const uint8_t rom_zones[DISK_TYPES] = { 5, 7, 9, 11, 13, 15, 16 };
 
 /**
- * @brief Load data to flash memory.
- * 
- * @param fil Pointer to the file object.
- * @param address Address to load data to.
- * @param size Size of the data to load.
- * @param br Pointer to store the number of bytes read.
- * @param progress Progress callback function.
+ * @brief Load the next erase block of a ROM's part past the SDRAM portion into flash.
+ *
+ * That's the shadow region, standing in for the last 128 KiB of the 64 MiB ROM
+ * space, then the extended region, for everything past 64 MiB.
+ *
+ * @param session Pointer to the load session, with flash_offset short of the ROM size.
  * @return flashcart_err_t Error code.
  */
-static flashcart_err_t load_to_flash (FIL *fil, void *address, size_t size, UINT *br, flashcart_progress_callback_t *progress) {
+static flashcart_err_t load_next_rom_flash_block (flashcart_load_rom_session_t *session) {
+    FIL *fil = &session->fil;
+    UINT br;
     size_t erase_block_size;
-    UINT bp;
 
-    *br = 0;
+    size_t offset = session->flash_offset;
+
+    bool in_shadow = (offset < MiB(64));
+    void *address = in_shadow ? (void *) (SHADOW_ADDRESS + (offset - session->sdram_size)) : (void *) (EXTENDED_ADDRESS + (offset - MiB(64)));
+    size_t region_end = in_shadow ? MIN(session->rom_size, MiB(64)) : session->rom_size;
 
     if (sc64_ll_flash_get_erase_block_size(&erase_block_size) != SC64_OK) {
         return FLASHCART_ERR_INT;
     }
 
-    while (size > 0) {
-        size_t program_size = MIN(size, erase_block_size);
-        if (sc64_ll_flash_erase_block(address) != SC64_OK) {
-            return FLASHCART_ERR_INT;
-        }
-        if (f_read(fil, address, program_size, &bp) != FR_OK) {
-            return FLASHCART_ERR_LOAD;
-        }
-        if (sc64_ll_flash_wait_busy() != SC64_OK) {
-            return FLASHCART_ERR_INT;
-        }
-        if (progress) {
-            progress(f_tell(fil) / (float) (f_size(fil)));
-        }
-        address += program_size;
-        size -= program_size;
-        *br += bp;
+    // Never past the end of the region, so a block never straddles the two
+    size_t program_size = MIN(region_end - offset, erase_block_size);
+
+    if ((f_tell(fil) != offset) && (f_lseek(fil, offset) != FR_OK)) {
+        return FLASHCART_ERR_LOAD;
     }
+    if (sc64_ll_flash_erase_block(address) != SC64_OK) {
+        return FLASHCART_ERR_INT;
+    }
+    if (f_read(fil, address, program_size, &br) != FR_OK) {
+        return FLASHCART_ERR_LOAD;
+    }
+    if (sc64_ll_flash_wait_busy() != SC64_OK) {
+        return FLASHCART_ERR_INT;
+    }
+    if (br != program_size) {
+        return FLASHCART_ERR_LOAD;
+    }
+
+    flashcart_utils_update_load_rom_session_progress(session, br);
+
+    debugf("[SC64] Loaded flash block at offset 0x%08X\n", (unsigned int) (offset));
+
+    session->flash_offset += program_size;
 
     return FLASHCART_OK;
 }
@@ -348,211 +358,96 @@ static bool sc64_has_feature (flashcart_features_t feature) {
 
 
 flashcart_load_rom_session_t sc64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
-    FIL fil;
-
-    // Opening from a locator captured when the directory was enumerated costs
-    // no disk access, where opening by path has to walk and scan every
-    // component. Falls back to the path when there's no usable locator.
-    FRESULT open_result = FR_INVALID_OBJECT;
-
-    if (rom_object != NULL && rom_object->fs != NULL) {
-        open_result = f_open_obj(&fil, rom_object, FA_READ);
-
-        if (open_result != FR_OK) {
-            debugf("[SC64] Locator open failed (%i), falling back to path\n", (int)open_result);
-        }
-    }
-
-    if (open_result != FR_OK) {
-        open_result = f_open(&fil, strip_fs_prefix(rom_path), FA_READ);
-    }
-
-    if (open_result != FR_OK) {
-        return (flashcart_load_rom_session_t) {};
-    }
-
-    fatfs_fix_file_size(&fil);
-
-    size_t rom_size = f_size(&fil);
-
-    if (rom_size > MiB(78)) {
-        f_close(&fil);
-        return (flashcart_load_rom_session_t) {};
-    }
-
-    size_t chunk_size = KiB(128);
-
-    bool shadow_enabled = (rom_size > (MiB(64) - KiB(128)));
-
-    size_t sdram_size = shadow_enabled ? (MiB(64) - KiB(128)) : rom_size;
-
-    unsigned int offset = chunk_size * initial_chunk;
-
-    f_lseek(&fil, offset);
-
-    return (flashcart_load_rom_session_t) {
-        fil,
-        chunk_size,
-        sdram_size,
-        initial_chunk,
-        rom_size,
-        initial_chunk,
-        0,
-        0,
-        false
-    };
+    // The last 128 KiB of SDRAM holds the save data, so the shadow region in
+    // flash stands in for it in a ROM that big
+    return flashcart_utils_begin_load_rom_session(rom_path, rom_object, initial_chunk, MiB(78), MiB(64) - KiB(128));
 }
 
-flashcart_err_t sc64_finish_load_rom_session(flashcart_load_rom_session_t* session, flashcart_progress_callback_t *progress) {
-    debugf("[SC64] Ending load rom session\n");
-    
-    FIL *fil = &session->fil;
-    UINT br;
-    size_t rom_size = session->rom_size;
-    size_t sdram_size = session->sdram_size;
-
-    bool shadow_enabled = (rom_size > (MiB(64) - KiB(128)));
-    bool extended_enabled = (rom_size > MiB(64));
-
-    size_t shadow_size = shadow_enabled ? MIN(rom_size - sdram_size, KiB(128)) : 0;
-    size_t extended_size = extended_enabled ? rom_size - MiB(64) : 0;
-
-    size_t chunk_size = session->chunk_size;
-
-    unsigned int start_offset = chunk_size * session->current_chunk;
-
-    if (!session->has_loaded_end_chunk) {
-        for (unsigned int offset = start_offset; offset < sdram_size; offset += chunk_size) {
-            size_t block_size = MIN(sdram_size - offset, chunk_size);
-            if (f_read(fil, (void *) (ROM_ADDRESS + offset), block_size, &br) != FR_OK) {
-                debugf("[SC64] Error 1\n");
-                f_close(fil);
-                return FLASHCART_ERR_LOAD;
-            }
-
-            session->loaded_bytes += br;
-            session->progress = fmin(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
-
-            if (progress) {
-                progress(session->progress);
-            }
-
-            debugf("[SC64] Loaded chunk (2) %i\n", session->current_chunk);
-            session->current_chunk++;
-        }
-        if (f_tell(fil) != sdram_size) {
-            debugf("[SC64] Error 2 %i %i\n", (int)f_tell(fil), sdram_size);
-            f_close(fil);
-            return FLASHCART_ERR_LOAD;
-        }
-
-        f_lseek(fil, 0);
-
-        session->current_chunk = 0;
-        start_offset = 0;
-    }
+/**
+ * @brief Set the cart up for the ROM's part past the SDRAM portion, if any.
+ *
+ * Done whatever the ROM's size, as a previous session may have left the
+ * shadow or extended region enabled.
+ *
+ * @param session Pointer to the load session.
+ * @return flashcart_err_t Error code.
+ */
+static flashcart_err_t begin_loading_rom_flash (flashcart_load_rom_session_t *session) {
+    bool shadow_enabled = (session->rom_size > session->sdram_size);
+    bool extended_enabled = (session->rom_size > MiB(64));
 
     if (sc64_ll_set_config(CFG_ID_ROM_SHADOW_ENABLE, shadow_enabled) != SC64_OK) {
-        debugf("[SC64] Error 3\n");
-        f_close(fil);
         return FLASHCART_ERR_INT;
-    }
-
-    if (shadow_enabled) {
-        flashcart_err_t err = load_to_flash(fil, (void *) (SHADOW_ADDRESS), shadow_size, &br, progress);
-        if (err != FLASHCART_OK) {
-            f_close(fil);
-            return err;
-        }
-        if (br != shadow_size) {
-            f_close(fil);
-            return FLASHCART_ERR_LOAD;
-        }
     }
 
     if (sc64_ll_set_config(CFG_ID_ROM_EXTENDED_ENABLE, extended_enabled) != SC64_OK) {
-        f_close(fil);
         return FLASHCART_ERR_INT;
     }
 
-    if (extended_enabled) {
-        flashcart_err_t err = load_to_flash(fil, (void *) (EXTENDED_ADDRESS), extended_size, &br, progress);
+    session->flash_offset = session->sdram_size;
+
+    return FLASHCART_OK;
+}
+
+/**
+ * @brief Load the next part of a ROM: from the initial chunk to the end of the SDRAM portion, then into flash, then the beginning chunks.
+ *
+ * @param session Pointer to the load session.
+ * @param load_beginning_chunks Whether to carry on past the end of the SDRAM portion.
+ * @return flashcart_err_t Error code.
+ */
+static flashcart_err_t load_next_rom_part (flashcart_load_rom_session_t *session, bool load_beginning_chunks) {
+    if (!session->has_loaded_end_chunk) {
+        return flashcart_utils_load_rom_chunk(session, ROM_ADDRESS);
+    }
+
+    // The flash waits for the launch too: it's slow to write, and setting it
+    // up changes what the cart maps.
+    if (!load_beginning_chunks) {
+        return FLASHCART_ERR_LOAD;
+    }
+
+    if (session->flash_offset == 0) {
+        flashcart_err_t err = begin_loading_rom_flash(session);
+
         if (err != FLASHCART_OK) {
-            f_close(fil);
             return err;
         }
-        if (br != extended_size) {
-            f_close(fil);
-            return FLASHCART_ERR_LOAD;
-        }
     }
 
-    unsigned int end_offset = chunk_size * session->initial_chunk;
-
-    for (unsigned int offset = start_offset; offset < end_offset; offset += chunk_size) {
-        size_t block_size = MIN(sdram_size - offset, chunk_size);
-        if (f_read(fil, (void *) (ROM_ADDRESS + offset), block_size, &br) != FR_OK) {
-            f_close(fil);
-            return FLASHCART_ERR_LOAD;
-        }
-
-        session->loaded_bytes += br;
-        session->progress = fmin(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
-
-        if (progress) {
-            progress(session->progress);
-        }
-
-        debugf("[SC64] Loaded chunk (2) %i\n", session->current_chunk);
-
-        session->current_chunk++;
+    if (session->flash_offset < session->rom_size) {
+        return load_next_rom_flash_block(session);
     }
 
-    if (f_close(fil) != FR_OK) {
-        return FLASHCART_ERR_LOAD;
+    if (!flashcart_utils_has_loaded_rom_chunks(session)) {
+        return flashcart_utils_load_rom_chunk(session, ROM_ADDRESS);
     }
 
     return FLASHCART_OK;
 }
 
 flashcart_err_t sc64_load_next_rom_chunk (flashcart_load_rom_session_t* session, bool load_beginning_chunks) {
-    FIL *fil = &session->fil;
-    UINT br;
-    size_t sdram_size = session->sdram_size;
+    bool was_waiting = session->has_loaded_end_chunk && !load_beginning_chunks;
 
-    unsigned int offset = session->chunk_size * session->current_chunk;
+    flashcart_err_t err = load_next_rom_part(session, load_beginning_chunks);
 
-    if (session->has_loaded_end_chunk) {
-        if (!load_beginning_chunks) {
-            return FLASHCART_ERR_LOAD;
-        }
-
-        if (session->current_chunk >= session->initial_chunk) {
-            return FLASHCART_ERR_LOAD;
-        }
+    if (was_waiting) {
+        return err;
     }
 
-    if (offset >= sdram_size) {
-        session->has_loaded_end_chunk = true;
-        session->current_chunk = 0;
-
-        offset = 0;
-
-        f_lseek(fil, 0);
+    if (err != FLASHCART_OK) {
+        f_close(&session->fil);
+        return err;
     }
 
-    size_t block_size = MIN(sdram_size - offset, session->chunk_size);
-    if (f_read(fil, (void *) (ROM_ADDRESS + offset), block_size, &br) != FR_OK) {
-        f_close(fil);
-        return FLASHCART_ERR_LOAD;
+    // Straight away rather than on the next call, so the caller sees the
+    // session complete as soon as the last part lands. The flash still has
+    // to be set up when there's nothing to load into it.
+    bool has_loaded_flash = (session->flash_offset != 0) && (session->flash_offset >= session->rom_size);
+
+    if (has_loaded_flash && flashcart_utils_has_loaded_rom_chunks(session)) {
+        return flashcart_utils_complete_load_rom_session(session);
     }
-
-    session->loaded_bytes += br;
-    session->progress = fmin(1.0f, (session->loaded_bytes / (float) (session->rom_size)));
-
-    debugf("[SC64] Loaded chunk (1) %i\n", session->current_chunk);
-
-    session->current_chunk++;
 
     return FLASHCART_OK;
 }
@@ -817,7 +712,6 @@ static flashcart_t flashcart_sc64 = {
     .get_firmware_version = sc64_get_firmware_version,
     .begin_load_rom_session = sc64_begin_load_rom_session,
     .load_next_rom_chunk = sc64_load_next_rom_chunk,
-    .finish_load_rom_session = sc64_finish_load_rom_session,
     .load_file = sc64_load_file,
     .load_save = sc64_load_save,
     .load_64dd_ipl = sc64_load_64dd_ipl,

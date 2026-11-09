@@ -6,6 +6,7 @@
 #pragma once
 
 #include "utils/utils.h"
+#include <cstdint>
 #ifdef N64
 #include <libdragon.h>
 #include <fatfs/ff.h>
@@ -13,6 +14,7 @@ extern "C" {
 #include "utils/fs.h"
 }
 #endif
+#include <cstddef>
 #include <cstring>
 #include <vector>
 #include <unordered_map>
@@ -81,27 +83,10 @@ constexpr size_t DB_L_LABEL_SIZE_PADDED = DB_L_LABEL_SIZE + (DB_LABEL_CHUNKS_PER
 constexpr size_t DB_ENTRY_TITLE_LENGTH = 64;
 constexpr size_t DB_ENTRY_DEVELOPER_LENGTH = 32;
 
-/**
- * Spare bytes padded to the end of every entry.
- */
-constexpr size_t DB_ENTRY_RESERVED_LENGTH = 6;
-
-/**
- * Size in bytes of each game entry in the database
- */
-constexpr size_t DB_ENTRY_SIZE = DB_ENTRY_TITLE_LENGTH + DB_ENTRY_DEVELOPER_LENGTH + 4 + 1 + 1 + 2 + 2 + 4 + 4
-                               + DB_ENTRY_RESERVED_LENGTH;
-
-static_assert(DB_ENTRY_SIZE == 120, "DB_ENTRY_SIZE must stay at 120 bytes");
-
-// Every entry must begin on a 2-byte boundary, which single-entry PI DMA requires
-static_assert(DB_ENTRY_SIZE % 2 == 0, "DB_ENTRY_SIZE must stay even for PI DMA");
-
 // TODO: don't hardcode
-constexpr int DB_ENTRIES_START_OFFSET = 5224;
+constexpr int DB_STRINGS_START_OFFSET = 5224;
 
-constexpr int DB_DMA_SIZE = KiB(112);
-// constexpr int DB_DMA_SIZE = DB_ENTRIES_START_OFFSET + (DB_ENTRY_SIZE * 906);
+constexpr int DB_DMA_SIZE = KiB(44);
 
 /**
  * Represents the WonderMenu.db database format.
@@ -111,60 +96,80 @@ public:
     /**
      * Database entry for a known game
      */
-    struct __attribute__((packed)) Entry {
-        // The title of the game (e.g. Banjo Kazooie)
-        char title[DB_ENTRY_TITLE_LENGTH];
+    struct Entry {
+        struct __attribute__((packed)) Data {
+            // Byte offsets into the string pool
+            uint16_t titleOffset;
+            uint16_t developerOffset;
 
-        // The developer of the game (e.g. Rareware)
-        char developer[DB_ENTRY_DEVELOPER_LENGTH];
+            // An alphanumeric character that specifies the kind of media the game is stored on.
+            CategoryCode categoryCode;
 
-        // An alphanumeric character that specifies the kind of media the game is stored on.
-        CategoryCode categoryCode;
+            // The 2 character game ID (e.g. BK)
+            char uniqueID[2];
 
-        // The 2 character game ID (e.g. BK)
-        char uniqueID[2] = "0";
+            RegionCode regionCode;
 
-        RegionCode regionCode;
+            // Share a byte: saveType in the high nibble, cicType in the low
+            uint8_t saveType : 4;
+            uint8_t cicType  : 4;
 
-        SaveType saveType;
+            uint16_t smallLabelTileIndex;
+            uint16_t largeLabelTileIndex;
 
-        uint8_t cicType;
+            // Byte offset into cheat data section
+            // 0xFFFFFFFF = no cheats
+            uint32_t cheatByteOffset;
 
-        uint16_t smallLabelTileIndex;
-        uint16_t largeLabelTileIndex;
+            // Byte offset into speedrun data section
+            // 0xFFFFFFFF = no speedruns
+            uint32_t speedrunsByteOffset;
 
-        // Byte offset into cheat data section
-        // 0xFFFFFFFF = no cheats
-        uint32_t cheatByteOffset;
+            // Share a byte: maxControllers in the high nibble, then
+            // requiresExpansionPak, then 3 spare bits
+            uint8_t maxControllers : 4;
+            uint8_t requiresExpansionPak : 1;
+            uint8_t reserved : 3;
 
-        // Byte offset into speedrun data section
-        // 0xFFFFFFFF = no speedruns
-        uint32_t speedrunsByteOffset;
+            // Position of the title in a case-insensitive sort of every title.
+            // Equal titles share an index.
+            uint16_t sortIndex;
+        };
 
-        // Spare room for fields added later
-        uint8_t reserved[DB_ENTRY_RESERVED_LENGTH];
-
-        // Not imported from .db file:
+        Data& data;
+        const char* strings;
 
         uint32_t labelTileCluster = 0;
+        uint32_t largeLabelTileCluster = 0;
         uint32_t cheatsCluster = 0;
-        uint16_t entryIndex;
+
+        Entry(Data& data, const char* strings) : data(data), strings(strings) {}
+
+        // The title of the game (e.g. Banjo Kazooie)
+        const char* title() const {
+            return strings + data.titleOffset;
+        }
+
+        // The developer of the game (e.g. Rareware)
+        const char* developer() const {
+            return strings + data.developerOffset;
+        }
 
         bool hasSpeedrunDatabase() {
-            return speedrunsByteOffset != NO_SPEEDRUNS_DATABASE;
+            return data.speedrunsByteOffset != NO_SPEEDRUNS_DATABASE;
         }
 
         bool hasCheatDatabase() {
-            return cheatByteOffset != NO_CHEATS_DATABASE;
+            return data.cheatByteOffset != NO_CHEATS_DATABASE;
         }
 
         bool hasHomebrewGameCode() {
             // Homebrew developed with libdragon has a 'ED' unique ID
-            if (uniqueID[0] == 'E' && uniqueID[1] == 'D') {
+            if (data.uniqueID[0] == 'E' && data.uniqueID[1] == 'D') {
                 return true;
             }
             // Some Homebrew titles appear to have NULL bytes here
-            else if (uniqueID[0] == 0 && uniqueID[1] == 0) {
+            else if (data.uniqueID[0] == 0 && data.uniqueID[1] == 0) {
                 return true;
             }
             else {
@@ -178,7 +183,8 @@ private:
 
     std::unordered_map<uint32_t, uint16_t> titleLookupMap;
 
-    Entry placeholderEntry;
+    Entry::Data placeholderData = {};
+    Entry placeholderEntry{placeholderData, ""};
 
     #ifdef N64
     // Zeroed so `obj.fs` reads as null (not open) until load() opens it
@@ -190,12 +196,11 @@ private:
      */
     uint16_t entryCount = 0;
 
-    /**
-     * The whole entries block held in RDRAM, `entryCount` records of
-     * `DB_ENTRY_SIZE` bytes each. Null until `loadEntriesIntoMemory()` is
-     * called, which is what `readEntryAtIndex` keys its fast path off.
-     */
-    unsigned char* entriesData = nullptr;
+    uint16_t stringsSize = 0;
+
+    // The string pool, with the entries directly after it in the same block
+    char* strings = nullptr;
+    Entry::Data* entriesData = nullptr;
 
     long entriesStartOffset;
     long labelsStartOffset;
@@ -207,57 +212,39 @@ private:
     bool seekTo(long offset);
     bool readBytes(void* buffer, size_t size);
 
+    bool loadEntriesIntoMemory();
+    void releaseEntriesFromMemory();
+
 public:
     GameDatabase();
     ~GameDatabase();
 
     static uint32_t djb2(const unsigned char* data, size_t length);
 
-    bool isDatabaseOpen();
+    bool isOpen() const;
 
     int getLabelTileOffset(int tileIndex);
 
     Entry* readEntryAtIndex(uint16_t index);
 
     /**
-     * On `load()`, entries are moved from the SD card into cartridge SDRAM.
-     * This method moves the entries again from cart space in main memory.
-     * This provides a fast path for database seeking on boot.
-     */
-    bool loadEntriesIntoMemory();
-
-    /**
-     * Release memory temporarily occupied by database entries during boot.
-     */
-    void releaseEntriesFromMemory();
-
-    bool hasEntriesInMemory() const { return entriesData != nullptr; }
-
-    /**
      * Read only the region code for the entry at the given index.
      * Cheaper than readEntryAtIndex when scanning variants, as it avoids
-     * allocating and reading the full entry.
-     * Returns RegionCode::UNKNOWN on read failure.
+     * allocating an entry.
+     * Returns RegionCode::UNKNOWN for an index outside the database.
      */
     RegionCode readRegionCodeAtIndex(uint16_t index);
 
     int16_t indexForTitle(char title[21]);
     int16_t indexForUniqueID(char uniqueID[2], RegionCode regionCode, uint8_t version);
 
-    Entry* entryForTitle(char title[21]);
-    Entry* entryForUniqueID(char uniqueID[2], RegionCode regionCode, uint8_t version);
+    int16_t indexForROMFile(ROMFile& romFile);
 
-    /**
-     * Get database entry for a game ID
-     * Returns nullptr if not found
-     */
-    Entry* entryForROMFile(ROMFile* romFile);
-
+    #ifdef N64
     /**
      * Load database from WonderMenu.db
      * Reads raw Entry structs and populates the database
      */
-    #ifdef N64
     bool load(const char* filename);
     #endif
 
@@ -280,3 +267,15 @@ public:
      */
     SpeedrunDatabase* loadSpeedrunDatabase(Entry* entry);
 };
+
+/**
+ * Size in bytes of each game entry in the database
+ */
+constexpr size_t DB_ENTRY_SIZE = sizeof(GameDatabase::Entry::Data);
+
+static_assert(DB_ENTRY_SIZE == 24, "DB_ENTRY_SIZE must stay at 24 bytes");
+
+static_assert(DB_ENTRY_SIZE % 8 == 0, "DB_ENTRY_SIZE must stay a multiple of 8");
+
+// Every entry must begin on a 2-byte boundary, which single-entry PI DMA requires
+static_assert(DB_ENTRY_SIZE % 2 == 0, "DB_ENTRY_SIZE must stay even for PI DMA");

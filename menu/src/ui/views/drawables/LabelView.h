@@ -62,5 +62,6 @@ public:
         }
 
         this->updateAnimation();
+        this->updateTextColors();
     }
 };

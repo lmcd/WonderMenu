@@ -5,23 +5,25 @@
 
 #include "SpeedrunsScene.h"
 
-#include <filesystem>
 #include <algorithm>
 #include <cstring>
 
 #include "general/Game.h"
 #include "general/M64File.h"
 #include "general/SpeedrunDatabase.h"
+#include "ui/Theme.h"
+#include "ui/popovers/AlertPopover.h"
 #include "ui/scenes/GameLaunchScene.h"
 #include "ui/views/ScrollbarView.h"
 
-SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game* game)
+SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game& game)
     : GameInfoTabScene(),
       speedrunDatabase(speedrunDatabase),
       game(game),
       isRecording(state.isRecording),
       selectedRow(state.selectedRow),
       selectedCRC(state.selectedCRC),
+      numberOfControllers(state.numberOfControllers),
       state(state) {
     // Formatted up front, not per rebuild: the row titles point straight at these
     if (speedrunDatabase != nullptr) {
@@ -52,7 +54,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
 
             // An entry is only shown if the recording it names is actually here,
             // matched on the CRC32 of the .m64 header
-            for (M64File* m64File : game->m64Files) {
+            for (M64File* m64File : game.m64Files) {
                 if (m64File->crc == entry.m64CRC) {
                     entryM64Files[i] = m64File;
                     break;
@@ -60,7 +62,7 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
             }
         }
 
-        for (M64File* m64File : game->m64Files) {
+        for (M64File* m64File : game.m64Files) {
             if (std::find(entryM64Files.begin(), entryM64Files.end(), m64File) == entryM64Files.end()) {
                 uncategorisedM64Files.push_back(m64File);
             }
@@ -72,13 +74,16 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
-    labelView.textColor = Color(128);
+    labelView.textColor = Theme::emptyListLabelColor;
 
     if (is_memory_expanded()) {
-        labelView.setString(game->hasSpeedrunDatabase() ? "No Speedruns Found" : "Not Supported for this Game");
+        labelView.setString(game.hasSpeedrunDatabase() ? "No Speedruns Found" : "Not Supported for this Game");
     }
     else {
         labelView.setString("Expansion Pak Required");
+
+        expansionPakImage = Image("rom:/ui/ExpansionPak.RGBA32.sprite");
+        expansionPakImageView.image = &expansionPakImage;
     }
 
     tableView.rowCount = rows.size();
@@ -92,6 +97,10 @@ SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrun
     }
 }
 
+SpeedrunsScene::~SpeedrunsScene() {
+    delete speedrunDatabase;
+}
+
 void SpeedrunsScene::rebuildRows() {
     rows.clear();
 
@@ -102,18 +111,12 @@ void SpeedrunsScene::rebuildRows() {
     uint16_t groupCount = speedrunDatabase->groups.size();
     uint16_t entryCount = speedrunDatabase->entries.size();
 
-    if (true) {
-        RowInfo createRow = {
-            false,
-            0,
-            0,
-            0
-        };
-
-        createRow.isCreate = true;
-
-        rows.push_back(createRow);
-    }
+    rows.push_back({
+        RowInfo::CREATE,
+        0,
+        0,
+        0
+    });
 
     // Speedrun groups don't nest the way cheat groups do -- there is no span to
     // walk, just a flat list -- so this is one level deep and needs no recursion.
@@ -139,7 +142,7 @@ void SpeedrunsScene::rebuildRows() {
         }
 
         rows.push_back({
-            true,
+            RowInfo::GROUP,
             groupIndex,
             0,
             0
@@ -160,7 +163,7 @@ void SpeedrunsScene::rebuildRows() {
             }
 
             rows.push_back({
-                false,
+                RowInfo::ENTRY,
                 entryIndex,
                 groupRowIndex,
                 1
@@ -178,14 +181,13 @@ void SpeedrunsScene::rebuildRows() {
     uint16_t groupRowIndex = rows.size();
 
     RowInfo groupRow = {
-        true,
+        RowInfo::UNCATEGORISED_GROUP,
         groupCount,
         0,
         0
     };
 
     groupRow.entryCount = uncategorisedM64Files.size();
-    groupRow.isUncategorised = true;
 
     rows.push_back(groupRow);
 
@@ -194,23 +196,19 @@ void SpeedrunsScene::rebuildRows() {
     }
 
     for (uint16_t fileIndex = 0; fileIndex < uncategorisedM64Files.size(); fileIndex++) {
-        RowInfo fileRow = {
-            false,
+        rows.push_back({
+            RowInfo::UNCATEGORISED_ENTRY,
             fileIndex,
             groupRowIndex,
             1
-        };
-
-        fileRow.isUncategorised = true;
-
-        rows.push_back(fileRow);
+        });
     }
 
     rows[groupRowIndex].childRowCount = (rows.size() - groupRowIndex - 1);
 }
 
 int SpeedrunsScene::selectionKey(const RowInfo& row) const {
-    if (row.isUncategorised) {
+    if (row.type == RowInfo::UNCATEGORISED_ENTRY) {
         return (int)speedrunDatabase->entries.size() + row.index;
     }
 
@@ -220,58 +218,104 @@ int SpeedrunsScene::selectionKey(const RowInfo& row) const {
 void SpeedrunsScene::didBeginScene(SceneEntry) {
     view.addSubview(&tableView);
     view.addSubview(&labelView);
+
+    if (expansionPakImage.isValid()) {
+        view.addSubview(&expansionPakImageView);
+    }
 }
 
 void SpeedrunsScene::update(const UpdateInfo& updateInfo) {
     joypad_buttons_t btn = updateInfo.btn;
 
+    bootSession.advance();
+
     if (tableView.handleInputs(updateInfo)) {}
 
     // A: toggle expand/collapse on a group, or select/deselect a run
     if (btn.a && !rows.empty()) {
+        if (tableView.isHidden) {
+            return;
+        }
+        
         const int selectedIndex = tableView.selectedRowIndex;
         const RowInfo& row = rows[selectedIndex];
 
-        if (row.isCreate) {
-            // Recording and playing back a run are mutually exclusive
-            if (isRecording) {
-                isRecording = false;
-                selectedRow = -1;
-                selectedCRC = 0;
-            }
-            else {
-                isRecording = true;
-                selectedRow = -1;
-                selectedCRC = 0;
-            }
-        }
-        else if (row.isGroup) {
-            if (state.toggleGroupExpanded(row.index)) {
-                rebuildRows();
+        switch (row.type) {
+            case RowInfo::CREATE:
+                // Recording and playing back a run are mutually exclusive
+                if (isRecording) {
+                    isRecording = false;
+                    selectedRow = -1;
+                    selectedCRC = 0;
+                }
+                else {
+                    tableView.isADown = false;
 
-                // rebuildRows() replaced the rows, so `row` can't be used here
-                tableView.openSelectedGroup(rows[selectedIndex].childRowCount);
-            }
-            else {
-                tableView.closeSelectedGroup(row.childRowCount);
-            }
-        }
-        else {
-            // Keyed on the entry, not the row, so the selection survives the
-            // groups around it opening and closing
-            int key = selectionKey(row);
+                    int maxControllers = game.maxControllers();
 
-            if (selectedRow == key) {
-                selectedRow = -1;
-                selectedCRC = 0;
-            }
-            else {
-                isRecording = false;
+                    if (maxControllers > 1) {
+                        Scene* baseScene = (parentScene != nullptr) ? parentScene : this;
 
-                selectedRow = key;
-                selectedCRC = row.isUncategorised
-                    ? uncategorisedM64Files[row.index]->crc
-                    : speedrunDatabase->entries[row.index].m64CRC;
+                        std::vector<std::string> buttons = {"1 Controller"};
+
+                        for (int count = 2; count <= maxControllers; count++) {
+                            buttons.push_back(std::to_string(count) + " Controllers");
+                        }
+
+                        AlertPopover* alert = new AlertPopover(baseScene, "CREATE SPEEDRUN");
+                        alert->setButtons(std::move(buttons));
+                        alert->setInitialButtonIndex(std::clamp((int)numberOfControllers, 1, maxControllers) - 1);
+
+                        auto result = alert->present();
+
+                        if (result.didSucceed()) {
+                            numberOfControllers = result.value + 1;
+                            isRecording = true;
+                            selectedRow = -1;
+                            selectedCRC = 0;
+                        }
+                    }
+                    else {
+                        numberOfControllers = 1;
+                        isRecording = true;
+                        selectedRow = -1;
+                        selectedCRC = 0;
+                    }
+                }
+                break;
+
+            case RowInfo::GROUP:
+            case RowInfo::UNCATEGORISED_GROUP:
+                if (state.toggleGroupExpanded(row.index)) {
+                    rebuildRows();
+
+                    // rebuildRows() replaced the rows, so `row` can't be used here
+                    tableView.openSelectedGroup(rows[selectedIndex].childRowCount);
+                }
+                else {
+                    tableView.closeSelectedGroup(row.childRowCount);
+                }
+                break;
+
+            case RowInfo::ENTRY:
+            case RowInfo::UNCATEGORISED_ENTRY: {
+                // Keyed on the entry, not the row, so the selection survives the
+                // groups around it opening and closing
+                int key = selectionKey(row);
+
+                if (selectedRow == key) {
+                    selectedRow = -1;
+                    selectedCRC = 0;
+                }
+                else {
+                    isRecording = false;
+
+                    selectedRow = key;
+                    selectedCRC = (row.type == RowInfo::UNCATEGORISED_ENTRY)
+                        ? uncategorisedM64Files[row.index]->crc
+                        : speedrunDatabase->entries[row.index].m64CRC;
+                }
+                break;
             }
         }
     }
@@ -298,6 +342,27 @@ void SpeedrunsScene::updateViews(const RenderInfo&) {
     labelView.maxWidth = view.frame.size.width;
     labelView.isHidden = !tableIsHidden;
 
+    if (expansionPakImage.isValid()) {
+        // Centred together on where the label sits alone, so the label's own
+        // height cancels out and only the image and gap shift them
+        constexpr int labelY = 250;
+        constexpr int imageSpacing = 36;
+
+        Size imageSize = expansionPakImage.size();
+
+        expansionPakImageView.frame = Rect(
+            Vec2(
+                view.frame.size.width / 2 - imageSize.midX(),
+                labelY - (imageSize.height + imageSpacing) / 2
+            ),
+            imageSize
+        );
+
+        labelView.frame.origin.y = expansionPakImageView.frame.maxY() + imageSpacing;
+    }
+
+    expansionPakImageView.isHidden = labelView.isHidden;
+
     if (!labelView.isHidden) {
         // This is a hack for a compositing issue (cart drawing over text)
         // TODO: fix
@@ -313,37 +378,54 @@ void SpeedrunsScene::updateViews(const RenderInfo&) {
         SpeedrunRowView* rowView = &tableView.rowViews[i++];
 
         rowView->indentLevel = row.indentLevel;
-        rowView->isGroup = row.isGroup;
+        rowView->isGroup = row.isGroup();
         rowView->isExpanded = state.isGroupExpanded(row.index);
+        rowView->hasOptionSubtitle = (row.type == RowInfo::CREATE);
 
-        if (row.isCreate) {
-            rowView->isChecked = isRecording;
-            rowView->titleView.stringReference = "Create a Speedrun!";
-            rowView->subtitleView.setString("");
-        }
-        else if (row.isGroup) {
-            rowView->isChecked = false;
-            rowView->titleView.stringReference = row.isUncategorised
-                ? "Uncategorised"
-                : speedrunDatabase->groups[row.index].title;
-            rowView->subtitleView.setString("");
-        }
-        else if (row.isUncategorised) {
-            M64File* m64File = uncategorisedM64Files[row.index];
-            rowView->isChecked = (selectedRow == selectionKey(row));
-            rowView->titleView.stringReference = m64File->filename.c_str();
-            
-            if (m64File->authoringProgram == M64File::WONDERMENU) {
-                rowView->subtitleView.setString("^01By^00 WonderMenu");
-            }
-            else {
+        switch (row.type) {
+            case RowInfo::CREATE:
+                rowView->isChecked = isRecording;
+                rowView->titleView.stringReference = "Create a Speedrun";
+
+                if (isRecording) {
+                    rowView->subtitleView.setString("^01%i %s", numberOfControllers, (numberOfControllers == 1) ? "Controller" : "Controllers");
+                }
+                else {
+                    rowView->subtitleView.setString("");
+                }
+                break;
+
+            case RowInfo::GROUP:
+                rowView->isChecked = false;
+                rowView->titleView.stringReference = speedrunDatabase->groups[row.index].title;
                 rowView->subtitleView.setString("");
+                break;
+
+            case RowInfo::UNCATEGORISED_GROUP:
+                rowView->isChecked = false;
+                rowView->titleView.stringReference = "Uncategorised";
+                rowView->subtitleView.setString("");
+                break;
+
+            case RowInfo::ENTRY:
+                rowView->isChecked = (selectedRow == row.index);
+                rowView->titleView.stringReference = entryTimeTexts[row.index].data();
+                rowView->subtitleView.setString("^01By^00 %s", entryAuthorTexts[row.index].c_str());
+                break;
+
+            case RowInfo::UNCATEGORISED_ENTRY: {
+                M64File* m64File = uncategorisedM64Files[row.index];
+                rowView->isChecked = (selectedRow == selectionKey(row));
+                rowView->titleView.stringReference = m64File->filename.c_str();
+
+                if (m64File->authoringProgram == M64File::WONDERMENU) {
+                    rowView->subtitleView.setString("^01By^00 WonderMenu");
+                }
+                else {
+                    rowView->subtitleView.setString("");
+                }
+                break;
             }
-        }
-        else {
-            rowView->isChecked = (selectedRow == row.index);
-            rowView->titleView.stringReference = entryTimeTexts[row.index].data();
-            rowView->subtitleView.setString("^01By^00 %s", entryAuthorTexts[row.index].c_str());
         }
     }
 

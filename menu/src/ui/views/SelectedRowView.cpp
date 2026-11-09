@@ -6,11 +6,11 @@
 #include "SelectedRowView.h"
 
 SelectedRowView::SelectedRowView() {
-    leftOutsetRectView.fillColor = Color::BLACK;
-    leftOutsetRectView.backgroundColor = Color::BLACK;
+    leftOutsetRectView.fillColor = Theme::backgroundColor;
+    leftOutsetRectView.backgroundColor = Theme::backgroundColor;
 
-    rightOutsetRectView.fillColor = Color::BLACK;
-    rightOutsetRectView.backgroundColor = Color::BLACK;
+    rightOutsetRectView.fillColor = Theme::backgroundColor;
+    rightOutsetRectView.backgroundColor = Theme::backgroundColor;
 
     rectView.isOpaque = false;
 

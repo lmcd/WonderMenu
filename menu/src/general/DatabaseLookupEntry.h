@@ -64,7 +64,7 @@ struct DatabaseLookupEntry {
         return indexAndCount >> COUNT_BITS;
     }
     uint16_t numberOfVariants() const {
-        return indexAndCount;
+        return indexAndCount & COUNT_MAX;
     }
 
     void set(uint16_t indexStart, uint16_t numberOfVariants) {

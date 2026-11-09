@@ -1,4 +1,4 @@
-BUILD_DIR=build/emulator
+BUILD_DIR=build/debug
 T3D_INST=$(N64_INST)
 # N64_ROM_HEADER = /Users/lee/Documents/GitHub/libdragon/boot/bin/ipl3_dev.z64
 
@@ -10,7 +10,7 @@ include $(N64_INST)/include/t3d.mk
 # not build outputs. Because they're prerequisites of the filesystem copy rule,
 # make walks that implicit chain -- v64 <- z64 <- $(BUILD_DIR)/%.elf -- and,
 # since `%.z64`'s directory is split off, tries to LINK a bogus
-# assets/sd/build/emulator/NNN.elf with no object files ([LD] error). Cancel
+# assets/sd/build/debug/NNN.elf with no object files ([LD] error). Cancel
 # the rule (redefine the pattern with no recipe) so these stay plain sources.
 %.v64: %.z64
 
@@ -29,6 +29,16 @@ N64_CXXFLAGS += -Wall -Wextra -Wno-missing-field-initializers -std=gnu++20 -Os -
 N64_CFLAGS += -MP
 N64_CXXFLAGS += -MP
 N64_ASFLAGS += -MP
+
+# RELEASE=1 (passed by the release target) compiles out debugf and the asserts
+# in the menu's own code. libdragon and Tiny3D keep theirs, as they're built
+# separately.
+RELEASE ?= 0
+
+ifeq ($(RELEASE),1)
+N64_CFLAGS   += -DNDEBUG
+N64_CXXFLAGS += -DNDEBUG
+endif
 
 MKSPRITE_FLAGS=
 
@@ -56,7 +66,8 @@ src = $(wildcard src/*.cpp) \
 	  $(wildcard src/ui/views/drawables/*.cpp) \
 	  $(wildcard src/ui/views/rows/*.cpp) \
       $(wildcard src/util/*.cpp) \
-      $(wildcard src/utils/*.c)
+      $(wildcard src/utils/*.c) \
+      $(wildcard libdragon/*.c)
 
 assets_png =. $(wildcard assets/ui/*.png) \
 			  $(wildcard assets/ui/tab-control/*.png) \
@@ -81,8 +92,6 @@ assets_bin =  $(wildcard assets/sd/*.db) \
 
 assets_txt =  $(wildcard assets/*.txt)
 
-assets_elf =  $(wildcard assets/*.elf.stripped)
-
 assets_conv = $(patsubst assets/%,filesystem/%,$(assets_png:%.png=%.sprite)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_ttf:%.ttf=%.font64)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_otf:%.otf=%.font64)) \
@@ -91,7 +100,7 @@ assets_conv = $(patsubst assets/%,filesystem/%,$(assets_png:%.png=%.sprite)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_ini)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_bin)) \
 			  $(patsubst assets/%,filesystem/%,$(assets_txt)) \
-			  $(patsubst assets/%,filesystem/%,$(assets_elf))
+			  filesystem/payload.bin
 
 all: $(PROJECT_NAME).z64
 all: rom-with-size
@@ -159,20 +168,74 @@ filesystem/%.txt: assets/%.txt
 	@echo "    [TEXT] $@"
 	@cp "$<" "$@"
 
-filesystem/%.elf.stripped: assets/%.elf.stripped
+# The payload's ELF, flattened into one image the menu DMAs in a single go, and
+# that image's layout as defines for PayloadImage.cpp. mkpayload.py works both
+# out from the ELF the same way, so they always agree.
+PAYLOAD_ELF    = assets/payload.elf.stripped
+PAYLOAD_LAYOUT = $(BUILD_DIR)/payload_layout.h
+MKPAYLOAD      = ../tools/mkpayload.py
+
+filesystem/payload.bin: $(PAYLOAD_ELF) $(MKPAYLOAD)
 	@mkdir -p $(dir $@)
-	@echo "    [ELF] $@"
-	@cp "$<" "$@"
+	@echo "    [PAYLOAD] $@"
+	@python3 -I $(MKPAYLOAD) bin "$<" "$@"
+
+$(PAYLOAD_LAYOUT): $(PAYLOAD_ELF) $(MKPAYLOAD)
+	@mkdir -p $(dir $@)
+	@echo "    [PAYLOAD] $@"
+	@python3 -I $(MKPAYLOAD) header "$<" "$@"
+
+$(BUILD_DIR)/src/general/PayloadImage.o: CXXFLAGS += -I$(BUILD_DIR)
+$(BUILD_DIR)/src/general/PayloadImage.o: $(PAYLOAD_LAYOUT)
 
 objs = $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(src))) \
        $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(src))) \
        $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(src)))
 
-$(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv)
-$(BUILD_DIR)/$(PROJECT_NAME).elf: $(objs)
+# Per-game state DSOs (filesystem/state/<code>.dso), packed into the DFS
+include src/dso/dso.mk
+
+$(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv) $(GAME_STATE_DSOS)
+$(BUILD_DIR)/$(PROJECT_NAME).elf: $(objs) $(BUILD_DIR)/$(PROJECT_NAME).externs
+
+# The symbols DSOs import from the menu (e.g. a memset the compiler emitted).
+# n64.mk links the ELF with this so they're kept, and limits the msym to them;
+# without it the msym holds every global symbol in the menu (~100 KB).
+$(BUILD_DIR)/$(PROJECT_NAME).externs: $(GAME_STATE_DSOS)
+
+# The menu's symbol table, so dlopen can resolve those imports
+$(BUILD_DIR)/$(PROJECT_NAME).msym: $(BUILD_DIR)/$(PROJECT_NAME).elf $(BUILD_DIR)/$(PROJECT_NAME).externs
 
 $(PROJECT_NAME).z64: N64_ROM_TITLE="WonderMenu"
-$(PROJECT_NAME).z64: $(BUILD_DIR)/$(PROJECT_NAME).dfs
+$(PROJECT_NAME).z64: $(BUILD_DIR)/$(PROJECT_NAME).dfs $(BUILD_DIR)/$(PROJECT_NAME).msym
+
+ifeq ($(RELEASE),1)
+# n64.mk's %.z64 recipe without the backtrace symbol table (.sym), which only
+# the crash screen reads, and never into RAM. A release crash shows addresses
+# rather than function names. The .msym stays: dlopen needs it for the DSOs.
+# Keep in step with the recipe in n64.mk.
+RELEASE_ELF = $(BUILD_DIR)/$(PROJECT_NAME).elf
+
+$(PROJECT_NAME).z64: $(RELEASE_ELF)
+	@echo "    [Z64] $@"
+	cp $(RELEASE_ELF) $(RELEASE_ELF).stripped
+	$(N64_STRIP) -s $(RELEASE_ELF).stripped
+	$(N64_ELFCOMPRESS) -o $(dir $(RELEASE_ELF)) -c $(N64_ROM_ELFCOMPRESS) $(RELEASE_ELF).stripped
+	@rm -f $@
+	$(N64_TOOL) $(N64_TOOLFLAGS) --output $(BUILD_DIR)/$@.tmp \
+		--align 256 $(RELEASE_ELF).stripped \
+		$(filter %.dfs, $^) \
+		$(filter %.msym, $^) \
+		$(N64_TOOLFILES)
+	if [ ! -z "$(strip $(N64_ED64ROMCONFIGFLAGS))" ]; then \
+		$(N64_ED64ROMCONFIG) $(N64_ED64ROMCONFIGFLAGS) $(BUILD_DIR)/$@.tmp; \
+	fi
+	if [ ! -z "$(N64_ROM_METADATA)" ]; then \
+		echo "    [METADATA] $@"; \
+		$(N64_METADATA) $(N64_METADATAFLAGS) $(BUILD_DIR)/$@.tmp $(N64_ROM_METADATA); \
+	fi
+	@mv $(BUILD_DIR)/$@.tmp $@
+endif
 
 rom-with-size: $(PROJECT_NAME).z64
 	@python3 -c "import os,struct; p='$<'; s=os.path.getsize(p); \
@@ -180,14 +243,12 @@ rom-with-size: $(PROJECT_NAME).z64
 	print(f'    [SIZE] {s} bytes -> {p}')"
 
 clean:
-	rm -rf $(BUILD_DIR) *.z64
+	rm -rf $(BUILD_DIR) build/release *.z64
 	rm -rf filesystem
 
+# Its own build directory, so objects built with and without NDEBUG never mix
 release:
-	$(MAKE) all assets_n64= assets_ini= assets_bin= BUILD_DIR=build/console PROJECT_NAME=$(PROJECT_NAME)-release
-
-release-bundle:
-	$(MAKE) all BUILD_DIR=build/console PROJECT_NAME=$(PROJECT_NAME)-release-bundle
+	$(MAKE) all BUILD_DIR=build/release PROJECT_NAME=$(PROJECT_NAME)-release RELEASE=1
 
 build_lib:
 	rm -rf $(BUILD_DIR) *.z64
@@ -208,4 +269,4 @@ sc64:
 
 -include $(objs:.o=.d)
 
-.PHONY: all clean release release-bundle emu rom-with-size sc64
+.PHONY: all clean release rom-with-size sc64

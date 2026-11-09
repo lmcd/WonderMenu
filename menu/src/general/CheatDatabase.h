@@ -16,12 +16,22 @@
 // "?" an alias for X). Each option line supplies one value per wildcard.
 static constexpr size_t MAX_CHEAT_WILDCARDS = 3;
 
+enum CheatGroupType: uint8_t {
+    CHEAT_GROUP_USER_SELECTABLE,
+    CHEAT_GROUP_REQUIRED,
+    CHEAT_GROUP_osViSwapBuffer,
+    CHEAT_GROUP_osSpTaskLoad,
+    CHEAT_GROUP_osContGetReadData,
+    CHEAT_GROUP_osContStartReadData
+};
+
 struct __attribute__((packed)) CheatGroup {
     char title[50];
     uint16_t cheatStartIndex;   // span of ALL cheats in sub-tree
     uint16_t cheatCount;
     uint16_t groupStartIndex;   // first direct child group in groups[]
     uint16_t groupCount;        // number of direct child groups
+    CheatGroupType cheatGroupType;
 };
 
 // One choice offered for a multiple choice cheat. valueN is the value taken by
@@ -57,6 +67,10 @@ struct CheatDatabase {
 
     void print() const;
 
+    // Indexes of every cheat in a group of the given type, including those in
+    // its sub-groups, in database order and without repeats.
+    std::vector<uint16_t> cheatIndexesForGroupType(CheatGroupType type) const;
+
     #ifndef N64
     // Serializes to a flat byte array in big-endian.
     // Layout:
@@ -64,7 +78,7 @@ struct CheatDatabase {
     //   uint16_t cheatCount
     //   uint16_t codeCount
     //.  uint16_t wildcardOptionsCount
-    //   CheatGroup[groupCount]  { char title[50], u16 cheatStartIndex, u16 cheatCount, u16 groupStartIndex, u16 groupCount }
+    //   CheatGroup[groupCount]  { char title[50], u16 cheatStartIndex, u16 cheatCount, u16 groupStartIndex, u16 groupCount, u8 cheatGroupType }
     //   Cheat[cheatCount]       { char title[50], u16 codesStartIndex, u16 codesCount, u16 wildcardStartIndex, u16 wildcardCount }
     //   CheatCode[codeCount]    { u32 address, u16 value, u8 wildcardIndex }
     //   CheatWildcardOption[wildcardOptionsCount] { char title[46], u16 value1, u16 value2, u16 value3 }

@@ -39,6 +39,16 @@ public:
         tableView.rowCount = (int)buttons.size();
     }
 
+    void setButtons(std::vector<std::string> titles) {
+        buttons = std::move(titles);
+
+        tableView.rowCount = (int)buttons.size();
+    }
+
+    void setInitialButtonIndex(int index) {
+        initialSelectedRowIndex = index;
+    }
+
     void updateViews(const RenderInfo& renderInfo);
     void update(const UpdateInfo& updateInfo) override;
 };

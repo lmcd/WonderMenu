@@ -5,6 +5,8 @@
 
 #include "SpeedrunRowView.h"
 
+#include "ui/Theme.h"
+
 SpeedrunRowView::SpeedrunRowView() {
     checkboxView.isRadio = true;
 
@@ -25,11 +27,8 @@ SpeedrunRowView::SpeedrunRowView() {
 void SpeedrunRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
-    Color titleColor1 = Color::WHITE;
-    titleColor1.a *= 0.85f;
-
-    Color titleColor2 = Color::WHITE;
-    titleColor2.a *= 0.35f;
+    Color titleColor1 = Theme::labelColor;
+    Color titleColor2 = Theme::secondaryLabelColor;
 
     Color selectedTitleColor1 = Color::WHITE;
     selectedTitleColor1.a *= 1.00f;
@@ -75,7 +74,7 @@ void SpeedrunRowView::update(const RenderInfo& renderInfo) {
 
     subtitleView.frame.origin = subtitlePosition;
     subtitleView.textColor = isSelected ? selectedSubtitleColor : subtitleColor1;
-    subtitleView.alternateColor = subtitleColor2;
+    subtitleView.alternateColor = hasOptionSubtitle ? Color(2, 163, 238) : subtitleColor2;
 
     if (isSelected) {
         subtitleView.startAnimating();

@@ -9,32 +9,54 @@
 #include <t3d/t3d.h>
 #include <sys/stat.h>
 
-// Game data and database
 #include "flashcart/flashcart.h"
 #include "general/GameDatabase.h"
 #include "general/GameLibrary.h"
 
 // Scene system
+#include "general/CartAllocator.h"
+#include "rdpq_text.h"
 #include "ui/SceneRenderer.h"
 #include "ui/scenes/IntroScene.h"
 #include "ui/scenes/TestScene.h"
+#include "utils/utils.h"
 
 BootSession bootSession;
 WarmResetState warmResetState;
-
-uint32_t get_rom_size(void) {
-    return io_read(ROM_ADDRESS + 0x18);  // header reserved word, big-endian
-}
-
-uint32_t get_entry_point(void) {
-    return io_read(ROM_ADDRESS + 0x08);  // header entry point (initial PC), big-endian
-}
+// CartAllocator cartAllocator;
 
 // We don't ever return from `main`
 [[noreturn]]
 int main()
 {
-    int32_t t0 = get_ticks();
+    // using enum CartAllocator::Region;
+    // using enum CartAllocator::Alignment;
+
+    // cartAllocator.allocate(
+    //     REGION_MENU,
+    //     ALIGN_LEFT,
+    //     CartAllocator::romSize()
+    // );
+    // cartAllocator.allocate(
+    //     REGION_TILES_A, 
+    //     ALIGN_LEFT,
+    //     DB_L_LABEL_SIZE
+    // );
+    // cartAllocator.allocate(
+    //     REGION_TILES_B, 
+    //     ALIGN_LEFT,
+    //     DB_L_LABEL_SIZE
+    // );
+    // cartAllocator.allocate(
+    //     REGION_DATABASE,
+    //     ALIGN_LEFT,
+    //     KiB(128)
+    // );
+    // cartAllocator.allocate(
+    //     REGION_WARM_RESET_STATE,
+    //     ALIGN_RIGHT,
+    //     WARM_RESET_STATE_DATA_SIZE
+    // );
 
     // Init emulator logging
     debug_init_emulog();
@@ -49,13 +71,13 @@ int main()
     // Restore state from previous launch of WonderMenu, following warm-reset
     warmResetState.restore();
 
-    uint32_t t1 = get_ticks();
-
-    debugf("[main] Base loaded: %.3fs\n", (float)TICKS_TO_MS(t1 - t0) / 1000.0f);
-
-    resolution_t resolution = RESOLUTION_640x480;
-
-    display_init(resolution, DEPTH_16_BPP, BUFF_COUNT, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS_DEDITHER);
+    display_init(
+        RESOLUTION_640x480, 
+        DEPTH_16_BPP, 
+        FRAMEBUFFER_COUNT, 
+        GAMMA_NONE, 
+        FILTERS_RESAMPLE_ANTIALIAS_DEDITHER
+    );
 
     rdpq_init();
 
@@ -67,10 +89,8 @@ int main()
     // Disable fog
     t3d_fog_set_enabled(false);
 
+    // Enabled RDPQ validator
     // rdpq_debug_start();
-
-    debugf("[main] ROM Size: %li\n", get_rom_size());
-    debugf("[main] ROM Entry Point: 0x%08lX\n", get_entry_point());
 
     rdpq_text_register_font(FONT_BUILTIN_DEBUG_MONO, rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO));
 

@@ -17,15 +17,14 @@ std::vector<uint8_t> SpeedrunDatabase::serialize() const {
     std::vector<uint8_t> out;
 
     writeU32BE(out, gameCRC1);
-    writeU32BE(out, currentFrameAddress);
-    writeU32BE(out, controllerWriteAddress);
-    writeU32BE(out, controllerReadAddress);
+    writeU32BE(out, reserved1);
+    writeU32BE(out, reserved2);
+    writeU32BE(out, 0);
+    writeU32BE(out, 0);
 
-    out.push_back((uint8_t)frameDelayOffset);
+    out.push_back(0);
     out.push_back((uint8_t)groups.size());
     out.push_back((uint8_t)entries.size());
-
-    // reserved
     out.push_back(0);
 
     for (const SpeedrunGroup& group : groups) {

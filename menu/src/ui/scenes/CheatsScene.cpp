@@ -15,11 +15,13 @@
 #include "general/Game.h"
 #include "ui/popovers/ChooseCheatOptionPopover.h"
 #include "ui/SceneRenderer.h"
+#include "ui/Theme.h"
 #include "ui/views/ScrollbarView.h"
 
-CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase)
+CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game& game)
     : GameInfoTabScene(),
       cheatsDatabase(cheatsDatabase),
+      game(game),
       expandedGroupIndexes(state.expandedGroupIndexes),
       enabledCheatIndexes(state.enabledCheatIndexes),
       multipleChoiceIndexes(state.multipleChoiceIndexes) {
@@ -28,11 +30,27 @@ CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase)
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_15;
-    labelView.setString(is_memory_expanded() ? "No Cheats Found" : "Expansion Pak Required");
-    labelView.textColor = Color(128);
+    labelView.textColor = Theme::emptyListLabelColor;
+
+    if (game.requiresExpansionPak()) {
+        labelView.setString("Not Supported for this Game");
+    }
+    else if (is_memory_expanded()) {
+        labelView.setString("No Cheats Found");
+    }
+    else {
+        labelView.setString("Expansion Pak Required");
+
+        expansionPakImage = Image("rom:/ui/ExpansionPak.RGBA32.sprite");
+        expansionPakImageView.image = &expansionPakImage;
+    }
 
     view.addSubview(&tableView);
     view.addSubview(&labelView);
+
+    if (expansionPakImage.isValid()) {
+        view.addSubview(&expansionPakImageView);
+    }
 
     if (rows.size() > 0) {
         mainContentView = &tableView;
@@ -83,6 +101,14 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, uint16_t parentRowI
         if (isGroup) {
             const CheatGroup& childGroup = cheatsDatabase->groups[groupIndex];
 
+            // Groups the menu applies itself (required codes, hooks) aren't
+            // offered: skip the group and every cheat it covers
+            if (childGroup.cheatGroupType != CHEAT_GROUP_USER_SELECTABLE) {
+                cheatIndex = childGroup.cheatStartIndex + childGroup.cheatCount;
+                groupIndex++;
+                continue;
+            }
+
             bool isExpanded = expandedGroupIndexes.contains(groupIndex);
 
             rows.push_back({
@@ -126,6 +152,8 @@ void CheatsScene::buildRowsForGroup(uint16_t baseGroupIndex, uint16_t parentRowI
 void CheatsScene::rebuildRows() {
     rows.clear();
 
+    needsRowViewUpdate = true;
+
     if (!cheatsDatabase || cheatsDatabase->groups.empty()) {
         return;
     }
@@ -135,6 +163,10 @@ void CheatsScene::rebuildRows() {
 }
 
 void CheatsScene::updateViews(const RenderInfo&) {
+    // Taken before updateGroupTransition(), which clears `expandRowCount` on
+    // the animation's final frame, so that frame still counts as animating
+    bool isGroupAnimating = (tableView.expandRowCount > 0);
+
     bool needsRowRebuild = tableView.updateGroupTransition();
 
     if (needsRowRebuild) {
@@ -143,7 +175,7 @@ void CheatsScene::updateViews(const RenderInfo&) {
 
     int yPosition = 84;
 
-    bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded();
+    bool tableIsHidden = (tableView.rowCount == 0) || !is_memory_expanded() || game.requiresExpansionPak();
 
     tableView.rowCount = rows.size();
     tableView.frame = Rect(0, yPosition, view.frame.size.width, view.frame.size.height);
@@ -154,12 +186,57 @@ void CheatsScene::updateViews(const RenderInfo&) {
     labelView.maxWidth = view.frame.size.width;
     labelView.isHidden = !tableIsHidden;
 
+    if (expansionPakImage.isValid()) {
+        // Centred together on where the label sits alone, so the label's own
+        // height cancels out and only the image and gap shift them
+        constexpr int labelY = 250;
+        constexpr int imageSpacing = 36;
+
+        Size imageSize = expansionPakImage.size();
+
+        expansionPakImageView.frame = Rect(
+            Vec2(
+                view.frame.size.width / 2 - imageSize.midX(),
+                labelY - (imageSize.height + imageSpacing) / 2
+            ),
+            imageSize
+        );
+
+        labelView.frame.origin.y = expansionPakImageView.frame.maxY() + imageSpacing;
+    }
+
+    expansionPakImageView.isHidden = labelView.isHidden;
+
     if (!labelView.isHidden) {
         // This is a hack for a compositing issue (cart drawing over text)
         // TODO: fix
         labelView.setNeedsDisplay();
     }
 
+    int scrollPosition = tableView.scrollPosition;
+    int visibleRowCount = tableView.visibleRowCount();
+
+    bool tableDidChange = needsRowViewUpdate || (scrollPosition != lastScrollPosition) || (visibleRowCount != lastVisibleRowCount);
+
+    if (tableDidChange) {
+        updateRowViews();
+
+        needsRowViewUpdate = false;
+        lastScrollPosition = scrollPosition;
+        lastVisibleRowCount = visibleRowCount;
+    }
+
+    // The content height changes every frame while a group expands/collapses
+    if (tableDidChange || isGroupAnimating) {
+        scrollbarView->contentHeight = tableView.contentHeight() + tableView.frame.minY();
+        scrollbarView->scrollPosition = tableView.scrollPosition * tableView.paddedRowHeight();
+
+        tableView.backgroundRectView.setNeedsDisplay(scrollbarView->worldFrame());
+        tableView.selectedRowView.setNeedsDisplay(scrollbarView->worldFrame());
+    }
+}
+
+void CheatsScene::updateRowViews() {
     auto indexRange = tableView.visibleIndexRange();
     int i = 0;
 
@@ -203,22 +280,22 @@ void CheatsScene::updateViews(const RenderInfo&) {
             }
         }
     }
-
-    scrollbarView->contentHeight = tableView.contentHeight() + tableView.frame.minY();
-    scrollbarView->scrollPosition = tableView.scrollPosition * tableView.paddedRowHeight();
-
-    tableView.backgroundRectView.setNeedsDisplay(scrollbarView->worldFrame());
-    tableView.selectedRowView.setNeedsDisplay(scrollbarView->worldFrame());
 }
 
 void CheatsScene::update(const UpdateInfo& updateInfo) {
     joypad_buttons_t btn = updateInfo.btn;
+
+    bootSession.advance();
 
     if (tableView.handleInputs(updateInfo)) {}
 
     InputWatcher::Event aButtonEvent = aButtonWatcher.update(updateInfo.joypad.btn.a);
 
     if (aButtonEvent == InputWatcher::BUTTON_UP) {
+        if (tableView.isHidden) {
+            return;
+        }
+
         const int selectedIndex = tableView.selectedRowIndex;
         RowInfo& row = rows[selectedIndex];
 
@@ -254,12 +331,19 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
         finishCheatSelection(row);
     }
     else if (aButtonEvent == InputWatcher::BUTTON_DOWN) {
+        if (tableView.isHidden) {
+            return;
+        }
+        
         const int selectedIndex = tableView.selectedRowIndex;
         const RowInfo& row = rows[selectedIndex];
         
         if (row.isGroup) {
             int index = row.index;
-            
+
+            // The group's chevron state changes either way
+            needsRowViewUpdate = true;
+
             if (!expandedGroupIndexes.erase(index)) {
                 expandedGroupIndexes.insert(index);
 
@@ -309,6 +393,9 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
 }
 
 void CheatsScene::finishCheatSelection(const RowInfo& row) {
+    // The cheat's checkbox/subtitle and its parents' counts have changed
+    needsRowViewUpdate = true;
+
     // Traverse up the row hierarchy and refresh each parent group's count.
     uint16_t parentIndex = row.parentRowIndex;
 

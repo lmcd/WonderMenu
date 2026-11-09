@@ -7,18 +7,19 @@
 #include <cmath>
 
 #include "ImageView.h"
+#include "util/Vec2.h"
 
 void ImageView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 
-    if (sprite != lastSprite) {
+    if (image != lastImage) {
         setNeedsRender();
-        lastSprite = sprite;
+        lastImage = image;
     }
 
-    if (spriteVersion != lastSpriteVersion) {
+    if (imageVersion != lastImageVersion) {
         setNeedsRender();
-        lastSpriteVersion = spriteVersion;
+        lastImageVersion = imageVersion;
     }
 
     if (scaleMode != lastScaleMode) {
@@ -26,17 +27,83 @@ void ImageView::update(const RenderInfo& renderInfo) {
         setNeedsRender();
         lastScaleMode = scaleMode;
     }
+
+    if (usesBilinearFiltering != lastUsesBilinearFiltering) {
+        setNeedsRender();
+        lastUsesBilinearFiltering = usesBilinearFiltering;
+    }
+
+    if (occludedRect != lastOccludedRect) {
+        // Redraws whatever the old rect hid. A translucent sprite would blend
+        // over its own pixels, so those are cleared first.
+        setNeedsRender();
+
+        if (!finalIsOpaque) {
+            setNeedsClear();
+        }
+
+        lastOccludedRect = occludedRect;
+    }
+}
+
+bool ImageView::isOccluding(const Rect& rect) const {
+    return occludedRect.size.width > 0
+        && occludedRect.size.height > 0
+        && rect.intersects(occludedRect);
+}
+
+void ImageView::drawPart(const Rect& rect, const rdpq_blitparms_t& params, const Rect& part) {
+    Rect scissorRect = hasScissor ? part.intersection(currentScissor()) : part;
+
+    if (scissorRect.size.width <= 0 || scissorRect.size.height <= 0) {
+        return;
+    }
+
+    float scaleX = (params.scale_x != 0.0f) ? params.scale_x : 1.0f;
+    float scaleY = (params.scale_y != 0.0f) ? params.scale_y : 1.0f;
+
+    int sourceWidth  = (params.width  != 0) ? params.width  : image->size().width  - params.s0;
+    int sourceHeight = (params.height != 0) ? params.height : image->size().height - params.t0;
+
+    // The texels under the part, relative to the source crop. Filtering
+    // samples a neighbour, so it needs one more texel each side.
+    int padding = params.filtering ? 1 : 0;
+
+    int s0 = std::max(0, (int)floorf((scissorRect.minX() - rect.minX()) / scaleX) - padding);
+    int t0 = std::max(0, (int)floorf((scissorRect.minY() - rect.minY()) / scaleY) - padding);
+    int s1 = std::min(sourceWidth,  (int)ceilf((scissorRect.maxX() - rect.minX()) / scaleX) + padding);
+    int t1 = std::min(sourceHeight, (int)ceilf((scissorRect.maxY() - rect.minY()) / scaleY) + padding);
+
+    if (s1 <= s0 || t1 <= t0) {
+        return;
+    }
+
+    rdpq_blitparms_t partParams = params;
+    partParams.s0     = params.s0 + s0;
+    partParams.t0     = params.t0 + t0;
+    partParams.width  = s1 - s0;
+    partParams.height = t1 - t0;
+
+    // Clips the texels outside the part, which only exist when scaled or
+    // padded
+    pushScissor(scissorRect);
+
+    Vec2 position = Vec2(
+      rect.minX() + s0 * scaleX,
+      rect.minY() + t0 * scaleY
+    );
+
+    drawImage(image, position, &partParams);
+
+    popScissor();
 }
 
 Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
-    Size spriteSize = Size(
-        sprite->width,
-        sprite->height
-    );
+    Size spriteSize = image->size();
 
     // Size is integral, so scale ratios must be computed in float.
-    float spriteWidth  = sprite->width;
-    float spriteHeight = sprite->height;
+    float spriteWidth  = spriteSize.width;
+    float spriteHeight = spriteSize.height;
 
     switch (scaleMode) {
         case SCALE_NONE:
@@ -106,7 +173,19 @@ Rect ImageView::layoutSprite(rdpq_blitparms_t& params) const {
 void ImageView::clear(const RenderInfo& renderInfo) {
     int bufferIndex = renderInfo.bufferIndex;
 
-    clearRect(drawnBoundingBox[bufferIndex]);
+    Rect drawnRect = drawnBoundingBox[bufferIndex];
+
+    if (isOccluding(drawnRect)) {
+        Rect visibleRects[4];
+        int visibleCount = drawnRect.subtract(occludedRect, visibleRects);
+
+        for (int i = 0; i < visibleCount; i++) {
+            clearRect(visibleRects[i], finalBlendColor);
+        }
+    }
+    else {
+        clearRect(drawnRect, finalBlendColor);
+    }
 
     drawnBoundingBox[bufferIndex] = Rect();
 }
@@ -120,7 +199,7 @@ void ImageView::render(const RenderInfo& renderInfo) {
         return;
     }
 
-    if (sprite == nullptr) {
+    if (image == nullptr || !image->isValid()) {
         return;
     }
 
@@ -129,33 +208,58 @@ void ImageView::render(const RenderInfo& renderInfo) {
     rdpq_blitparms_t params = {};
     Rect rect = layoutSprite(params);
 
+    // Compensates for filtering artifacts where rdpq splits a large sprite
+    // into TMEM-sized strips
+    params.filtering = usesBilinearFiltering;
+
     Color alphaColor = Color::BLACK;
     alphaColor.a *= finalOpacity;
 
     rdpq_mode_push();
 
     rdpq_mode_begin();
-        setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (TEX0, 0, PRIM, 0)));
+        if (ignoresTextureAlpha) {
+            setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (0, 0, 0, PRIM)));
+        }
+        else {
+            setCombiner(RDPQ_COMBINER1((0, 0, 0, TEX0), (TEX0, 0, PRIM, 0)));
+        }
         setBlender(finalIsOpaque ? WITH_BLEND_COLOR : WITH_FRAMEBUFFER);
+
+        if (usesBilinearFiltering) {
+            rdpq_mode_filter(FILTER_BILINEAR);
+        }
     rdpq_mode_end();
 
     setPrimitiveColor(alphaColor);
     setBlendColor(finalBlendColor);
 
-    // ASPECT_FILL rounds its source crop up so the image always covers the
-    // finalFrame, which can spill a fraction of a pixel past the edges -- clip it so
-    // the view never draws outside its own bounds.
-    bool needsScissor = (scaleMode == ASPECT_FILL);
+    if (isOccluding(rect)) {
+        // Each part is scissored to itself, which also covers ASPECT_FILL's
+        // overspill below
+        Rect visibleRects[4];
+        int visibleCount = rect.subtract(occludedRect, visibleRects);
 
-    if (needsScissor) {
-        Rect scissorRect = rect;
-        pushScissor(scissorRect);
+        for (int i = 0; i < visibleCount; i++) {
+            drawPart(rect, params, visibleRects[i]);
+        }
     }
+    else {
+        // ASPECT_FILL rounds its source crop up so the image always covers the
+        // finalFrame, which can spill a fraction of a pixel past the edges -- clip it so
+        // the view never draws outside its own bounds.
+        bool needsScissor = (scaleMode == ASPECT_FILL);
 
-    drawSprite(sprite, rect.origin, &params);
+        if (needsScissor) {
+            Rect scissorRect = rect;
+            pushScissor(scissorRect);
+        }
 
-    if (needsScissor) {
-        popScissor();
+        drawImage(image, rect.origin, &params);
+
+        if (needsScissor) {
+            popScissor();
+        }
     }
 
     rdpq_mode_pop();

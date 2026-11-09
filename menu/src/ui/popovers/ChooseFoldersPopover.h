@@ -24,7 +24,7 @@ private:
     InputWatcher aButtonWatcher;
 
     std::vector<FolderEntry> folderEntries;
-    sprite_t* sdCardSprite = nullptr;
+    Image sdCardImage = Image("rom:/ui/SD-128.RGBA16.sprite");
 
     void toggleSelectedFolder();
 

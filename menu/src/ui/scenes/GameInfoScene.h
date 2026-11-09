@@ -36,6 +36,11 @@ public:
     GameInfoScene(GameInfoState& state, Game& game, GameDatabase& database);
 
     int contentYOffset = 0;
+
+    // Set by GameInfoTransitionScene while it's moving this scene back out of
+    // view, and passed on to the current tab
+    bool isAnimatingOut = false;
+
     TabControlView tabControlView;
     ScrollbarView scrollbarView;
     View* mainContentView = nullptr;

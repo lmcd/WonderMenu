@@ -14,8 +14,10 @@
 #include "main.h"
 
 #include "general/SpeedrunDatabase.h"
+#include "ui/Image.h"
 #include "ui/scenes/GameInfoTabScene.h"
 #include "ui/views/TableView.h"
+#include "ui/views/drawables/ImageView.h"
 #include "ui/views/drawables/LabelView.h"
 #include "ui/views/rows/SpeedrunRowView.h"
 
@@ -29,12 +31,18 @@ private:
      * Data associated with a row in the cheats table.
      */
     struct RowInfo {
-        // Does this row represent a group/folder?
-        // true if row represents a group
-        // false if row represents an entry
-        bool isGroup;
-        // Indexes `SpeedrunDatabase::groups` when `isGroup` is `true`
-        // Indexes `SpeedrunDatabase::entries` when `isGroup` is `false`
+        enum Type : uint8_t {
+            CREATE,
+            GROUP,
+            ENTRY,
+            UNCATEGORISED_GROUP,
+            UNCATEGORISED_ENTRY
+        };
+
+        Type type;
+        // Indexes `SpeedrunDatabase::groups` for `GROUP`
+        // Indexes `SpeedrunDatabase::entries` for `ENTRY`
+        // Indexes `uncategorisedM64Files` for `UNCATEGORISED_ENTRY`
         uint16_t index;
         uint16_t parentRowIndex;
         uint8_t indentLevel = 0;
@@ -43,12 +51,12 @@ private:
         uint16_t childRowCount = 0;
         // Runs in this group, which `childRowCount` only reflects while expanded
         uint16_t entryCount = 0;
-        bool isUncategorised = false;
-        bool isCreate = false;
+
+        bool isGroup() const { return type == GROUP || type == UNCATEGORISED_GROUP; }
     };
 
     SpeedrunDatabase* speedrunDatabase;
-    Game* game;
+    Game& game;
 
     // Flat list of currently visible items (re-built on expand/collapse)
     std::vector<RowInfo> rows;
@@ -76,11 +84,16 @@ private:
     bool& isRecording;
     int& selectedRow;
     uint32_t& selectedCRC;
+    uint8_t& numberOfControllers;
 
     SpeedrunsState& state;
 
     TableView<SpeedrunRowView> tableView;
     LabelView<64> labelView;
+
+    // Only loaded when the Expansion Pak is missing
+    Image expansionPakImage;
+    ImageView expansionPakImageView;
 
     void rebuildRows();
     int selectionKey(const RowInfo& row) const;
@@ -88,7 +101,8 @@ private:
 public:
     const char* name() override { return "SpeedrunsScene"; }
 
-    SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game* game);
+    SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game& game);
+    ~SpeedrunsScene();
 
     void didBeginScene(SceneEntry entry);
     void update(const UpdateInfo& updateInfo) override;

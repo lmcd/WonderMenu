@@ -87,7 +87,8 @@ typedef void flashcart_progress_callback_t (float progress);
  * Holds the state required to load a ROM into the flashcart one chunk at a time,
  * so that the caller can interleave the transfer with other work (for example
  * rendering the menu). The load starts at @ref initial_chunk, runs to the end of
- * the ROM, then wraps around to fill in the chunks before it.
+ * the SDRAM portion, loads anything past it (the SC64's shadow and extended
+ * regions), then wraps around to fill in the chunks before the initial chunk.
  */
 typedef struct {
     FIL fil; /**< Open ROM file object */
@@ -98,7 +99,9 @@ typedef struct {
     unsigned int initial_chunk; /**< Chunk the session started at */
     float progress; /**< Load progress in the range 0.0f - 1.0f */
     unsigned int loaded_bytes; /**< Number of bytes loaded so far */
-    bool has_loaded_end_chunk; /**< True once the end of the ROM has been reached and the session wrapped around */
+    bool has_loaded_end_chunk; /**< True once the end of the SDRAM portion has been reached and the session wrapped around */
+    size_t flash_offset; /**< File offset of the next byte to load past the SDRAM portion, 0 until the cart has been set up for it (SC64 only) */
+    bool is_complete; /**< True once the whole ROM is loaded and the file closed */
 } flashcart_load_rom_session_t;
 
 /** @brief Flashcart Structure */
@@ -115,8 +118,6 @@ typedef struct {
     flashcart_load_rom_session_t (*begin_load_rom_session) (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk);
     /** @brief The flashcart chunked ROM load single chunk function */
     flashcart_err_t (*load_next_rom_chunk) (flashcart_load_rom_session_t *session, bool load_beginning_chunks);
-    /** @brief The flashcart chunked ROM load session finish function */
-    flashcart_err_t (*finish_load_rom_session) (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress);
     /** @brief The flashcart file load function */
     flashcart_err_t (*load_file) (char *file_path, uint32_t rom_offset, uint32_t file_offset);
     /** @brief The flashcart save file load function */
@@ -186,8 +187,9 @@ flashcart_err_t flashcart_load_rom (char *rom_path, bool byte_swap, flashcart_pr
 /**
  * @brief Start a chunked ROM load session.
  *
- * The returned session must be advanced with @ref flashcart_load_next_rom_chunk and
- * completed with @ref flashcart_finish_load_rom_session (which also closes the file).
+ * The returned session is advanced with @ref flashcart_load_next_rom_chunk until
+ * its @c is_complete is set, by which point the file is closed. Or
+ * @ref flashcart_finish_load_rom_session does that in one go.
  *
  * @param rom_path The path to the ROM file.
  * @param rom_object Optional file locator captured while enumerating the directory (may be NULL).
@@ -208,14 +210,30 @@ bool flashcart_load_rom_session_valid (const flashcart_load_rom_session_t *sessi
 /**
  * @brief Load the next chunk of a chunked ROM load session.
  *
+ * Closes the file and sets @c is_complete once the last chunk is loaded.
+ *
  * @param session Pointer to the load session.
- * @param load_beginning_chunks Whether to keep loading the chunks before the initial chunk once the end of the ROM has been reached.
- * @return flashcart_err_t Error code. FLASHCART_ERR_LOAD is returned once there is nothing left to load.
+ * @param load_beginning_chunks Whether to carry on past the end of the SDRAM portion: into the SC64's shadow and extended regions, then the chunks before the initial chunk.
+ * @return flashcart_err_t Error code. FLASHCART_ERR_LOAD is returned without loading anything when the session is complete, or is waiting on load_beginning_chunks.
  */
 flashcart_err_t flashcart_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks);
 
 /**
+ * @brief Mark a chunked ROM load session's chunks from the initial chunk to the end of the SDRAM portion as loaded, without loading them.
+ *
+ * For when the ROM is already in the cart SDRAM, e.g. after a warm reset. Only
+ * the chunks before the initial chunk, which the menu overwrote, are still
+ * loaded. Anything outside the SDRAM portion (the SC64's shadow and extended
+ * regions) is still loaded too.
+ *
+ * @param session Pointer to the load session. Must not have loaded any chunks yet.
+ */
+void flashcart_mark_end_rom_chunks_loaded (flashcart_load_rom_session_t *session);
+
+/**
  * @brief Load everything left in a chunked ROM load session and close it.
+ *
+ * Blocks, calling @ref flashcart_load_next_rom_chunk until the session is complete.
  *
  * @param session Pointer to the load session.
  * @param progress Callback function for progress updates.

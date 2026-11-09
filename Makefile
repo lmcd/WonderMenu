@@ -3,12 +3,13 @@
 # Builds the two sub-projects in dependency order:
 #
 #   payload/  -- the Expansion Pak resident payload (payload.z64 + a stripped
-#                ELF that the menu loads in place at runtime)
+#                ELF, which the menu's build flattens into the payload.bin it
+#                loads in place at runtime)
 #   menu/     -- the menu ROM itself (WonderMenu.z64)
 #
-# The menu embeds the payload's stripped ELF as a filesystem asset (see
-# ELFFile / IntroScene), so the payload must be built first and its output
-# copied into menu/assets/ before the menu's DFS is packed.
+# The menu embeds the payload as a filesystem asset (see PayloadImage /
+# BootSession), so the payload must be built first and its output copied into
+# menu/assets/ before the menu's DFS is packed.
 
 N64_INST ?= /opt/libdragon
 export N64_INST
@@ -58,39 +59,51 @@ menu: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu
 .PHONY: menu
 
+# The debug build is the menu's default one
+debug: menu
+.PHONY: debug
+
 # Pass-throughs to menu/, but gated on a current payload asset first, so a
-# release ROM can never embed a stale payload.elf.stripped. `deploy` picks
-# this up transitively via its `release` prerequisite.
-release release-bundle sc64: $(MENU_PAYLOAD_DEP)
+# release ROM can never embed a stale payload.elf.stripped.
+release sc64: $(MENU_PAYLOAD_DEP)
 	$(MAKE) -C menu $@
-.PHONY: release release-bundle sc64
+.PHONY: release sc64
 
-# --- hardware --------------------------------------------------------------
+# `console` and `emu` deploy whichever build is named alongside them (e.g.
+# `make release emu`), or the debug build when none is. Each goal is only made
+# once, so the build named first isn't made again.
+ifneq ($(filter release,$(MAKECMDGOALS)),)
+MENU_BUILD = release
+MENU_ROM = menu/WonderMenu-release.z64
+else
+MENU_BUILD = debug
+MENU_ROM = menu/WonderMenu.z64
+endif
 
-SC64DEPLOYER     ?= sc64deployer
-MENU_RELEASE_ROM  = menu/WonderMenu-release.z64
+# --- console ---------------------------------------------------------------
 
-# Build the release ROM, then push it to a connected SummerCart64.
-deploy: release
-	@command -v $(SC64DEPLOYER) >/dev/null || { echo "deploy: $(SC64DEPLOYER) not found in PATH"; exit 1; }
-	@echo "    [SC64] upload $(MENU_RELEASE_ROM)"
-	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_RELEASE_ROM)" --direct
+SC64DEPLOYER ?= sc64deployer
+
+# Build the ROM, then push it to a connected SummerCart64.
+console: $(MENU_BUILD)
+	@command -v $(SC64DEPLOYER) >/dev/null || { echo "console: $(SC64DEPLOYER) not found in PATH"; exit 1; }
+	@echo "    [SC64] upload $(MENU_ROM)"
+	$(SC64DEPLOYER) upload "$(CURDIR)/$(MENU_ROM)" --direct
 	$(SC64DEPLOYER) debug
-.PHONY: deploy
+.PHONY: console
 
 # --- emulator --------------------------------------------------------------
 
-ARES    ?= /Applications/ares.app/Contents/MacOS/ares
-MENU_ROM = menu/WonderMenu.z64
+ARES ?= /Applications/ares.app/Contents/MacOS/ares
 
 # Build the ROM, then boot it in ares. Invoked via the binary inside the bundle
 # rather than `open -a` so that ares takes the ROM path as an argument and its
 # stdout/stderr stay attached to this terminal.
-launch-emu: all
-	@test -x "$(ARES)" || { echo "launch-emu: ares not found at $(ARES)"; exit 1; }
+emu: $(MENU_BUILD)
+	@test -x "$(ARES)" || { echo "emu: ares not found at $(ARES)"; exit 1; }
 	@echo "    [ARES] $(MENU_ROM)"
 	"$(ARES)" "$(CURDIR)/$(MENU_ROM)"
-.PHONY: launch-emu
+.PHONY: emu
 
 # --- housekeeping ----------------------------------------------------------
 

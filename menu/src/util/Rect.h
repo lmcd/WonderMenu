@@ -29,6 +29,8 @@ struct Rect {
     int midX() const { return origin.x + size.width  / 2; }
     int midY() const { return origin.y + size.height / 2; }
     
+    Vec2 mid() const { return Vec2(midX(), midY()); }
+
     int maxX() const { return origin.x + size.width; }
     int maxY() const { return origin.y + size.height; }
 
@@ -148,4 +150,8 @@ struct Rect {
     bool operator!=(const Rect& other) const {
         return !(*this == other);
     }
+
+    static const Rect ZERO;
 };
+
+inline const Rect Rect::ZERO {};

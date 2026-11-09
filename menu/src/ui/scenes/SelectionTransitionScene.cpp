@@ -72,6 +72,7 @@ void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
     listScene->selectionRectView.opacity = lowerHalfOpacity;
     listScene->tabControlView.opacity = lowerHalfOpacity;
     listScene->scrollbarView.opacity = lowerHalfOpacity;
+    listScene->view.isHidden = (lowerHalfOpacity == 0.0f);
 
     uint8_t flags = CART_RENDER_DEFAULT;
     Game* gameShown = listScene->cart3DView.game;
@@ -140,7 +141,7 @@ void SelectionTransitionScene::update(const UpdateInfo& updateInfo) {
 
     if (transition.direction == Transition::FORWARDS) {
         if (passed70Percent) {
-            gameLaunchScene->advanceWorkers();
+            bootSession.advance();
         }
         else if (passed50Percent) {
             Game* game = &gameLaunchScene->game;

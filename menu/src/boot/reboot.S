@@ -53,6 +53,17 @@
 # The DMA engine addresses RDRAM with the low 24 bits.
 #define RDRAM_ADDRESS_MASK  0x00FFFFFF
 
+# DMEM, uncached, all of which is free scratch on the HLE paths.
+#define DMEM_ADDRESS        0xA4000000
+#define DMEM_SIZE           0x1000
+
+# IMEM, uncached. This code runs from it, past its first word.
+#define IMEM_ADDRESS        0xA4001000
+
+# The end of the base 4 MiB of RDRAM, as the DMA engine addresses it. The
+# Expansion Pak above it holds the cheat patcher and engine, which must survive.
+#define RDRAM_BASE_END      0x00400000
+
 
 .set noat
 .section .text.reboot, "ax", %progbits
@@ -150,6 +161,8 @@ run_ipl3:
 #   a2 = game load/entry address (KSEG0, from ROM header offset 0x08)
 #   a3 = cartridge source address of the game code (ROM offset 0x1000)
 #   t8 = where to jump once loaded: the cheat patcher, or a2 when no cheats
+#   s0, s1 = IMEM's and DMEM's first words, as the game's IPL3 leaves them
+#   s2 = non-zero to write s0 and s1 (see hle_enter_game)
 #   s3-s7 = boot flags, already published to the OS info block by boot()
 hle_boot:
     li $t0, PI_ADDRESS
@@ -194,6 +207,7 @@ wait_pi_dma:
 #   a2 = game load/entry address (KSEG0, from ROM header offset 0x08)
 #   a3 = staged copy of the game's first MiB (GAME_STAGING_ADDRESS)
 #   t8 = where to jump once copied: the cheat patcher, or a2 when no cheats
+#   s0-s2 = as for hle_boot
 #   s3-s7 = boot flags, already published to the OS info block by boot()
 #
 # DMEM is free scratch here: the HLE paths never load IPL3 into it, and the RSP
@@ -246,6 +260,72 @@ wait_sp_dma:
 
 # Shared tail for both HLE paths: the game is in RDRAM, hand control to it.
 hle_enter_game:
+    # Zero the rest of the base 4 MiB past the loaded game, which otherwise still
+    # holds whatever the menu left there. The RSP's DMA engine writes it out from
+    # a zeroed DMEM, far quicker than CPU stores. Neither HLE path leaves a DMA
+    # in flight, so DMEM is free.
+    li $t4, DMEM_ADDRESS
+    li $t5, DMEM_ADDRESS + DMEM_SIZE
+zero_dmem:
+    sw $zero, 0($t4)
+    addiu $t4, $t4, 4
+    bne $t4, $t5, zero_dmem
+
+    li $t0, SP_ADDRESS
+
+    # From the end of the game's MiB, rounded up to the DMA engine's 8 bytes
+    li $t9, RDRAM_ADDRESS_MASK
+    and $t4, $a2, $t9
+    li $t1, (GAME_LOAD_SIZE + 7)
+    addu $t4, $t4, $t1
+    li $t1, -8
+    and $t4, $t4, $t1
+
+    li $t5, RDRAM_BASE_END
+
+zero_rdram_chunk:
+    sltu $t1, $t4, $t5
+    beqz $t1, zero_rdram_done
+
+    # A whole DMEM's worth at a time, or whatever is left
+    subu $t6, $t5, $t4
+    li $t1, DMEM_SIZE
+    sltu $t7, $t6, $t1
+    bnez $t7, 1f
+    move $t6, $t1
+1:
+
+wait_sp_zero_slot:
+    lw $t1, SP_STATUS($t0)
+    andi $t1, $t1, SP_STATUS_DMA_FULL
+    bnez $t1, wait_sp_zero_slot
+
+    # DMEM -> RDRAM, the engine holding one running and one queued
+    sw $zero, SP_MEM_ADDR($t0)
+    sw $t4, SP_DRAM_ADDR($t0)
+    addiu $t1, $t6, -1
+    sw $t1, SP_WR_LEN($t0)
+
+    addu $t4, $t4, $t6
+    b zero_rdram_chunk
+
+zero_rdram_done:
+wait_sp_zero_dma:
+    lw $t1, SP_STATUS($t0)
+    andi $t1, $t1, SP_STATUS_DMA_BUSY
+    bnez $t1, wait_sp_zero_dma
+
+    # Leave the RSP's memory starting as the game's IPL3 would have, for games
+    # that check (e.g. Banjo-Kazooie, which won't load its RSP boot microcode
+    # otherwise). Now DMEM's no longer the zero source, and IMEM's first word
+    # is the x105 IPL2 stub, which the HLE paths never run.
+    beqz $s2, rsp_memory_done
+    li $t1, DMEM_ADDRESS
+    sw $s1, 0($t1)
+    li $t1, IMEM_ADDRESS
+    sw $s0, 0($t1)
+rsp_memory_done:
+
     # The game arrived by DMA, behind both caches. Invalidate them so the
     # freshly loaded code and data are what actually gets executed and read.
     # Dirty lines are discarded rather than written back: everything the boot

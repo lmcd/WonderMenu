@@ -19,6 +19,18 @@ boot_params_t boot_params;
 #define OS_INFO_ADDRESS       (0xA0000300)
 #define OS_INFO_NMI_BUFFER_WORDS (16)
 
+/* The x103 IPL3 copies its last stage, DMEM 0x4C0-0x767, to the start of RDRAM
+   and runs it from there while it fills DMEM and IMEM. The game inherits it:
+   Banjo-Kazooie checks the word at 0x800001D8 and clips its view if it isn't
+   there. IPL3 sits at the same offsets in DMEM as in the ROM. */
+#define X103_IPL3_STAGE_START   (0x4C0)
+#define X103_IPL3_STAGE_END     (0x768)
+#define X103_IPL3_STAGE_ADDRESS (0xA0000000)
+
+/* What the x103 IPL3 writes to osCicId. Banjo-Kazooie and Diddy Kong Racing
+   check it. The x102 IPL3 doesn't write osCicId at all. */
+#define X103_OS_CIC_ID (6103)
+
 /**
  * Selects the base IO address for the configured boot device.
  *
@@ -37,15 +49,16 @@ static io32_t *boot_get_device_base (boot_params_t *params) {
  * Can we boot this cartridge ourselves instead of running its IPL3?
  *
  * Only the plain retail CIC is claimed for now -- 6102/7101, which covers most
- * NTSC carts including Super Mario 64. Everything else (64DD variants, the
- * x105/x106 oddities, unrecognised or homebrew IPL3s) keeps running the real
- * thing, which is the safer default and a useful bisect when a game misbehaves.
+ * NTSC carts including Super Mario 64 -- and x103 (e.g. Banjo-Kazooie).
+ * Everything else (64DD variants, the x105/x106 oddities, unrecognised or
+ * homebrew IPL3s) keeps running the real thing, which is the safer default and
+ * a useful bisect when a game misbehaves.
  *
  * @param cic_type The type detected from the cartridge's IPL3.
  * @returns true to take the HLE path in reboot.S.
  */
 static bool boot_can_hle (cic_type_t cic_type) {
-    return cic_type == CIC_x102;
+    return cic_type == CIC_x102 || cic_type == CIC_x103;
 }
 
 /**
@@ -66,7 +79,9 @@ static void boot_write_os_info (boot_params_t *params, uint32_t version) {
                ? (0xA0000000 | ROM_DDIPL_BASE)
                : (0xA0000000 | ROM_CART_BASE);              // osRomBase
     os_info[3] = BOOT_RESET_TYPE_COLD;                      // osResetType
-    os_info[4] = (params->cic_seed & 0xFF);                 // osCicId
+    os_info[4] = (params->cic_type == CIC_x103)
+               ? X103_OS_CIC_ID
+               : (params->cic_seed & 0xFF);                 // osCicId
     os_info[5] = version;                                   // osVersion
     os_info[6] = __boot_memsize;                            // osMemSize
 
@@ -74,6 +89,24 @@ static void boot_write_os_info (boot_params_t *params, uint32_t version) {
        report a cold reset, so hand it over zeroed. */
     for (int i = 0; i < OS_INFO_NMI_BUFFER_WORDS; i++) {
         os_info[7 + i] = 0;
+    }
+}
+
+/**
+ * Leave the x103 IPL3's last stage at the start of RDRAM, as running it would.
+ *
+ * This overwrites the menu's exception vectors, so interrupts are disabled
+ * first. Nothing needs them again: the next stop is reboot.S, then the game.
+ *
+ * @param base The boot device, read for the cartridge's own IPL3.
+ */
+static void boot_write_x103_ipl3_stage (io32_t *base) {
+    disable_interrupts();
+
+    volatile uint32_t *dst = (volatile uint32_t *) X103_IPL3_STAGE_ADDRESS;
+
+    for (uint32_t offset = X103_IPL3_STAGE_START; offset < X103_IPL3_STAGE_END; offset += sizeof(io32_t)) {
+        *dst++ = io_read((uint32_t) (&base[offset / sizeof(io32_t)]));
     }
 }
 
@@ -147,13 +180,7 @@ void boot (boot_params_t *params) {
     cpu_io_write(&PI->SR, PI_SR_CLR_INTR | PI_SR_RESET);
     while ((cpu_io_read(&VI->CURR_LINE) & ~(VI_CURR_LINE_FIELD)) != 0);
 
-    /* Blank the DAC before disturbing anything else about the video state. We
-       are at the top of a field here, so the field that starts now is entirely
-       black, rather than showing the menu's framebuffer scanned out through the
-       cleared H_LIMITS below -- which is one visibly corrupt frame. The game
-       programs VI from scratch, so there is nothing here worth preserving. */
     cpu_io_write(&VI->CR, 0);
-
     cpu_io_write(&VI->V_INTR, 0x3FF);
     cpu_io_write(&VI->H_LIMITS, 0);
     cpu_io_write(&VI->CURR_LINE, 0);
@@ -191,7 +218,7 @@ void boot (boot_params_t *params) {
        cart transfer already happened behind the launch animation, so all that is
        left at boot time is a quick RDRAM-to-RDRAM copy. */
     bool hle_boot = boot_can_hle(params->cic_type);
-    bool hle_staged = hle_boot && params->rom_staged_in_memory && is_memory_expanded();
+    bool hle_staged = hle_boot && params->rom_staged_memory_address > 0 && is_memory_expanded();
 
     uint32_t boot_path = !hle_boot   ? BOOT_PATH_IPL3
                        : hle_staged  ? BOOT_PATH_HLE_STAGED
@@ -211,8 +238,18 @@ void boot (boot_params_t *params) {
     /* Where IPL3 would have put the game, and where it would have jumped:
        ROM header offset 0x08 is the load address and the initial PC. */
     uint32_t game_entry_address = io_read((uint32_t) (&base[2]));
+
+    /* x103 and x106 IPL3s load and enter the game this far below the header's
+       entry point, e.g. Banjo-Kazooie's header says 0x80100400 for code linked
+       at 0x80000400 */
+    if (params->cic_type == CIC_x103) {
+        game_entry_address -= 0x100000;
+    }
+    else if (params->cic_type == CIC_x106) {
+        game_entry_address -= 0x200000;
+    }
     uint32_t game_source_address = hle_staged
-        ? GAME_STAGING_ADDRESS
+        ? params->rom_staged_memory_address
         : (uint32_t) (&base[GAME_LOAD_ROM_OFFSET / sizeof(io32_t)]);
 
     uint32_t version_value = (params->tv_type == BOOT_TV_TYPE_PAL) ? 6
@@ -244,11 +281,19 @@ void boot (boot_params_t *params) {
         );
     }
 
+    // Last, as it disables interrupts
+    if (hle_boot && params->cic_type == CIC_x103) {
+        boot_write_x103_ipl3_stage(base);
+    }
+
     register uint32_t skip_rdram_reset asm ("a0");
     register uint32_t hle_flag asm ("a1");
     register uint32_t game_entry asm ("a2");
     register uint32_t game_source asm ("a3");
     register uint32_t jump_target asm ("t8");
+    register uint32_t rsp_imem_word asm ("s0");
+    register uint32_t rsp_dmem_word asm ("s1");
+    register uint32_t sets_rsp_words asm ("s2");
     register uint32_t boot_device asm ("s3");
     register uint32_t tv_type asm ("s4");
     register uint32_t reset_type asm ("s5");
@@ -262,6 +307,13 @@ void boot (boot_params_t *params) {
     // With cheats the patcher runs first and jumps onwards via t1; without it
     // there is nothing to do but enter the game.
     jump_target = cheats_installed ? cheats_patcher_address() : game_entry_address;
+    /* What the x103 IPL3 leaves at the start of IMEM (6103) and DMEM, which
+       Banjo-Kazooie checks for before loading its RSP boot microcode (ucode.c
+       in the decomp), hanging without it. Not known for the other types, so
+       they're left as the HLE path leaves them. */
+    sets_rsp_words = (hle_boot && params->cic_type == CIC_x103);
+    rsp_imem_word = 6103;
+    rsp_dmem_word = 0xFFFFFFFF;
     boot_device = (params->device_type & 0x01);
     tv_type = (params->tv_type & 0x03);
     reset_type = BOOT_RESET_TYPE_COLD;
@@ -280,6 +332,9 @@ void boot (boot_params_t *params) {
         [game_entry] "r" (game_entry),
         [game_source] "r" (game_source),
         [jump_target] "r" (jump_target),
+        [rsp_imem_word] "r" (rsp_imem_word),
+        [rsp_dmem_word] "r" (rsp_dmem_word),
+        [sets_rsp_words] "r" (sets_rsp_words),
         [boot_device] "r" (boot_device),
         [tv_type] "r" (tv_type),
         [reset_type] "r" (reset_type),

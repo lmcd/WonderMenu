@@ -21,8 +21,6 @@ struct GameGroup;
 
 struct GameRowView : public BaseRowView {
 private:
-    static constexpr Color STAR_ON_COLOR = Color(255, 204, 0);
-    static constexpr Color STAR_OFF_COLOR = Color(96);
     static constexpr Color NUMBER_FILL_COLOR = Color(0, 156, 255, 192);
 
 public:
@@ -58,6 +56,7 @@ public:
     float cartScale = 1.0f;
     Vec2 cartPosition;
     GameGroup* gameGroup = nullptr;
+    bool popoverIsVisible = false;
 
     GameRowView();
 

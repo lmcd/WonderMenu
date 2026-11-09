@@ -5,6 +5,8 @@
 
 #include "FolderRowView.h"
 
+#include "ui/Theme.h"
+
 FolderRowView::FolderRowView() {
     titleView.fontID = FONT_ID;
     titleView.align = ALIGN_LEFT;
@@ -19,8 +21,7 @@ FolderRowView::FolderRowView() {
 void FolderRowView::update(const RenderInfo& renderInfo) {
     BaseRowView::update(renderInfo);
 
-    Color titleColor = Color::WHITE;
-    titleColor.a *= 0.85f;
+    Color titleColor = Theme::labelColor;
 
     Color selectedTitleColor = Color::WHITE;
 

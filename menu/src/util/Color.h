@@ -5,6 +5,7 @@
 #pragma once
 
 #include <libdragon.h>
+#include <algorithm>
 #include <cmath>
 
 struct RGB {
@@ -16,6 +17,19 @@ struct RGB {
         b *= opacity;
 
         return *this;
+    }
+
+    // Linearly interpolate from this colour towards `other`. t is clamped to
+    // [0, 1]: t=0 returns this colour, t=1 returns `other`.
+    constexpr RGB lerpTo(const RGB& other, float t) const {
+        if (t <= 0.0f) return *this;
+        if (t >= 1.0f) return other;
+
+        return RGB{
+            (uint8_t)std::lerp(r, other.r, t),
+            (uint8_t)std::lerp(g, other.g, t),
+            (uint8_t)std::lerp(b, other.b, t)
+        };
     }
 };
 
@@ -59,6 +73,14 @@ struct Color {
             (uint8_t)std::lerp(b, other.b, t),
             (uint8_t)std::lerp(a, other.a, t)
         );
+    }
+
+    // This colour with its alpha replaced by `alpha` (clamped to [0, 1], where
+    // 1 is fully opaque). Replaces, rather than scales, the existing alpha.
+    constexpr Color withAlphaComponent(float alpha) const {
+        alpha = std::clamp(alpha, 0.0f, 1.0f);
+
+        return Color(r, g, b, (uint8_t)(alpha * 255.0f + 0.5f));
     }
 
     // True if this colour survives a round trip through RGBA16 (5551) unchanged:

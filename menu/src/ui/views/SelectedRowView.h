@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "ui/Theme.h"
 #include "ui/View.h"
 #include "ui/views/drawables/BottomShadowView.h"
 #include "ui/views/drawables/RectView.h"

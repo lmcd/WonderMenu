@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ranges>
 #include <string>
 
 #include "ui/View.h"
@@ -23,6 +24,17 @@ struct FolderEntry {
  */
 struct FolderRowView : public BaseRowView {
     const char* name() const override { return "FolderRowView"; }
+
+    template<typename Range>
+    static void renderGroup(const RenderInfo& renderInfo, Range&& views) {
+        auto checkboxViews = views | std::views::transform(&FolderRowView::checkboxView);
+
+        CheckboxView::renderGroup(renderInfo, checkboxViews);
+
+        for (FolderRowView& view : views) {
+            view.titleView.render(renderInfo);
+        }
+    }
 
     CheckboxView checkboxView;
     LabelView<72> titleView;

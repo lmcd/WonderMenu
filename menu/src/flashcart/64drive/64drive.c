@@ -136,7 +136,7 @@ static flashcart_firmware_version_t d64_get_firmware_version (void) {
  * @return flashcart_load_rom_session_t The load session, zeroed out on failure.
  */
 static flashcart_load_rom_session_t d64_begin_load_rom_session (char *rom_path, const FFOBJID *rom_object, unsigned int initial_chunk) {
-    return flashcart_utils_begin_load_rom_session(rom_path, rom_object, initial_chunk, MiB(64));
+    return flashcart_utils_begin_load_rom_session(rom_path, rom_object, initial_chunk, MiB(64), MiB(64));
 }
 
 /**
@@ -148,17 +148,6 @@ static flashcart_load_rom_session_t d64_begin_load_rom_session (char *rom_path, 
  */
 static flashcart_err_t d64_load_next_rom_chunk (flashcart_load_rom_session_t *session, bool load_beginning_chunks) {
     return flashcart_utils_load_next_rom_chunk(session, ROM_ADDRESS, load_beginning_chunks);
-}
-
-/**
- * @brief Load everything left in a chunked ROM load session into the 64drive.
- * 
- * @param session Pointer to the load session.
- * @param progress Progress callback function.
- * @return flashcart_err_t Error code.
- */
-static flashcart_err_t d64_finish_load_rom_session (flashcart_load_rom_session_t *session, flashcart_progress_callback_t *progress) {
-    return flashcart_utils_finish_load_rom_session(session, ROM_ADDRESS, progress);
 }
 
 
@@ -353,7 +342,6 @@ static flashcart_t flashcart_d64 = {
     .get_firmware_version = d64_get_firmware_version,
     .begin_load_rom_session = d64_begin_load_rom_session,
     .load_next_rom_chunk = d64_load_next_rom_chunk,
-    .finish_load_rom_session = d64_finish_load_rom_session,
     .load_file = d64_load_file,
     .load_save = d64_load_save,
     .load_64dd_ipl = NULL,

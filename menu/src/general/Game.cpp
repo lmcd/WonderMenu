@@ -5,7 +5,6 @@
 
 #include "Game.h"
 
-#include <filesystem>
 #include <cstring>
 #include <cstdio>
 
@@ -21,8 +20,8 @@ Game::~Game() {
 
 const char* Game::title() const {
     // Prefer database title if available
-    if (databaseEntry && databaseEntry->title[0] != '\0') {
-        return databaseEntry->title;
+    if (databaseEntry && databaseEntry->title()[0] != '\0') {
+        return databaseEntry->title();
     }
 
     // Last resort: return filename. Cached on the Game rather than built into a
@@ -30,7 +29,8 @@ const char* Game::title() const {
     // with a dangling pointer.
     if (!romFile.path.empty()) {
         if (fallbackTitle.empty()) {
-            fallbackTitle = std::filesystem::path(romFile.path).filename().string();
+            size_t separator = romFile.path.rfind('/');
+            fallbackTitle = (separator == std::string::npos) ? romFile.path : romFile.path.substr(separator + 1);
         }
 
         return fallbackTitle.c_str();
@@ -41,8 +41,8 @@ const char* Game::title() const {
 
 const char* Game::developer() const {
     // Return database developer if available
-    if (databaseEntry && databaseEntry->developer[0] != '\0') {
-        return databaseEntry->developer;
+    if (databaseEntry && databaseEntry->developer()[0] != '\0') {
+        return databaseEntry->developer();
     }
 
     return "Unknown";

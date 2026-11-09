@@ -33,9 +33,9 @@ private:
     TimingFunction timingFunction;
 
     // Per-framebuffer record of whether the completed (final) frame has been
-    // drawn into each of the BUFF_COUNT buffers. mutable so the const query below
+    // drawn into each of the FRAMEBUFFER_COUNT buffers. mutable so the const query below
     // can update it, matching the codebase's per-buffer dirty-tracking pattern.
-    mutable bool bufferComplete[BUFF_COUNT] = {};
+    mutable bool bufferComplete[FRAMEBUFFER_COUNT] = {};
 
     float valueForTime(float t) const {
         switch (timingFunction) {
@@ -88,12 +88,12 @@ public:
     // Buffer-aware completion. In triple-buffered rendering the animation's final
     // frame must be drawn into every framebuffer before the view can stop
     // redrawing. Call this once per rendered buffer with its index; it returns
-    // true only once the completed frame has been drawn into all BUFF_COUNT
+    // true only once the completed frame has been drawn into all FRAMEBUFFER_COUNT
     // buffers. While the animation is still running the flags are held clear, so
     // a not-yet-finished (or restarted) animation never reports complete early.
     bool isComplete(int bufferIndex) const {
         if (!isComplete()) {
-            for (int i = 0; i < BUFF_COUNT; i++) {
+            for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
                 bufferComplete[i] = false;
             }
             return false;
@@ -101,7 +101,7 @@ public:
 
         bufferComplete[bufferIndex] = true;
 
-        for (int i = 0; i < BUFF_COUNT; i++) {
+        for (int i = 0; i < FRAMEBUFFER_COUNT; i++) {
             if (!bufferComplete[i]) {
                 return false;
             }

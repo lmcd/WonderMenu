@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <libdragon.h>
 #include <vector>
 
 #include "util/Size.h"
@@ -57,7 +58,27 @@ private:
      */
     void collectGarbageScenes();
 
+    /**
+     * Draw debug metrics (currently the frame rate) over the frame. Call while
+     * the frame is attached, after everything else is drawn.
+     */
+    void printDebugMetrics();
+
 public:
+    /*
+     * The framebuffer most recently rendered into and queued for display.
+     * It only reaches the screen at the next vblank, so it can still be
+     * pending when the frame after it starts.
+     */
+    surface_t* lastSurface = nullptr;
+
+    /*
+     * Every framebuffer display_get() has handed out so far, in the order
+     * first seen. libdragon shows them in FIFO order, so at any point one can
+     * be on screen, one queued behind it, and one being drawn.
+     */
+    surface_t* framebuffers[FRAMEBUFFER_COUNT] = {};
+
     SceneRenderer(Scene* initialScene = nullptr);
     ~SceneRenderer();
 

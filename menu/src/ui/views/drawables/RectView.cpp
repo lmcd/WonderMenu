@@ -97,6 +97,11 @@ void RectView::renderRect(const RenderInfo& renderInfo, Rect currentRect) {
 
         setCombiner(RDPQ_COMBINER1((0, 0, 0, PRIM), (0, 0, 0, PRIM)));
 
+        // Middle-areas that are known to be opaque should not blend with framebuffer
+        if (!finalIsOpaque && finalOpacity == 1.0f && fillColor.a == 255) {
+            setBlender(WITH_BLEND_COLOR);
+        }
+
         drawFilledRect(leftRect);
         drawFilledRect(middleRect);
         drawFilledRect(rightRect);
@@ -152,7 +157,12 @@ void RectView::update(const RenderInfo& renderInfo) {
     if (finalFrame != bufferFrame) {
         setNeedsClear(bufferIndex);
 
-        if (isInverted || !finalIsOpaque) {
+        if (finalIsHidden) {
+            // Only what it last drew is cleared, which is nothing once its
+            // hidden clear is done. The old frame may well have been drawn
+            // over by something else since, so it's left alone.
+        }
+        else if (isInverted || !finalIsOpaque) {
             setNeedsFullRender(bufferIndex);
         }
         else {
@@ -228,15 +238,12 @@ void RectView::clear(const RenderInfo& renderInfo) {
     }
     else {
         for (int i = 0; i < 4; i++) {
-            Rect rect = rectsToClear[i];
+            Rect& rect = rectsToClear[i];
 
             clearRect(rect, finalBlendColor);
-        }
 
-        rectsToClear[0].size.width = 0;
-        rectsToClear[1].size.width = 0;
-        rectsToClear[2].size.width = 0;
-        rectsToClear[3].size.width = 0;
+            rect.size.width = 0;
+        }
 
         needsPartialClear = false;
     }
@@ -258,7 +265,7 @@ void RectView::render(const RenderInfo& renderInfo) {
     Color color = fillColor;
 
     if (finalIsOpaque)  {
-        color.rgb *= finalOpacity;
+        color.rgb = color.rgb.lerpTo(finalBlendColor.rgb, 1.0f - finalOpacity);
     }
     else {
         color.a *= finalOpacity;

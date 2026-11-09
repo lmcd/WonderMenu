@@ -37,14 +37,15 @@ struct PendingCartPreload {
 enum CartLabelType : uint8_t {
     CART_LABEL_NONE  = 0,
     CART_LABEL_SMALL = 1,
-    CART_LARGE_LABEL = 2,
+    CART_LABEL_LARGE = 2,
 };
 
 enum CartRenderFlags : uint8_t {
     CART_RENDER_DEFAULT        = 0,
     CART_RENDER_SLIM           = 1 << 0,
     CART_RENDER_LABEL_ONLY     = 1 << 1,
-    CART_RENDER_PREFER_HIGHRES = 1 << 2
+    CART_RENDER_PREFER_HIGHRES = 1 << 2,
+    CART_RENDER_REDUCED_AA     = 1 << 3
 };
 
 /**

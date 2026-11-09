@@ -4,20 +4,20 @@
 */
 
 #include "ChooseFoldersPopover.h"
+#include "ui/Theme.h"
+#include "util/Color.h"
 
 ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<std::string>& paths)
     : Popover<FolderRowView, std::vector<std::string>>(baseScene) {
     title = "CHOOSE FOLDERS";
     isCancellable = false;
 
-    sdCardSprite = sprite_load("rom:/ui/SD-128.RGBA16.sprite");
-
     imageView.isOpaque = false;
-    imageView.sprite = sdCardSprite;
+    imageView.image = &sdCardImage;
 
     messageLabel.fontID = Fonts::INTERDISPLAY_BOLD_14;
     messageLabel.align = ALIGN_CENTER;
-    messageLabel.textColor = Color(140);
+    messageLabel.textColor = Theme::popoverMessageColor;
     messageLabel.setString("%i $07ROM folders found!\nWhich would you like to use?", paths.size());
 
     folderEntries.reserve(paths.size());
@@ -70,7 +70,7 @@ void ChooseFoldersPopover::updateViews(const RenderInfo& renderInfo) {
     titleLabelView.isHidden = true;
     tableY = 134;
 
-    Size imageSize = Size(sdCardSprite->width, sdCardSprite->height);
+    Size imageSize = sdCardImage.size();
 
     imageView.frame = Rect(
         Vec2(

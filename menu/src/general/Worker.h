@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include <libdragon.h>
 
 #include "boot/boot.h"
@@ -58,7 +60,7 @@ public:
 };
 
 class LoadROMToCartWorker : public Worker {
-    static constexpr unsigned int initialChunk = 10;
+    static constexpr unsigned int initialChunk = 11;
 
     ROMFile romFile;
     flashcart_load_rom_session_t session = {};
@@ -81,10 +83,18 @@ class LoadROMToCartWorker : public Worker {
             return (romFile.size + KiB(128) - 1) / KiB(128);
         }
 
-        unsigned int total = (session.sdram_size + session.chunk_size - 1) / session.chunk_size;
-        unsigned int loaded = session.loaded_bytes / session.chunk_size;
+        // Including a session that failed, which closed the file: there's
+        // nothing more it can load.
+        if (session.is_complete || !flashcart_load_rom_session_valid(&session)) {
+            return 0;
+        }
 
-        return loaded >= total ? 0 : (total - loaded);
+        // Covers the flash past the SDRAM portion too, as it's in the ROM size.
+        // At least one while the session is open, whatever's left to round.
+        size_t loaded = std::min((size_t)session.loaded_bytes, session.rom_size);
+        size_t remaining = (session.rom_size - loaded + session.chunk_size - 1) / session.chunk_size;
+
+        return std::max(remaining, (size_t)1);
     }
 
     void doWork() override {
@@ -107,18 +117,14 @@ public:
     bool loadBeginningChunks = false;
 
     /**
-     * Load whatever is left of the ROM in one blocking go, and close the
-     * session. Does nothing if the session was never opened.
-     *
-     * @param progressHandler Invoked as the remaining chunks land, so the caller
-     *                        can keep drawing while the load blocks. Optional.
+     * Treat every chunk from `initialChunk` on as already loaded, leaving only
+     * the beginning chunks the menu lives in. For returning from a warm reset,
+     * when the game is still in the cart SDRAM. Call before any work is done.
      */
-    flashcart_err_t finish(flashcart_progress_callback_t* progressHandler = nullptr) {
-        if (!hasSession) {
-            return FLASHCART_OK;
-        }
+    void markEndChunksLoaded() {
+        beginSession();
 
-        return flashcart_finish_load_rom_session(&session, progressHandler);
+        flashcart_mark_end_rom_chunks_loaded(&session);
     }
 
     int workRemaining() override {
@@ -130,36 +136,31 @@ public:
     }
 
     LoadROMToCartWorker(const ROMFile& romFile) : romFile(romFile) {}
-
-    flashcart_load_rom_session_t* loadSession() {
-        return hasSession ? &session : nullptr;
-    }
 };
 
 class LoadROMFirstMBToMemoryWorker : public Worker {
     // Skip the header and IPL3: the boot path copies this straight to the game's
     // entry point, so it has to hold game code from its very first byte.
     static constexpr uint32_t romAddress = ROM_ADDRESS + GAME_LOAD_ROM_OFFSET;
-    static constexpr uint32_t stagingAddress = GAME_STAGING_ADDRESS;
-    static constexpr uint32_t chunkSize = KiB(64);
-    static constexpr int chunkCount = GAME_LOAD_SIZE / chunkSize;
+    static constexpr uint32_t CHUNK_SIZE = KiB(64);
+    static constexpr int CHUNK_COUNT = GAME_LOAD_SIZE / CHUNK_SIZE;
 
     int currentChunk = 0;
 
     void doWork() override {
-        if (!is_memory_expanded() || currentChunk >= chunkCount) {
+        if (!is_memory_expanded() || currentChunk >= CHUNK_COUNT) {
             return;
         }
 
-        uint32_t offset = currentChunk * chunkSize;
-        uint8_t* destination = (uint8_t*)(stagingAddress + offset);
+        uint32_t offset = currentChunk * CHUNK_SIZE;
+        uint8_t* destination = (uint8_t*)(GAME_STAGING_ADDRESS + offset);
 
-        data_cache_hit_writeback_invalidate(destination, chunkSize);
+        data_cache_hit_writeback_invalidate(destination, CHUNK_SIZE);
 
-        dma_read_raw_async(destination, romAddress + offset, chunkSize);
+        dma_read_raw_async(destination, romAddress + offset, CHUNK_SIZE);
         dma_wait();
 
-        debugf("[LoadROMFirstMBToMemoryWorker] Doing Work. Progress: %i / %i\n", currentChunk, chunkCount);
+        debugf("[LoadROMFirstMBToMemoryWorker] Doing Work. Progress: %i / %i\n", currentChunk, CHUNK_COUNT);
 
         currentChunk++;
     }
@@ -170,77 +171,14 @@ public:
      * RDRAM instead of going back to the cart.
      */
     bool hasStaged() {
-        return currentChunk >= chunkCount;
+        return currentChunk >= CHUNK_COUNT;
     }
 
     int workRemaining() override {
-        return chunkCount - currentChunk;
+        return CHUNK_COUNT - currentChunk;
     }
 
     float progress() override {
-        return (float)currentChunk / chunkCount;
-    }
-};
-
-class LoadROMWorker : public Worker {
-    LoadROMToCartWorker cartWorker;
-    LoadROMFirstMBToMemoryWorker memoryWorker;
-
-    int totalWork = 0;
-
-    void doWork() override {
-        cartWorker.loadBeginningChunks = loadBeginningChunks;
-
-        if (cartWorker.workRemaining() > 0) {
-            cartWorker.advance();
-            return;
-        }
-
-        memoryWorker.advance();
-    }
-
-public:
-    bool loadBeginningChunks = false;
-
-    LoadROMWorker(const ROMFile& romFile) : cartWorker(romFile) {}
-
-    /**
-     * @see LoadROMFirstMBToMemoryWorker::hasStaged
-     */
-    bool hasStagedFirstMB() {
-        return memoryWorker.hasStaged();
-    }
-
-    /**
-     * @see LoadROMToCartWorker::finish
-     */
-    flashcart_err_t finish(flashcart_progress_callback_t* progressHandler = nullptr) {
-        return cartWorker.finish(progressHandler);
-    }
-
-    int workRemaining() override {
-        return cartWorker.workRemaining() + memoryWorker.workRemaining();
-    }
-
-    float progress() override {
-        // Deliberately the cart load only, not `workRemaining()`. The staging
-        // into RDRAM is opportunistic -- it stops being advanced the moment the
-        // caller commits to launching -- so counting it here would peg the bar
-        // short of the end for any ROM whose stream outlasts the transition.
-        int remaining = cartWorker.workRemaining();
-
-        if (remaining > totalWork) {
-            totalWork = remaining;
-        }
-
-        if (totalWork == 0) {
-            return 1.0f;
-        }
-
-        return 1.0f - ((float)remaining / totalWork);
-    }
-
-    flashcart_load_rom_session_t* loadSession() {
-        return cartWorker.loadSession();
+        return (float)currentChunk / CHUNK_COUNT;
     }
 };
