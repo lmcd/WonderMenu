@@ -64,20 +64,6 @@ struct CheatList {
         cheatItems[itemCount++] = (uint32_t)code.value;
     }
 
-    void insertCheatCode(CheatCode code) {
-        if (itemCount >= MAX_CHEAT_CODES * 2) {
-            debugf("[CheatList] Cheat limit reached, dropped: %08lX %04X\n",
-                (unsigned long)cheatItems[itemCount - 2], (unsigned)cheatItems[itemCount - 1]);
-            itemCount -= 2;
-        }
-
-        memmove(&cheatItems[2], &cheatItems[0], itemCount * sizeof(uint32_t));
-
-        cheatItems[0] = code.address;
-        cheatItems[1] = (uint32_t)code.value;
-        itemCount += 2;
-    }
-
     // Adds the codes of every cheat in groups of the given type, with
     // valueOverride as above. Nothing when the game has no cheat database.
     void addCheatGroup(CheatGroupType type, int32_t valueOverride = -1) {
