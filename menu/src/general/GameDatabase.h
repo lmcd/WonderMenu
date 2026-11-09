@@ -142,9 +142,8 @@ public:
         uint32_t labelTileCluster = 0;
         uint32_t largeLabelTileCluster = 0;
         uint32_t cheatsCluster = 0;
-        uint16_t entryIndex;
 
-        Entry(Data& data, const char* strings, uint16_t entryIndex) : data(data), strings(strings), entryIndex(entryIndex) {}
+        Entry(Data& data, const char* strings) : data(data), strings(strings) {}
 
         // The title of the game (e.g. Banjo Kazooie)
         const char* title() const {
@@ -185,7 +184,7 @@ private:
     std::unordered_map<uint32_t, uint16_t> titleLookupMap;
 
     Entry::Data placeholderData = {};
-    Entry placeholderEntry{placeholderData, "", 0};
+    Entry placeholderEntry{placeholderData, ""};
 
     #ifdef N64
     // Zeroed so `obj.fs` reads as null (not open) until load() opens it
@@ -239,20 +238,13 @@ public:
     int16_t indexForTitle(char title[21]);
     int16_t indexForUniqueID(char uniqueID[2], RegionCode regionCode, uint8_t version);
 
-    Entry* entryForTitle(char title[21]);
-    Entry* entryForUniqueID(char uniqueID[2], RegionCode regionCode, uint8_t version);
+    int16_t indexForROMFile(ROMFile& romFile);
 
-    /**
-     * Get database entry for a game ID
-     * Returns nullptr if not found
-     */
-    Entry* entryForROMFile(ROMFile* romFile);
-
+    #ifdef N64
     /**
      * Load database from WonderMenu.db
      * Reads raw Entry structs and populates the database
      */
-    #ifdef N64
     bool load(const char* filename);
     #endif
 

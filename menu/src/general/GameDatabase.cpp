@@ -171,7 +171,7 @@ GameDatabase::Entry* GameDatabase::readEntryAtIndex(uint16_t index) {
         return nullptr;
     }
 
-    return new Entry(entriesData[index], strings, index);
+    return new Entry(entriesData[index], strings);
 }
 
 RegionCode GameDatabase::readRegionCodeAtIndex(uint16_t index) {
@@ -230,38 +230,12 @@ int16_t GameDatabase::indexForUniqueID(char uniqueID[2], RegionCode regionCode, 
     return -1;
 }
 
-GameDatabase::Entry* GameDatabase::entryForTitle(char title[21]) {
-    int16_t index = indexForTitle(title);
-
-    if (index == -1) {
-        return nullptr;
-    }
-
-    return readEntryAtIndex(index);
-}
-
-GameDatabase::Entry* GameDatabase::entryForUniqueID(char uniqueID[2], RegionCode regionCode, uint8_t version) {
-    // Signed: indexForUniqueID returns -1 for "not found", which as a uint16_t
-    // would compare as 65535 and send that straight to readEntryAtIndex.
-    int16_t index = indexForUniqueID(uniqueID, regionCode, version);
-
-    if (index == -1) {
-        return nullptr;
-    }
-
-    return readEntryAtIndex(index);
-}
-
-GameDatabase::Entry* GameDatabase::entryForROMFile(ROMFile* romFile) {
-    if (!isOpen()) {
-        return nullptr;
-    }
-    
-    if (romFile->hasHomebrewGameCode()) {
-        return entryForTitle(romFile->title);
+int16_t GameDatabase::indexForROMFile(ROMFile& romFile) {
+    if (romFile.hasHomebrewGameCode()) {
+        return indexForTitle(romFile.title);
     }
     else {
-        return entryForUniqueID(romFile->uniqueID, romFile->regionCode, romFile->version);
+        return indexForUniqueID(romFile.uniqueID, romFile.regionCode, romFile.version);
     }
 }
 

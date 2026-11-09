@@ -565,10 +565,10 @@ void GameLibrary::loadGames() {
             memcpy(fullPath, scanPath, scanPathLength);
             memcpy(fullPath + scanPathLength, filename, filenameLength + 1);
 
-            ROMFile* romFile = new ROMFile(fullPath, fileIndex);
+            ROMFile& romFile = *new ROMFile(fullPath, fileIndex);
 
             // Lets loadHeader() below open the file with no directory lookup
-            romFile->fileObject = scanner.fileObject;
+            romFile.fileObject = scanner.fileObject;
 
             GameDatabase::Entry* databaseEntry = nullptr;
 
@@ -577,8 +577,8 @@ void GameLibrary::loadGames() {
 
             // Set the ROM size here so it is populated on the cache-hit path too;
             // loadHeader() (cache-miss only) would otherwise be the sole place it is
-            // set, leaving romFile->size uninitialised for cached games.
-            romFile->size = fileSize;
+            // set, leaving romFile.size uninitialised for cached games.
+            romFile.size = fileSize;
 
             fileIndex++;
 
@@ -598,8 +598,8 @@ void GameLibrary::loadGames() {
                     databaseEntry = database.readEntryAtIndex(cacheResult.entryIndex);
                 }
 
-                romFile->version = cacheResult.version;
-                romFile->crc1 = cacheResult.crc1;
+                romFile.version = cacheResult.version;
+                romFile.crc1 = cacheResult.crc1;
 
                 cache[fileIndex].entryIndex = cacheResult.entryIndex;
                 cache[fileIndex].version = cacheResult.version;
@@ -608,17 +608,22 @@ void GameLibrary::loadGames() {
             else {
                 cache[fileIndex] = CacheResult(hash, fileSize, 0, 0);
                 
-                if (romFile->loadHeader()) {
-                    databaseEntry = database.entryForROMFile(romFile);
+                if (romFile.loadHeader()) {
+                    int16_t databaseIndex = database.indexForROMFile(romFile);
 
-                    cache[fileIndex].entryIndex = (databaseEntry == nullptr) ? -1 : databaseEntry->entryIndex;
-                    cache[fileIndex].version = romFile->version;
-                    cache[fileIndex].crc1 = romFile->crc1;
-                } else {
+                    if (databaseIndex != -1) {
+                        databaseEntry = database.readEntryAtIndex(databaseIndex);
+                    }
+
+                    cache[fileIndex].entryIndex = databaseIndex;
+                    cache[fileIndex].version = romFile.version;
+                    cache[fileIndex].crc1 = romFile.crc1;
+                }
+                else {
                     debugf("[GameLibrary] Failed to load ROM file: %s\n", filename);
 
                     // Failed to load, clean up
-                    delete romFile;
+                    delete &romFile;
 
                     cache[fileIndex].entryIndex = -1;
                     cache[fileIndex].version = 0;
@@ -629,12 +634,12 @@ void GameLibrary::loadGames() {
             }
 
             if (databaseEntry != nullptr) {
-                romFile->uniqueID[0] = databaseEntry->data.uniqueID[0];
-                romFile->uniqueID[1] = databaseEntry->data.uniqueID[1];
-                romFile->regionCode = databaseEntry->data.regionCode;
+                romFile.uniqueID[0] = databaseEntry->data.uniqueID[0];
+                romFile.uniqueID[1] = databaseEntry->data.uniqueID[1];
+                romFile.regionCode = databaseEntry->data.regionCode;
             }
 
-            Game& lastGame = allGames.emplace_back(*romFile, databaseEntry);
+            Game& lastGame = allGames.emplace_back(romFile, databaseEntry);
 
             if (databaseEntry != nullptr) {
                 if (databaseEntry->hasSpeedrunDatabase()) {
@@ -642,12 +647,12 @@ void GameLibrary::loadGames() {
                 }
             }
 
-            char* uniqueID = romFile->uniqueID;
+            char* uniqueID = romFile.uniqueID;
 
             int foundRetailEntryIndex = entryIndexMap[uniqueID];
 
             if (foundRetailEntryIndex == -1) {
-                bool hasHomebrewGameCode = romFile->hasHomebrewGameCode();
+                bool hasHomebrewGameCode = romFile.hasHomebrewGameCode();
                 
                 if (hasHomebrewGameCode || databaseEntry == nullptr) {
                     // Version field for homebrew roms can't be trusted, so keep it at 1.0
