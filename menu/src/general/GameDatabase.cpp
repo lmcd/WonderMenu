@@ -186,9 +186,6 @@ int16_t GameDatabase::indexForTitle(char title[21]) {
     std::string romTitle = std::string(title, strnlen(title, 20));
     uint32_t hash = djb2((const unsigned char*)romTitle.c_str(), romTitle.length());
 
-    //debugf("Calculating hash %s;  %i\n", romTitle.c_str(), romTitle.length());
-    //debugf("Looking up homebrew: %s %08lX\n", romTitle.c_str(), hash);
-
     auto it = titleLookupMap.find(hash);
     if (it == titleLookupMap.end()) {
         return -1;
