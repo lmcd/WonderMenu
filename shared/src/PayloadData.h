@@ -74,8 +74,10 @@ struct __attribute__((packed)) ScreenshotSettings {
     bool showOverlay = true;
     // Size: 1
     uint8_t overlayDelay = 32;
-    // Size: 9
-    uint8_t reserved[9] = {0};
+    // Size: 1
+    uint8_t dmaChunkSizeKiB = 16;
+    // Size: 8
+    uint8_t reserved[8] = {0};
 };
 
 // Size: 16
