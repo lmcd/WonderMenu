@@ -52,12 +52,19 @@ struct __attribute__((packed)) CacheHeader {
 
 static_assert(sizeof(CacheHeader) == 8, "CacheHeader must be 8 bytes");
 
+// Size: 16
 struct __attribute__((packed)) ROMCacheResult {
+    // Size: 4
     uint32_t hash = 0;
+    // Size: 4
     uint32_t fileSize = 0;
+    // Size: 2
     int16_t entryIndex = -1;
+    // Size: 1
     uint8_t version = 0;
+    // Size: 4
     uint32_t crc1 = 0;
+    // Size: 1
     uint8_t reserved = 0;
 };
 
