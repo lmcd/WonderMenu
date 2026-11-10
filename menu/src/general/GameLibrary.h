@@ -18,7 +18,7 @@
  * Each `ROMFile` and corresponding database entry has an associated memory
  * cost, so we have to draw the line somewhere.
  */
-#define MAX_NUMBER_OF_FILES 1000
+#define MAX_NUMBER_OF_ROM_FILES 1000
 
 #define MAX_NUMBER_OF_DIRECTORIES 255
 #define MAX_DIRECTORY_LENGTH 128
@@ -103,7 +103,7 @@ private:
 
     void allocateCache() {
         if (romCache.empty()) {
-            romCache.resize(MAX_NUMBER_OF_FILES);
+            romCache.resize(MAX_NUMBER_OF_ROM_FILES);
         }
     }
 

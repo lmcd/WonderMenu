@@ -203,7 +203,7 @@ bool GameLibrary::writeCache() {
         return false;
     }
 
-    size_t romEntriesToWrite = std::min((size_t)cachedROMFileCount, (size_t)MAX_NUMBER_OF_FILES);
+    size_t romEntriesToWrite = std::min((size_t)cachedROMFileCount, (size_t)MAX_NUMBER_OF_ROM_FILES);
     size_t m64EntriesToWrite = std::min((size_t)cachedM64FileCount, m64Cache.size());
 
     CacheHeader header = {};
@@ -590,8 +590,8 @@ void GameLibrary::loadGames() {
             }
 
             // The cache is a fixed-size array, so stop rather than run past it
-            if (fileIndex + 1 >= MAX_NUMBER_OF_FILES) {
-                debugf("[GameLibrary] Reached the %i file limit\n", MAX_NUMBER_OF_FILES);
+            if (fileIndex + 1 >= MAX_NUMBER_OF_ROM_FILES) {
+                debugf("[GameLibrary] Reached the %i file limit\n", MAX_NUMBER_OF_ROM_FILES);
                 break;
             }
 
