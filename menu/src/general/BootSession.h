@@ -227,11 +227,13 @@ public:
     }
 
     void applyUserChoices(GameInfoState& gameInfoState, GameDatabase& database) {
+        using enum SpeedrunSettings::Status;
+        
         SpeedrunsState& speedrunsState = gameInfoState.speedrunsState;
         CheatsState& cheatsState = gameInfoState.cheatsState;
 
-        bool isRecording = false;
         M64File* m64File = nullptr;
+        SpeedrunSettings::Status speedrunStatus = STATUS_NONE;
         
         cheatList = CheatList();
 
@@ -251,17 +253,10 @@ public:
 
             if (speedrunsState.selectedRow != -1 || speedrunsState.isRecording) {
                 if (speedrunsState.isRecording) {
+                    speedrunStatus = STATUS_RECORDING;
+
                     // NMI-reset handler
                     cheatList.addCheatCode(nmiHandlerCheatCode);
-
-                    // Show record icon
-                    cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_RECORD_ICON);
-
-                    // Increment frame number
-                    cheatList.addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
-
-                    // Write controller state to expansion pak
-                    cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_WRITE_M64_INPUTS);
                 }
                 else {
                     for (M64File* candidate : game->m64Files) {
@@ -272,18 +267,9 @@ public:
                     }
 
                     if (m64File != nullptr) {
-                        // Show play icon
-                        cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_SHOW_PLAY_ICON);
-
-                        // Increment frame number
-                        cheatList.addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_INCREMENT_M64_FRAME);
-
-                        // Read controller state from expansion pak
-                        cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_READ_M64_INPUTS);
+                        speedrunStatus = STATUS_PLAYING;
                     }
                 }
-
-                isRecording = speedrunsState.isRecording;
             }
             else if (cheatList.cheatsDatabase != nullptr && cheatsState.enabledCheatIndexes.size() > 0) {
                 for (int cheatIndex : cheatsState.enabledCheatIndexes) {
@@ -291,6 +277,12 @@ public:
 
                     cheatList.addCheatCodes(cheatIndex, option ? (int16_t)*option : -1);
                 }
+            }
+
+            if (speedrunStatus != STATUS_NONE) {
+                cheatList.addCheatGroup(CHEAT_GROUP_osViSwapBuffer,      HOOK_osViSwapBuffer);
+                cheatList.addCheatGroup(CHEAT_GROUP_osContStartReadData, HOOK_osContStartReadData);
+                cheatList.addCheatGroup(CHEAT_GROUP_osContGetReadData,   HOOK_osContGetReadData);
             }
 
             if (cheatList.itemCount > 0) {
@@ -310,7 +302,7 @@ public:
                 controllerCount = m64File->controllerCount;
                 sampleCount = m64File->sampleCount;
             }
-            else if (isRecording) {
+            else if (speedrunStatus == STATUS_RECORDING) {
                 controllerCount = speedrunsState.numberOfControllers;
             }
 
@@ -328,12 +320,12 @@ public:
             screenshotSettings->overlayDelay = 32;
 
             speedrunSettings->showOverlay = true;
-            speedrunSettings->isRecording = isRecording;
+            speedrunSettings->status = speedrunStatus;
             speedrunSettings->controllerCount = controllerCount;
             speedrunSettings->sampleCount = sampleCount;
         }
 
-        if (m64File == nullptr && !isRecording) {
+        if (m64File == nullptr && !(speedrunStatus != STATUS_RECORDING)) {
             loadSaveFile();
         }
     }

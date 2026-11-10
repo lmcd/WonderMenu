@@ -46,17 +46,16 @@ static_assert((M64_INPUTS_ADDRESS & 0x1FFFFFFF) + M64_INPUTS_MAX_SIZE <= (PAYLOA
 /* A hook value with this bit set runs jal_hook_c AFTER the original function
    returns, rather than before it's called (see jal_hook_entry in resume.S).
    Only for functions taking four or fewer arguments. */
-#define HOOK_AFTER 0x8000
+#define HOOK_BEFORE 0x0000
+#define HOOK_AFTER  0x8000
 
 enum HookIdentifier : uint16_t {
-    HOOK_SHOW_RECORD_ICON    = 0, // Before osViSwapBuffer
-    HOOK_SHOW_PLAY_ICON      = 1, // Before osViSwapBuffer
-    HOOK_BEGIN_SCREENSHOT    = 2, // Before osSpTaskLoad
-    HOOK_PROCESS_SCREENSHOT  = 3, // Before osViSwapBuffer
-    HOOK_READ_CONTROLLERS    = HOOK_AFTER | 4, // After osContGetReadData
-    HOOK_READ_M64_INPUTS     = HOOK_AFTER | 5, // After osContGetReadData
-    HOOK_WRITE_M64_INPUTS    = HOOK_AFTER | 6, // After osContGetReadData
-    HOOK_INCREMENT_M64_FRAME = 7, // Before osContStartReadData
+    HOOK_BEGIN_SCREENSHOT    = HOOK_BEFORE | 2,  // before_osViSwapBuffer
+    HOOK_READ_CONTROLLERS    = HOOK_AFTER  | 4,  // after_osContGetReadData
+    HOOK_osSpTaskLoad        = HOOK_BEFORE | 3,  // before_osSpTaskLoad
+    HOOK_osViSwapBuffer      = HOOK_BEFORE | 8,  // before_osViSwapBuffer
+    HOOK_osContStartReadData = HOOK_BEFORE | 9,  // before_osContStartReadData
+    HOOK_osContGetReadData   = HOOK_AFTER  | 10  // after_osContGetReadData
 };
 
 // Size: 8
@@ -81,10 +80,17 @@ struct __attribute__((packed)) ScreenshotSettings {
 
 // Size: 16
 struct __attribute__((packed)) SpeedrunSettings {
+    /** What the payload is doing with a speedrun's inputs. */
+    enum Status : uint8_t {
+        STATUS_NONE      = 0,
+        STATUS_RECORDING = 1,
+        STATUS_PLAYING   = 2,
+    };
+
     // Size: 4
     uint32_t sampleCount = 0;
     // Size: 1
-    bool isRecording = false;
+    Status status = STATUS_NONE;
     // Size: 1
     bool showOverlay = true;
     // Size: 1
