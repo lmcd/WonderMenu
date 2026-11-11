@@ -35,7 +35,7 @@
 extern WarmResetState warmResetState;
 
 // Most the payload's image may be, BSS included
-#define PAYLOAD_MAX_SIZE KiB(16)
+#define PAYLOAD_MAX_SIZE KiB(20)
 
 // Most the game DSO's code placed after the payload may be. Each limit is a
 // multiple of 16, so this has room for the alignment between them.
