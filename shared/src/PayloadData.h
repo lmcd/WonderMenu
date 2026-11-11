@@ -13,11 +13,11 @@
 #define FRAMEBUFFER_COPY_ADDRESS  0x80400000  // @4MB (Expansion Pak, used in payload)
 #define GAME_STAGING_ADDRESS      0x80400000  // @4MB (Expansion Pak, used in menu)
 #define M64_INPUTS_ADDRESS        0x80500000  // @5MB (Expansion Pak, used in payload)
-#define PAYLOAD_ADDRESS           0xA0700000  // @7MB (Expansion Pak, used in payload, uncached)
+#define PAYLOAD_ADDRESS           0xA07D0000  // @7.8125MB (Expansion Pak, used in payload, uncached)
 
 #define GAME_STAGING_SIZE         0x00100000  // MiB(1)
 #define FRAMEBUFFER_COPY_MAX_SIZE 0x00100000  // MiB(1)
-#define M64_INPUTS_MAX_SIZE       0x00200000  // MiB(2), up to the payload
+#define M64_INPUTS_MAX_SIZE       0x00200000  // MiB(2), up to the cheat patcher (PATCHER_ADDRESS)
 
 // Physical addresses, so cached and uncached views compare
 static_assert((GAME_STAGING_ADDRESS & 0x1FFFFFFF) + GAME_STAGING_SIZE <= (M64_INPUTS_ADDRESS & 0x1FFFFFFF),

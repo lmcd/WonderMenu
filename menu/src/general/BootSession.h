@@ -62,7 +62,7 @@ private:
     // the game has no DSO, or (state_frame_delay only) doesn't define one.
     DSOSymbols dsoSymbols;
 
-    // `PayloadData` lives at the start of the payload, at 7 MiB in the expansion pak.
+    // `PayloadData` lives at the start of the payload, at 7.8125 MiB in the expansion pak.
     PayloadData* payloadData = (PayloadData*)PAYLOAD_ADDRESS;
     SpeedrunSettings* speedrunSettings = &payloadData->speedrunSettings;
     ScreenshotSettings* screenshotSettings = &payloadData->screenshotSettings;
@@ -318,8 +318,8 @@ public:
 
             screenshotSettings->showOverlay  = true;
             screenshotSettings->overlayDelay = 32;
-            screenshotSettings->dmaChunkSizeKiB = 48;
-            screenshotSettings->allowVideo = false;
+            screenshotSettings->dmaChunkSizeKiB = 32;
+            screenshotSettings->allowVideo = true;
 
             speedrunSettings->showOverlay = true;
             speedrunSettings->status = speedrunStatus;

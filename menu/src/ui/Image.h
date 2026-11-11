@@ -81,7 +81,7 @@ public:
      * valid. Valid for as long as this image is.
      *
      * For a full-size screenshot, which has its game state before the pixels
-     * (GAME_STATE_SPRITE_MARKER_OFFSET), only `surface()` finds the pixels.
+     * (SCREENSHOT_FRAME_COUNT_OFFSET), only `surface()` finds the pixels.
      */
     sprite_t* sprite() const { return spritePtr; }
 

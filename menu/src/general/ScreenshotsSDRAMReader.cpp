@@ -3,6 +3,7 @@
 * @license AGPLv3
 */
 
+#include <algorithm>
 #include <cstring>
 #include <malloc.h>
 
@@ -62,8 +63,12 @@ sprite_t* ScreenshotsSDRAMReader::nextSprite() {
     dma_read_raw_async(buffer + sizeof(sprite_t), readOffset + sizeof(sprite_t), bodyBytes);
     dma_wait();
 
+    // Only the first frame is read, but a video's record holds every frame
+    // (SCREENSHOT_FRAME_COUNT_OFFSET), so the next record follows them all.
+    int frameCount = std::max<int>(((const uint8_t*)sprite)[SCREENSHOT_FRAME_COUNT_OFFSET], 1);
+
     recordOffset = readOffset;
-    recordSize = ALIGN(sizeof(sprite_t) + bodyBytes, 512);
+    recordSize = ALIGN(sizeof(sprite_t) + bodyBytes + (frameCount - 1) * imageBytes, 512);
 
     readOffset += recordSize;
 

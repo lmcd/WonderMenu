@@ -22,13 +22,17 @@
 
 #define RELOCATED_EXCEPTION_HANDLER_ADDRESS (0x80000120)
 #define EXCEPTION_HANDLER_ADDRESS (0x80000180)
-// The patcher gets 32 KiB, after the payload's 32 KiB at 0x80700000-0x80707FFF
-// (PAYLOAD_ADDRESS)
+// The patcher and the engine's temporary copy are only used while booting, so
+// they sit in the payload's screenshot frame slots, which are only used once
+// the game's running. Both are above the M64 inputs table the menu stages
+// below 0x80700000 (M64_INPUTS_MAX_SIZE).
 #define PATCHER_ADDRESS (0x80708000)
 #define ENGINE_TEMPORARY_ADDRESS (0x80710000)
-#define DEFAULT_ENGINE_ADDRESS (0x807C5C00)
+// The resident engine, after the payload's 32 KiB at 0x807D0000-0x807D7FFF
+// (PAYLOAD_ADDRESS). It has up to the payload's stack at the top of RDRAM.
+#define DEFAULT_ENGINE_ADDRESS (0x807D8000)
 
-// The payload reserves the first 64 bytes at 0x80700000 (payload_settings /
+// The payload reserves the first 64 bytes at 0x807D0000 (payload_settings /
 // PayloadData) for its own settings. The resume trampoline's game_ctx snapshot
 // buffer -- and every O_* offset / flag the engine writes into it -- therefore
 // sits this many bytes higher. MUST match the payload_settings size in resume.S.
@@ -330,8 +334,9 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
 
         // IP4 stays set until the NMI, so every later exception lands here
         // too. The flag lives in game_ctx (zero after staging) and is reached
-        // uncached so it's coherent on the next exception.
-        *engine_p++ = I_LUI(REG_K0, 0xA070);                                // PAYLOAD_ADDRESS
+        // uncached so it's coherent on the next exception. The payload's base
+        // is the jump target's upper half, as both are in its first 64 KiB.
+        *engine_p++ = I_LUI(REG_K0, (pre_nmi_target | 0x20000000) >> 16);  // PAYLOAD_ADDRESS
         *engine_p++ = I_LW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
         io32_t *fired_branch = engine_p;
         *engine_p++ = I_NOP();                                              // patched: BNE k1,0,not_nmi

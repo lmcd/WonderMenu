@@ -104,7 +104,8 @@ void Image::adoptSprite(sprite_t* sprite) {
 }
 
 bool Image::hasGameState() const {
-    return spritePtr != nullptr && ((const uint8_t*)spritePtr)[GAME_STATE_SPRITE_MARKER_OFFSET] != 0;
+    // Only screenshots have a frame count (SCREENSHOT_FRAME_COUNT_OFFSET)
+    return spritePtr != nullptr && ((const uint8_t*)spritePtr)[SCREENSHOT_FRAME_COUNT_OFFSET] != 0;
 }
 
 const uint8_t* Image::gameState() const {
