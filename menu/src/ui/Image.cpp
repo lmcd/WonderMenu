@@ -5,7 +5,9 @@
 
 #include "Image.h"
 
+#include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <malloc.h>
 
 #include "../libdragon/sprite_ext.h"
@@ -51,6 +53,28 @@ sprite_t* Image::loadSprite(const FFOBJID& fileObject) {
         return nullptr;
     }
 
+    sprite_t header;
+    UINT headerBytesRead = 0;
+
+    if (f_read(&file, &header, sizeof(header), &headerBytesRead) != FR_OK) {
+        f_close(&file);
+        return nullptr;
+    }
+    
+    if (headerBytesRead != sizeof(header)) {
+        f_close(&file);
+        return nullptr;
+    }
+
+    // A screenshot video's frames follow on from the first, which is all
+    // that's shown, so only it's read (SCREENSHOT_FRAME_COUNT_OFFSET)
+    if (((const uint8_t*)&header)[SCREENSHOT_FRAME_COUNT_OFFSET] > 1) {
+        tex_format_t format = (tex_format_t)(header.flags & SPRITE_FLAGS_TEXFORMAT);
+        UINT firstFrameSize = sizeof(sprite_t) + GAME_STATE_BUFFER_SIZE + TEX_FORMAT_PIX2BYTES(format, header.width) * header.height;
+
+        size = std::min(size, firstFrameSize);
+    }
+
     // As asset_load() allocates, so the pixels are aligned for the RDP
     void* buffer = memalign(32, size);
 
@@ -59,15 +83,18 @@ sprite_t* Image::loadSprite(const FFOBJID& fileObject) {
         return nullptr;
     }
 
+    memcpy(buffer, &header, sizeof(header));
+
     // Read straight into RDRAM, not staged in cart SDRAM: a game's ROM may
     // already be streaming into that SDRAM (GameLaunchScene), and staging there
     // would overwrite it
+    UINT bodySize = size - sizeof(header);
     UINT bytesRead = 0;
-    FRESULT result = f_read(&file, buffer, size, &bytesRead);
+    FRESULT result = f_read(&file, (uint8_t*)buffer + sizeof(header), bodySize, &bytesRead);
 
     f_close(&file);
 
-    if (result != FR_OK || bytesRead != size) {
+    if (result != FR_OK || bytesRead != bodySize) {
         free(buffer);
         return nullptr;
     }
@@ -107,7 +134,7 @@ bool Image::hasGameState() const {
     // Only screenshots have a frame count (SCREENSHOT_FRAME_COUNT_OFFSET)
     return spritePtr != nullptr && ((const uint8_t*)spritePtr)[SCREENSHOT_FRAME_COUNT_OFFSET] != 0;
 }
-
+    
 const uint8_t* Image::gameState() const {
     return hasGameState() ? (const uint8_t*)spritePtr + sizeof(sprite_t) : nullptr;
 }
