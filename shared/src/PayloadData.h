@@ -76,8 +76,10 @@ struct __attribute__((packed)) ScreenshotSettings {
     uint8_t overlayDelay = 32;
     // Size: 1
     uint8_t dmaChunkSizeKiB = 16;
-    // Size: 8
-    uint8_t reserved[8] = {0};
+    // Size: 1
+    bool allowVideo = false;
+    // Size: 7
+    uint8_t reserved[7] = {0};
 };
 
 // Size: 16

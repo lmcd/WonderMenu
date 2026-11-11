@@ -319,6 +319,7 @@ public:
             screenshotSettings->showOverlay  = true;
             screenshotSettings->overlayDelay = 32;
             screenshotSettings->dmaChunkSizeKiB = 48;
+            screenshotSettings->allowVideo = false;
 
             speedrunSettings->showOverlay = true;
             speedrunSettings->status = speedrunStatus;
