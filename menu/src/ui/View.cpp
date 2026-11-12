@@ -471,13 +471,13 @@ bool Drawable::rasterizeView(const RenderInfo& renderInfo, Rect bounds) {
     // Space from an earlier version went with the old buffer, and a new size
     // takes new space
     bool isRasterReusable = rasterVersion == rasterScratch.version
-        && size.width == raster.width
-        && size.height == raster.height;
+        && size.width == rasterSurface.width
+        && size.height == rasterSurface.height;
 
     if (!isRasterReusable) {
-        raster = rasterScratch.take(size);
+        rasterSurface = rasterScratch.take(size);
 
-        if (raster.buffer == nullptr) {
+        if (rasterSurface.buffer == nullptr) {
             return false;
         }
 
@@ -486,7 +486,7 @@ bool Drawable::rasterizeView(const RenderInfo& renderInfo, Rect bounds) {
 
     int bufferIndex = renderInfo.bufferIndex;
 
-    beginRasterizing(raster);
+    beginRasterizing(rasterSurface);
 
     // Pushed once, as the mode stack is shallow and render() pushes its own
     rdpq_mode_push();
@@ -575,7 +575,7 @@ bool Drawable::renderRasterizedView(const RenderInfo& renderInfo) {
             rdpq_set_mode_copy(false);
         }
 
-        rdpq_tex_blit(&raster, rect.minX(), rect.minY(), NULL);
+        rdpq_tex_blit(&rasterSurface, rect.minX(), rect.minY(), NULL);
     rdpq_mode_pop();
 
     drawnBoundingBox[bufferIndex] = hasScissor ? rect.intersection(currentScissor()) : rect;

@@ -271,7 +271,7 @@ class Drawable: public View {
 private:
     // This view's space in the raster scratch memory, and what was last
     // rasterized into it
-    surface_t raster = {};
+    surface_t rasterSurface = {};
     int rasterVersion = -1;
     Rect rasteredBounds = {};
     bool rasterIsValid = false;
