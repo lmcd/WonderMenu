@@ -19,10 +19,7 @@ ScreenshotsSDRAMReader::ScreenshotsSDRAMReader(uint32_t baseAddress, int count)
 }
 
 ScreenshotsSDRAMReader::~ScreenshotsSDRAMReader() {
-    if (buffer != nullptr) {
-        free(buffer);
-        buffer = nullptr;
-    }
+    free(buffer);
 }
 
 void ScreenshotsSDRAMReader::reset() {

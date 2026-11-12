@@ -143,10 +143,7 @@ CartRenderer::CartRenderer(Size displaySize, LabelLoader& labelLoader)
 }
 
 CartRenderer::~CartRenderer() {
-    if (cartListMatFP) {
-        free_uncached(cartListMatFP);
-        cartListMatFP = nullptr;
-    }
+    free_uncached(cartListMatFP);
 }
 
 void CartRenderer::fillSurfaces() {

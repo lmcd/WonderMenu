@@ -19,8 +19,6 @@ Scene::~Scene() {
         }
         else {
             delete childScene;
-
-            childScene = nullptr;
         }
     }
 

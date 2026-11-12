@@ -48,20 +48,9 @@ TabControlView::~TabControlView() {
 
     freeLabelsBlock();
 
-    if (scrollAnimation != nullptr) {
-        delete scrollAnimation;
-        scrollAnimation = nullptr;
-    }
-
-    if (lLabelAnimation != nullptr) {
-        delete lLabelAnimation;
-        lLabelAnimation = nullptr;
-    }
-
-    if (rLabelAnimation != nullptr) {
-        delete rLabelAnimation;
-        rLabelAnimation = nullptr;
-    }
+    delete scrollAnimation;
+    delete lLabelAnimation;
+    delete rLabelAnimation;
 }
 
 void TabControlView::setSelectedSegment(int index, bool) {

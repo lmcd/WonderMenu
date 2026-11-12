@@ -35,10 +35,7 @@ SceneRenderer::SceneRenderer(Scene* initialScene) : currentScene(initialScene), 
 }
 
 SceneRenderer::~SceneRenderer() {
-    if (currentScene) {
-        delete currentScene;
-        currentScene = nullptr;
-    }
+    delete currentScene;
 
     // Clean up scene stack
     for (Scene* scene : sceneStack) {
