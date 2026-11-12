@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <math.h>
 
 #include "main.h"
 

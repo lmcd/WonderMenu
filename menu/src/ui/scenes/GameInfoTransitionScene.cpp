@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <math.h>
 
 #include "animation/TimingFunctions.h"
 #include "general/SceneStates.h"

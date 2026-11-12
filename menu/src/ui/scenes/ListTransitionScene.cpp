@@ -6,7 +6,6 @@
 #include "ListTransitionScene.h"
 
 #include <algorithm>
-#include <math.h>
 
 #include "ui/scenes/IntroScene.h"
 #include "ui/scenes/ListScene.h"
