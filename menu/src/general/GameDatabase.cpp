@@ -253,14 +253,14 @@ void GameDatabase::warmClusterOffsets(const std::vector<GameDatabase::Entry*>& e
         }
     }
 
-    // for (GameDatabase::Entry* entry : entries) {
-    //     if (!entry->hasCheatDatabase()) {
-    //         continue;
-    //     }
+    for (GameDatabase::Entry* entry : entries) {
+        if (!entry->hasCheatDatabase()) {
+            continue;
+        }
         
-    //     f_lseek(&file, cheatsStartOffset + entry->cheatByteOffset);
-    //     entry->cheatsCluster = file.clust;
-    // }
+        f_lseek(&file, cheatsStartOffset + entry->data.cheatByteOffset);
+        entry->cheatsCluster = file.clust;
+    }
 }
 
 bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, int chunkOffset, int chunkCount) {
@@ -424,12 +424,19 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     debugf("[GameDatabase] Reading cheats at local offset: %li\n", (long)entry->data.cheatByteOffset);
     debugf("[GameDatabase] Global offset: %li\n", offset);
 
-    // if (entry->cheatsCluster != 0) {
-    //     file.clust = entry->cheatsCluster;
-    //     file.fptr = offset;
-    // }
-    // else
-    if (!seekTo(offset)) {
+    bool canRestoreCluster = (entry->cheatsCluster != 0);
+
+    #ifdef N64
+    if (canRestoreCluster) {
+        file.clust = entry->cheatsCluster;
+        file.fptr = offset;
+    }
+    #else
+    // No file outside the console, so there's never a cluster to restore
+    canRestoreCluster = false;
+    #endif
+
+    if (!canRestoreCluster && !seekTo(offset)) {
         debugf("[GameDatabase] Failed to seek to offset %li\n", cheatsStartOffset);
         return nullptr;
     }
