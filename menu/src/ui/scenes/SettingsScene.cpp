@@ -12,8 +12,7 @@
 #include "ui/views/ScrollbarView.h"
 
 SettingsScene::SettingsScene(Game& game)
-    : GameInfoTabScene(),
-      game(game) {
+    : game(game) {
 
     labelView.frame.origin.y = 250;
     labelView.align = ALIGN_CENTER;

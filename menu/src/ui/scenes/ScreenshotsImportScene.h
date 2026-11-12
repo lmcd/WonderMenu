@@ -34,7 +34,6 @@ private:
 
     IntroScene& introScene;
     Game& lastLaunchedGame;
-    int count;
     ScreenshotsSDRAMReader& reader;
 
     ScreenshotThumbnailView screenshotThumbnailView;
@@ -54,7 +53,7 @@ private:
     int writingScreenshotIndex = 0;
 
     /**
-     * The full path of the directory we'll be wiriting screenshots to.
+     * The full path of the directory we'll be writing screenshots to.
      * E.g. 'sd:/screenshots/SME"
      */
     std::string directoryPath;
@@ -66,7 +65,7 @@ private:
     DIR screenshotDir = {};
 
     ScreenshotSDWriter screenshotSDWriter;
-    ScreenshotSDWriter thumbnailWriter;
+    ScreenshotSDWriter thumbnailSDWriter;
 
     bool isScreenshotDirOpen() const {
         return screenshotDir.obj.fs != nullptr;
@@ -89,13 +88,10 @@ private:
 
     void beginThumbnailWrite();
 
-    bool writeScreenshot(int width, int height);
-    bool writeThumbnail();
-
 public:
     const char* name() override { return "ScreenshotsImportScene"; }
 
-    ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, int count, ScreenshotsSDRAMReader& reader);
+    ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, ScreenshotsSDRAMReader& reader);
     ~ScreenshotsImportScene();
 
     void didBeginScene(SceneEntry entry) override;

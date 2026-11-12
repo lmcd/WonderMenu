@@ -27,10 +27,17 @@
 #include "../../shared/src/PayloadData.h"
 
 IntroScene::IntroScene(GameLibrary* gameLibrary)
-    : Scene(),
-    gameLibrary(gameLibrary) {
+    : gameLibrary(gameLibrary) {
 
     ownedByRenderer = true;
+
+    rectView.fillColor = Theme::backgroundColor;
+    rectView.usesMultipliedOpacity = false;
+
+    labelView.textColor = Color(128);
+    labelView.align = ALIGN_CENTER;
+    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
+    labelView.usesMultipliedOpacity = false;
 
     view.addSubview(&rectView);
     view.addSubview(&imageView);
@@ -58,9 +65,7 @@ void IntroScene::didBeginScene(SceneEntry) {
 }
 
 void IntroScene::updateViews(const RenderInfo& renderInfo) {
-    rectView.fillColor = Theme::backgroundColor;
     rectView.frame = renderInfo.screenRect;
-    rectView.usesMultipliedOpacity = false;
 
     Size imageSize = logoImage.size();
 
@@ -69,10 +74,6 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 
     labelView.frame.origin = Vec2(0, 458);
     labelView.maxWidth = view.frame.size.width;
-    labelView.textColor = Color(128);
-    labelView.align = ALIGN_CENTER;
-    labelView.fontID = Fonts::INTERDISPLAY_SEMIBOLD_12;
-    labelView.usesMultipliedOpacity = false;
     labelView.opacity = hasActivePopover ? popoverTransitionProgress : 1.0f;
 }
 
@@ -111,6 +112,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         seconds = measure([&] {
             Fonts::loadAll();
         });
+        totalSeconds += seconds;
 
         debugf("[IntroScene] Loaded Fonts: %.3fs\n", seconds);
 
@@ -174,7 +176,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
                 uint32_t count = io_read(baseReadOffset + 4);
 
-                debugf("[IntroScene] %li Screenshots Found\n", count);
+                debugf("[IntroScene] %lu Screenshots Found\n", count);
 
                 // Only the magic is validated, so clamp the count rather than
                 // trusting it to be sane.
@@ -192,7 +194,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
                     // labelView.setString("Processing Screenshots");
 
-                    ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(*this, *lastLaunchedGame, count, *screenshotsReader);
+                    ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(*this, *lastLaunchedGame, *screenshotsReader);
                     pushScene(screenshotsImportScene);
                 }
                 else {
@@ -209,7 +211,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                 auto result = presentPopover<SpeedrunImportPopover>();
 
                 if (result.value == 0) {
-                    debugf("[IntroScene] %li M64 Frames Found (%lu controllers)\n", count, controllerCount);
+                    debugf("[IntroScene] %lu M64 Frames Found (%lu controllers)\n", count, controllerCount);
 
                     labelView.setString("Processing Speedrun");
 

@@ -84,7 +84,7 @@ struct GameDSO {
     }
 
     void* symbol(const char* name) const {
-        return (handle != nullptr) ? dlsym(handle, name) : nullptr;
+        return isOpen() ? dlsym(handle, name) : nullptr;
     }
 
     /**

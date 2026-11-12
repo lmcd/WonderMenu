@@ -15,9 +15,8 @@
 
 SelectionTransitionScene::SelectionTransitionScene(ListScene* listScene,
                                                    GameLaunchScene* gameLaunchScene)
-    : Scene(),
-    listScene(listScene),
-    gameLaunchScene(gameLaunchScene) {
+    : listScene(listScene),
+      gameLaunchScene(gameLaunchScene) {
 
     ownedByRenderer = true;
 
@@ -56,16 +55,16 @@ void SelectionTransitionScene::updateViews(const RenderInfo& renderInfo) {
     float lowerHalfValue = TimingFunctions::easeInOutQuad(lowerHalfTransitionProgress);
     float upperHalfValue = TimingFunctions::easeInOutQuad(upperHalfTransitionProgress);
 
+    float lowerHalfOpacity = 1.0f - lowerHalfValue;
+    float upperHalfOpacity = upperHalfValue;
+
     for (int i = 0; i < 7; i++) {
-        float opacity = std::lerp(listScene->opacityForRow(i), 0.0f, lowerHalfValue);
+        float opacity = listScene->opacityForRow(i) * lowerHalfOpacity;
         listScene->tableView.rowViews[i].opacity = opacity;
     }
 
     listScene->updateViews(renderInfo);
     gameLaunchScene->updateViews(renderInfo);
-    
-    float lowerHalfOpacity = std::lerp(1.0f, 0.0f, lowerHalfValue);
-    float upperHalfOpacity = std::lerp(0.0f, 1.0f, upperHalfValue);
 
     listScene->cart3DView.isHidden = true;
     listScene->selectionRectView.opacity = lowerHalfOpacity;

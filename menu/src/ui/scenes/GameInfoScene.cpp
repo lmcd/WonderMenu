@@ -12,8 +12,7 @@
 #include "general/GameDatabase.h"
 
 GameInfoScene::GameInfoScene(GameInfoState& state, Game& game, GameDatabase& database)
-    : Scene(),
-      state(state),
+    : state(state),
       game(game),
       database(database),
       currentTab(state.currentTab) {

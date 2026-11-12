@@ -19,8 +19,7 @@
 #include "ui/views/ScrollbarView.h"
 
 CheatsScene::CheatsScene(CheatsState& state, CheatDatabase* cheatsDatabase, Game& game)
-    : GameInfoTabScene(),
-      cheatsDatabase(cheatsDatabase),
+    : cheatsDatabase(cheatsDatabase),
       game(game),
       expandedGroupIndexes(state.expandedGroupIndexes),
       enabledCheatIndexes(state.enabledCheatIndexes),

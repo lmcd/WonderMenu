@@ -16,8 +16,7 @@
 // Keeping the offset in one place lets the sprite be freed from its own pointer.
 static constexpr size_t SPRITE_HEADER_OFFSET = (64 - (sizeof(sprite_t) % 64)) % 64;
 
-TestScene::TestScene()
-    : Scene() {
+TestScene::TestScene() {
 
     imageView2.opacity = 0;
 

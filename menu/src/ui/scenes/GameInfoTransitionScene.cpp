@@ -15,9 +15,8 @@
 #include "utils/a3d.h"
 
 GameInfoTransitionScene::GameInfoTransitionScene(GameLaunchScene* gameLaunchScene, GameInfoScene* gameInfoScene)
-    : Scene(),
-    gameLaunchScene(gameLaunchScene),
-    gameInfoScene(gameInfoScene) {
+    : gameLaunchScene(gameLaunchScene),
+      gameInfoScene(gameInfoScene) {
 
     ownedByRenderer = true;
 
@@ -59,8 +58,8 @@ void GameInfoTransitionScene::didBeginScene(SceneEntry entry) {
 void GameInfoTransitionScene::updateViews(const RenderInfo& renderInfo) {
     float value = TimingFunctions::easeInOutQuad(transition.progress);
 
-    float opacityOut = std::lerp(1.0f, 0.0f, value);
-    float opacityIn  = std::lerp(0.0f, 1.0f, value);
+    float opacityOut = 1 - value;
+    float opacityIn  = value;
 
     float yOffset = std::lerp(renderInfo.screenRect.size.height, 0, value);
 

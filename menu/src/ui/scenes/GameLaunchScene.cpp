@@ -19,10 +19,9 @@
 #include "ui/scenes/GameInfoTransitionScene.h"
 
 GameLaunchScene::GameLaunchScene(Game& game, CartRenderer* cartRenderer, GameDatabase& database)
-    : Scene(),
-    game(game),
-    cartRenderer(cartRenderer),
-    database(database) {
+    : game(game),
+      cartRenderer(cartRenderer),
+      database(database) {
 
     transition.speed = 0.035;
     transition.direction = Transition::IDLE;

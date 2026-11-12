@@ -15,12 +15,10 @@
 #include "ui/scenes/ScreenshotsImportScene.h"
 #include "utils/fs.h"
 
-ScreenshotsImportScene::ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, int count, ScreenshotsSDRAMReader& reader)
-    : Scene(),
-    introScene(introScene),
-    lastLaunchedGame(lastLaunchedGame),
-    count(count),
-    reader(reader) {
+ScreenshotsImportScene::ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, ScreenshotsSDRAMReader& reader)
+    : introScene(introScene),
+      lastLaunchedGame(lastLaunchedGame),
+      reader(reader) {
 
     ownedByRenderer = true;
     directoryPath = "sd:/screenshots/" + lastLaunchedGame.directoryName();
@@ -31,7 +29,7 @@ ScreenshotsImportScene::~ScreenshotsImportScene() {
 
     // Writers first: they hold FILs opened inside screenshotDir.
     screenshotSDWriter.close();
-    thumbnailWriter.close();
+    thumbnailSDWriter.close();
     closeScreenshotDir();
 
     delete &reader;
@@ -56,11 +54,11 @@ std::string ScreenshotsImportScene::filenameForScreenshot(int index, bool isThum
 }
 
 bool ScreenshotsImportScene::openScreenshotDir() {
-    directory_create(directoryPath.data());
-
     if (isScreenshotDirOpen()) {
         return true;
     }
+
+    directory_create(directoryPath.data());
 
     FRESULT result = f_opendir(&screenshotDir, strip_fs_prefix((char*)directoryPath.c_str()));
 
@@ -129,8 +127,8 @@ void ScreenshotsImportScene::beginThumbnailWrite() {
     // hasSession() stays true once a writer has been used, so it can't tell
     // whether the previous thumbnail is still being written. Finish that one
     // off rather than skipping this thumbnail.
-    if (thumbnailWriter.hasSession() && !thumbnailWriter.isFinished()) {
-        thumbnailWriter.write();
+    if (thumbnailSDWriter.hasSession() && !thumbnailSDWriter.isFinished()) {
+        thumbnailSDWriter.write();
     }
 
     Size size = thumbnailImage->size();
@@ -157,7 +155,7 @@ void ScreenshotsImportScene::beginThumbnailWrite() {
     dma_write_raw_async(thumbnailImage->surface().buffer, screenshotRecordOffset + sizeof(sprite_t), pixelsSize);
     dma_wait();
 
-    thumbnailWriter.begin(
+    thumbnailSDWriter.begin(
         &screenshotDir,
         filenameForScreenshot(writingScreenshotIndex, true),
         (const void*)(uintptr_t)screenshotRecordOffset,
@@ -185,7 +183,7 @@ void ScreenshotsImportScene::didBeginScene(SceneEntry) {
 
 void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     progressBarView.frame = Rect(220, 428, 200, 8);
-    progressBarView.maxValue = screenshotFrameInterval * count;
+    progressBarView.maxValue = screenshotFrameInterval * reader.count;
     progressBarView.progress += 1.0f;
 
     Rect progressRect = progressBarView.progressRect();
@@ -213,7 +211,7 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
 }
 
 void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
-    int maxFrameNumber = (count * screenshotFrameInterval) + 10;
+    int maxFrameNumber = (reader.count * screenshotFrameInterval) + 10;
 
     if (updateInfo.sceneFrameNumber == maxFrameNumber) {
         popScene();
@@ -226,17 +224,17 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
     // before maxFrameNumber; once every screenshot has been started, the
     // remaining frames just finish writing the last one (and its thumbnail)
     // rather than reading a screenshot that isn't there.
-    bool startsNextScreenshot = (cycleFrameNumber == 0) && (currentScreenshotIndex < count);
+    bool startsNextScreenshot = (cycleFrameNumber == 0) && (currentScreenshotIndex < reader.count);
 
     // Proceed to the next screenshot every `screenshotFrameInterval` frames
     if (!startsNextScreenshot) {
         if (screenshotSDWriter.isFinished()) {
-            if (thumbnailWriter.hasSession()) {
+            if (thumbnailSDWriter.hasSession()) {
                 float seconds = measure([&] {
-                    thumbnailWriter.advance();
+                    thumbnailSDWriter.advance();
                 });
 
-                debugf("[ScreenshotsImportScene] thumbnailWriter.advance: %.3fs\n", seconds);
+                debugf("[ScreenshotsImportScene] thumbnailSDWriter.advance: %.3fs\n", seconds);
             }
         }
         else if (screenshotSDWriter.hasSession()) {

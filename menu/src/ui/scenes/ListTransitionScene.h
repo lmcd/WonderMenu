@@ -26,8 +26,6 @@ private:
 
     Transition transition;
 
-    int isFinishedCount = 0;
-
     float fadeProgress = 0.0f;
 
 public:

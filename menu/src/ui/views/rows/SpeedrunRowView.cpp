@@ -31,7 +31,6 @@ void SpeedrunRowView::update(const RenderInfo& renderInfo) {
     Color titleColor2 = Theme::secondaryLabelColor;
 
     Color selectedTitleColor1 = Color::WHITE;
-    selectedTitleColor1.a *= 1.00f;
 
     Color selectedTitleColor2 = Color::WHITE;
     selectedTitleColor2.a *= 0.55f;

@@ -638,13 +638,9 @@ void GameLibrary::loadGames() {
 
                 romFile.version = cacheResult.version;
                 romFile.crc1 = cacheResult.crc1;
-
-                romCache[fileIndex].entryIndex = cacheResult.entryIndex;
-                romCache[fileIndex].version = cacheResult.version;
-                romCache[fileIndex].crc1 = cacheResult.crc1;
             }
             else {
-                romCache[fileIndex] = ROMCacheResult(hash, fileSize, 0, 0);
+                romCache[fileIndex] = ROMCacheResult(hash, fileSize, -1, 0, 0);
                 
                 if (romFile.loadHeader()) {
                     int16_t databaseIndex = database.indexForROMFile(romFile);
@@ -662,10 +658,6 @@ void GameLibrary::loadGames() {
 
                     // Failed to load, clean up
                     delete &romFile;
-
-                    romCache[fileIndex].entryIndex = -1;
-                    romCache[fileIndex].version = 0;
-                    romCache[fileIndex].crc1 = 0;
 
                     continue;
                 }
@@ -750,7 +742,7 @@ void GameLibrary::loadGames() {
     // the sort above put in INI order. Left null when there are no recents.
     lastLaunchedGame = recentGroups.empty() ? nullptr : recentGroups.front().preferredGame();
 
-    debugf("[GameLibrary] File count %i\n", fileIndex);
+    debugf("[GameLibrary] File count %i\n", cachedROMFileCount);
     debugf("[GameLibrary] Loaded %i Retail Games\n", retailGroups.size());
     debugf("[GameLibrary] Loaded %i Homebrew Games\n", homebrewGroups.size());
     debugf("[GameLibrary] Loaded %i Recent Games\n", recentGroups.size());
@@ -760,7 +752,7 @@ void GameLibrary::loadGames() {
 void GameLibrary::loadM64Files() {
     DirectoryScanner scanner;
 
-     // .m64 files live in the speedruns/ folder on the SD card
+    // .m64 files live in the speedruns/ folder on the SD card
     char m64sPath[256];
     snprintf(m64sPath, sizeof(m64sPath), "%sspeedruns/", path);
 

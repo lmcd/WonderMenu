@@ -34,7 +34,7 @@ struct __attribute__((packed)) GameIdentifier {
 
     // Unique-per-ROM folder name: the two character game ID, the region letter,
     // then the version as a suffix once there's more than one of them (e.g.
-    // "SME", "SME-2").
+    // "SME", "SME2").
     std::string directoryName() {
         char buffer[16];
 

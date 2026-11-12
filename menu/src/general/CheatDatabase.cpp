@@ -79,13 +79,20 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
         uint16_t wildcardStartIndex;
         uint16_t wildcardCount;
     };
+    
     struct TmpItem {
         bool isGroup;
         size_t ref; // node index when isGroup, else cheat-pool index
     };
+
     struct TmpNode {
         std::string name;
         std::vector<TmpItem> items; // direct cheats and child groups, in file order
+    };
+
+    struct GroupFrame {
+        size_t nodeIdx;
+        std::string name;
     };
 
     std::vector<TmpNode>  nodes;
@@ -95,7 +102,6 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
     nodes.push_back(TmpNode{}); // root is node 0
     const size_t rootNode = 0;
 
-    struct GroupFrame { size_t nodeIdx; std::string name; };
     std::vector<GroupFrame> stack;
 
     auto currentParent = [&]() -> size_t {
@@ -254,7 +260,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             if (close != std::string::npos) {
                 outKey = line.substr(1, close - 1);
             }
-                
+
             continue;
         }
 

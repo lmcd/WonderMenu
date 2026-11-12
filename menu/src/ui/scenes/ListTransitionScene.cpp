@@ -11,9 +11,8 @@
 #include "ui/scenes/ListScene.h"
 
 ListTransitionScene::ListTransitionScene(IntroScene* introScene, ListScene* listScene)
-    : Scene(),
-    introScene(introScene),
-    listScene(listScene) {
+    : introScene(introScene),
+      listScene(listScene) {
     
     transition.speed = 0.005;
 }
@@ -75,16 +74,6 @@ void ListTransitionScene::update(const UpdateInfo& updateInfo) {
     // fadeProgress reaches (MAX_VISIBLE_LIST_ITEMS - 1) * FADE_HANDOFF + 1.0.
     float fadeMax = (MAX_VISIBLE_LIST_ITEMS - 1) * FADE_HANDOFF + 1.0f;
     fadeProgress = std::clamp(fadeProgress + FADE_STEP * transition.directionAsFloat(), 0.0f, fadeMax);
-
-    if (transition.didReachBeginning()) {
-        isFinishedCount++;
-    }
-    else if (transition.didReachEnd()) {
-        isFinishedCount++;
-    }
-    else {
-        isFinishedCount = 0;
-    }
 
     if (listScene->tableView.rowViews[6].opacity == 1.0f) {
         pushScene(listScene);

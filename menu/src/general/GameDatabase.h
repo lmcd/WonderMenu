@@ -216,7 +216,6 @@ private:
     void releaseEntriesFromMemory();
 
 public:
-    GameDatabase();
     ~GameDatabase();
 
     static uint32_t djb2(const unsigned char* data, size_t length);

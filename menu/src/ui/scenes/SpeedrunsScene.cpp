@@ -17,8 +17,7 @@
 #include "ui/views/ScrollbarView.h"
 
 SpeedrunsScene::SpeedrunsScene(SpeedrunsState& state, SpeedrunDatabase* speedrunDatabase, Game& game)
-    : GameInfoTabScene(),
-      speedrunDatabase(speedrunDatabase),
+    : speedrunDatabase(speedrunDatabase),
       game(game),
       isRecording(state.isRecording),
       selectedRow(state.selectedRow),

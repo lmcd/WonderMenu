@@ -49,11 +49,6 @@ uint32_t GameDatabase::djb2(const unsigned char* data, size_t length) {
     return hash;
 }
 
-// GameDatabase implementation
-GameDatabase::GameDatabase() {
-    titleLookupMap.reserve(10);
-}
-
 GameDatabase::~GameDatabase() {
     close();
 }
@@ -183,8 +178,7 @@ RegionCode GameDatabase::readRegionCodeAtIndex(uint16_t index) {
 }
 
 int16_t GameDatabase::indexForTitle(char title[21]) {
-    std::string romTitle = std::string(title, strnlen(title, 20));
-    uint32_t hash = djb2((const unsigned char*)romTitle.c_str(), romTitle.length());
+    uint32_t hash = djb2((const unsigned char*)title, strnlen(title, 20));
 
     auto it = titleLookupMap.find(hash);
     if (it == titleLookupMap.end()) {
@@ -213,8 +207,7 @@ int16_t GameDatabase::indexForUniqueID(char uniqueID[2], RegionCode regionCode, 
         // it's one the mask has no room for (a region outside its five, or a v3
         // that isn't Japan). Those entries are still written after the ones the
         // mask covers, so fall back to scanning the run for a matching region.
-
-        // TODO: this is costing us 320ms
+        
         for (uint16_t v = 0; v < variants; v++) {
             int variantIndex = v;
 
@@ -342,10 +335,6 @@ bool GameDatabase::loadCartLabelChunk(Entry* entry, bool highRes, char* buffer, 
 
     useBSpace = !useBSpace;
 
-    #ifdef N64
-    // data_cache_hit_writeback(buffer + bufferOffset, size);
-    #endif
-
     return true;
 }
 #endif
@@ -437,7 +426,7 @@ CheatDatabase* GameDatabase::loadCheatDatabase(Entry* entry) {
     #endif
 
     if (!canRestoreCluster && !seekTo(offset)) {
-        debugf("[GameDatabase] Failed to seek to offset %li\n", cheatsStartOffset);
+        debugf("[GameDatabase] Failed to seek to offset %li\n", offset);
         return nullptr;
     }
 
@@ -501,7 +490,7 @@ bool GameDatabase::load(const char* filename) {
     // 4 bytes
     cursor += 4;
 
-    if (headerBuffer[0] != 'N' || headerBuffer[1] != 'U' || headerBuffer[2] != 'F' || headerBuffer[3] != 'M') {
+    if (memcmp(headerBuffer, "NUFM", 4) != 0) {
         debugf("Invalid database header\n");
         close();
         return false;
@@ -518,6 +507,8 @@ bool GameDatabase::load(const char* filename) {
 
     memcpy(&matchedByTitleCount, &headerBuffer[cursor], 2);
     cursor += sizeof(matchedByTitleCount);
+
+    titleLookupMap.reserve(matchedByTitleCount);
 
     // READ TILE COUNT
     // 2 bytes

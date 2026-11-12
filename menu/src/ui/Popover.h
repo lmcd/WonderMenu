@@ -62,7 +62,7 @@ public:
 
     const char* name() override { return "Popover"; }
 
-    Popover(Scene* baseScene) : Scene(), baseScene(baseScene) {
+    Popover(Scene* baseScene) : baseScene(baseScene) {
         ownedByRenderer = true;
 
         tableView.drawsBackground = false;
@@ -180,9 +180,9 @@ public:
         Color titleColor = Theme::accentColor;
 
         // Parent scene fades out
-        float parentSceneOpacity = std::lerp(1.0f, 0.5f, transition.progress);
+        float parentSceneOpacity  = std::lerp(1.0f, 0.5f, transition.progress);
         // Popover fades in
-        float popoverSceneOpacity  = std::lerp(0.0f, 1.0f, transition.progress);
+        float popoverSceneOpacity = transition.progress;
 
         baseScene->view.opacity = parentSceneOpacity;
         contentView.opacity = popoverSceneOpacity;

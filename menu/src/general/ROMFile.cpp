@@ -134,8 +134,8 @@ bool ROMFile::readAndValidateROMData(const char* path, size_t numBytes, unsigned
 }
 
 void ROMFile::setMetadataFromBuffer(const unsigned char* buffer) {
-    memcpy(&this->crc1, &buffer[0x10], 4);
-    memcpy(&this->crc2, &buffer[0x14], 4);
+    // CRC1 & CRC2
+    memcpy(&this->crc1, &buffer[0x10], 8);
     
     // Extract title from offset 0x20 (20 bytes, null-terminated)
     memcpy(this->title, &buffer[0x20], 20);

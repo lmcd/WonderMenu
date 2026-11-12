@@ -16,10 +16,9 @@
 #include "ui/popovers/ChooseVersionPopover.h"
 
 ListScene::ListScene(CartRenderer* cartRenderer, GameLibrary* gameLibrary, GameDatabase* database)
-    : Scene(),
-    cartRenderer(cartRenderer),
-    database(database),
-    gameLibrary(gameLibrary) {
+    : cartRenderer(cartRenderer),
+      database(database),
+      gameLibrary(gameLibrary) {
 
     numberOfRows = 0;
 

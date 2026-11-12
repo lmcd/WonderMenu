@@ -118,11 +118,6 @@ private:
     static constexpr int MAX_STATE_SPRITES = 16;
     std::vector<Image> stateSprites;
 
-    // Centred in the selected screenshot's empty slot while it's shown at full
-    // size. Under the full size screenshot, which covers it as it settles back.
-    Image cameraIcon = Image("rom:/ui/Camera.RGBA16.sprite");
-    ImageView cameraIconView;
-
     LabelView<64> labelView;
 
     // The game's screenshot directory, e.g. "sd:/screenshots/SME/"

@@ -106,8 +106,7 @@ namespace {
 }
 
 ScreenshotsScene::ScreenshotsScene(Game& game)
-    : GameInfoTabScene(),
-      game(game) {
+    : game(game) {
 
     dso.open(game.romFile.uniqueID);
 
@@ -155,14 +154,6 @@ ScreenshotsScene::ScreenshotsScene(Game& game)
 
     contentView.addSubview(&selectedCornerView);
 
-    // Blended with what's under it, the bar's colour, rather than the theme's
-    // background
-    cameraIconView.image = &cameraIcon;
-    cameraIconView.isOpaque = false;
-    cameraIconView.isHidden = true;
-
-    // contentView.addSubview(&cameraIconView);
-
     // Drawn as it is in the thumbnail at first, then at its own size
     fullScreenshotView.fillsFrame = true;
     fullScreenshotView.isSmooth = true;
@@ -188,7 +179,6 @@ ScreenshotsScene::~ScreenshotsScene() {
 
     for (int i = 0; i < SCREENSHOT_COUNT; i++) {
         delete composedImages[i];
-        composedImages[i] = nullptr;
     }
 }
 
@@ -597,11 +587,7 @@ void ScreenshotsScene::fadeBehindFullScreenshot(float openValue, float zoomValue
         return;
     }
 
-    // Everything behind fades as it opens, as behind a popover, and fully to
-    // black (the theme's background) at FULLSCREEN. The screenshot is in the
-    // faded tree, so it opts out of the multiplied opacity.
-    float openOpacity = std::lerp(0.0f, 0.0f, zoomValue);
-    float opacity = std::lerp(1.0f, openOpacity, openValue);
+    float opacity = std::lerp(1.0f, 0.0f, openValue);
 
     // Everything behind redraws as it fades, which draws over the screenshot,
     // so it has to redraw on top even once its frame has settled
@@ -785,11 +771,6 @@ void ScreenshotsScene::updateGridViews(const RenderInfo& renderInfo) {
     selectedCornerView.isInverted = true;
     selectedCornerView.isOpaque = false;
     selectedCornerView.isHidden = !hasSelection || isShowingFullScreenshot;
-
-    // In the slot the full size screenshot left, at the sprite's own size
-    
-    cameraIconView.frame = centredIn(cameraIcon.size(), selectedThumbnailRect);
-    cameraIconView.isHidden = !hasSelection || !isShowingFullScreenshot;
 
     // Scrolls a row at a time, so the content is the scrollbar's own height plus
     // the rows that can be scrolled through. A knob only shows when there's

@@ -10,14 +10,10 @@
 #include <cstring>
 #include <malloc.h>
 
-#include "../libdragon/sprite_ext.h"
 #include "dso/game_state_abi.h"
-#include "utils/utils.h"
 
 Image::Image(Size size, tex_format_t format)
     : surfaceStorage(surface_alloc(format, size.width, size.height)) {
-
-    createSpriteForSurface();
 }
 
 Image::Image(sprite_t& sprite) {
@@ -26,8 +22,6 @@ Image::Image(sprite_t& sprite) {
 
 Image::Image(const surface_t& surface)
     : surfaceStorage(surface) {
-
-    createSpriteForSurface();
 }
 
 Image::Image(const char* path) {
@@ -48,7 +42,9 @@ sprite_t* Image::loadSprite(const FFOBJID& fileObject) {
 
     UINT size = fileObject.objsize;
 
-    if (size < sizeof(sprite_t)) {
+    size_t headerSize = sizeof(sprite_t);
+
+    if (size < headerSize) {
         f_close(&file);
         return nullptr;
     }
@@ -56,12 +52,12 @@ sprite_t* Image::loadSprite(const FFOBJID& fileObject) {
     sprite_t header;
     UINT headerBytesRead = 0;
 
-    if (f_read(&file, &header, sizeof(header), &headerBytesRead) != FR_OK) {
+    if (f_read(&file, &header, headerSize, &headerBytesRead) != FR_OK) {
         f_close(&file);
         return nullptr;
     }
     
-    if (headerBytesRead != sizeof(header)) {
+    if (headerBytesRead != headerSize) {
         f_close(&file);
         return nullptr;
     }
@@ -70,7 +66,7 @@ sprite_t* Image::loadSprite(const FFOBJID& fileObject) {
     // that's shown, so only it's read (SCREENSHOT_FRAME_COUNT_OFFSET)
     if (((const uint8_t*)&header)[SCREENSHOT_FRAME_COUNT_OFFSET] > 1) {
         tex_format_t format = (tex_format_t)(header.flags & SPRITE_FLAGS_TEXFORMAT);
-        UINT firstFrameSize = sizeof(sprite_t) + GAME_STATE_BUFFER_SIZE + TEX_FORMAT_PIX2BYTES(format, header.width) * header.height;
+        UINT firstFrameSize = headerSize + GAME_STATE_BUFFER_SIZE + TEX_FORMAT_PIX2BYTES(format, header.width) * header.height;
 
         size = std::min(size, firstFrameSize);
     }
@@ -83,14 +79,14 @@ sprite_t* Image::loadSprite(const FFOBJID& fileObject) {
         return nullptr;
     }
 
-    memcpy(buffer, &header, sizeof(header));
+    memcpy(buffer, &header, headerSize);
 
     // Read straight into RDRAM, not staged in cart SDRAM: a game's ROM may
     // already be streaming into that SDRAM (GameLaunchScene), and staging there
     // would overwrite it
-    UINT bodySize = size - sizeof(header);
+    UINT bodySize = size - headerSize;
     UINT bytesRead = 0;
-    FRESULT result = f_read(&file, (uint8_t*)buffer + sizeof(header), bodySize, &bytesRead);
+    FRESULT result = f_read(&file, (uint8_t*)buffer + headerSize, bodySize, &bytesRead);
 
     f_close(&file);
 
@@ -120,7 +116,6 @@ void Image::adoptSprite(sprite_t* sprite) {
     }
 
     spritePtr = sprite;
-    ownsSpritePixels = true;
 
     surfaceStorage = sprite_get_pixels(spritePtr);
 
@@ -139,64 +134,16 @@ const uint8_t* Image::gameState() const {
     return hasGameState() ? (const uint8_t*)spritePtr + sizeof(sprite_t) : nullptr;
 }
 
-void Image::createSpriteForSurface() {
-    if (surfaceStorage.buffer == nullptr) {
-        return;
-    }
-
-    tex_format_t format = surface_get_format(&surfaceStorage);
-
-    assertf(surfaceStorage.stride == TEX_FORMAT_PIX2BYTES(format, surfaceStorage.width),
-        "Image: surface rows must be tightly packed (stride %d, expected %d)",
-        surfaceStorage.stride, TEX_FORMAT_PIX2BYTES(format, surfaceStorage.width));
-
-    // With SPRITE_FLAGS_NODATA, libdragon finds the extended header straight
-    // after the base one, and the pixels at `data_ptr` bytes from the sprite
-    sprite_t* sprite = (sprite_t*)calloc(1, sizeof(sprite_t) + sizeof(sprite_ext_t));
-
-    if (sprite == nullptr) {
-        return;
-    }
-
-    sprite->width   = surfaceStorage.width;
-    sprite->height  = surfaceStorage.height;
-    sprite->flags   = (format & SPRITE_FLAGS_TEXFORMAT) | SPRITE_FLAGS_EXT | SPRITE_FLAGS_NODATA;
-    sprite->hslices = 1;
-    sprite->vslices = 1;
-
-    sprite_ext_t* ext = (sprite_ext_t*)((uint8_t*)sprite + sizeof(sprite_t));
-
-    ext->size = sizeof(sprite_ext_t);
-    ext->version = SPRITE_EXT_VERSION;
-
-    // An offset from the sprite, which can be "negative" (the pixels can sit at a
-    // lower address); 32-bit wraparound brings it back to the pixels
-    ext->data_ptr = (uint32_t)((uintptr_t)surfaceStorage.buffer - (uintptr_t)sprite);
-
-    // Lets rdpq_sprite_upload() take it, which asserts on this. Pitches in TMEM
-    // are padded to 8 bytes, which mksprite takes into account too.
-    int tmemPitch = ALIGN(surfaceStorage.stride, 8);
-
-    if (tmemPitch * surfaceStorage.height <= KiB(4)) {
-        ext->flags |= SPRITE_FLAG_FITS_TMEM;
-    }
-
-    spritePtr = sprite;
-    ownsSpritePixels = false;
-}
-
 Image::~Image() {
     reset();
 }
 
 Image::Image(Image&& other)
     : surfaceStorage(other.surfaceStorage),
-      spritePtr(other.spritePtr),
-      ownsSpritePixels(other.ownsSpritePixels) {
+      spritePtr(other.spritePtr) {
 
     other.surfaceStorage = {};
     other.spritePtr = nullptr;
-    other.ownsSpritePixels = false;
 }
 
 Image& Image::operator=(Image&& other) {
@@ -205,11 +152,9 @@ Image& Image::operator=(Image&& other) {
 
         surfaceStorage = other.surfaceStorage;
         spritePtr = other.spritePtr;
-        ownsSpritePixels = other.ownsSpritePixels;
 
         other.surfaceStorage = {};
         other.spritePtr = nullptr;
-        other.ownsSpritePixels = false;
     }
 
     return *this;
@@ -221,15 +166,7 @@ void Image::reset() {
     surface_free(&surfaceStorage);
 
     if (spritePtr != nullptr) {
-        if (ownsSpritePixels) {
-            sprite_free(spritePtr);
-        }
-        else {
-            free(spritePtr);
-        }
-
+        sprite_free(spritePtr);
         spritePtr = nullptr;
     }
-
-    ownsSpritePixels = false;
 }

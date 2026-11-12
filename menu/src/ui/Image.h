@@ -14,10 +14,6 @@
  * An image, whose pixels are always described by `surface()` -- however it was
  * created. It owns what it was created from, and frees it the right way.
  *
- * There's always a `sprite()` too (e.g. for `ImageView`). When the image wasn't
- * created from one, it's a header-only sprite pointing at the surface's pixels,
- * so the pixels are never copied.
- *
  * Move-only, so there's always exactly one owner.
  */
 class Image {
@@ -40,8 +36,7 @@ public:
      * Takes ownership of `surface`, which is freed with `surface_free()`. That
      * only frees the pixels if the surface owns them (e.g. from
      * `surface_alloc()` or `View::renderToSurface()`), so a surface made over
-     * someone else's memory is safe to pass too. Its rows must be tightly packed
-     * (as from `surface_alloc()`), as that's the only layout a sprite describes.
+     * someone else's memory is safe to pass too.
      */
     explicit Image(const surface_t& surface);
 
@@ -77,15 +72,6 @@ public:
     tex_format_t format() const { return surface_get_format(&surfaceStorage); }
 
     /**
-     * A sprite describing the image's pixels. Only null when the image isn't
-     * valid. Valid for as long as this image is.
-     *
-     * For a full-size screenshot, which has its game state before the pixels
-     * (SCREENSHOT_FRAME_COUNT_OFFSET), only `surface()` finds the pixels.
-     */
-    sprite_t* sprite() const { return spritePtr; }
-
-    /**
      * A full-size screenshot's game state (GAME_STATE_BUFFER_SIZE bytes, as the
      * payload captured it), or null if the image has none. Valid for as long as
      * this image is.
@@ -109,16 +95,10 @@ private:
     // nullptr if it can't be read.
     static sprite_t* loadSprite(const FFOBJID& fileObject);
 
-    // Shared by the size and surface constructors: a header-only sprite for
-    // surfaceStorage's pixels
-    void createSpriteForSurface();
-
     surface_t surfaceStorage = {};
 
+    // The sprite this image was created from, freed with sprite_free(), or null
+    // if it was created from a size or surface. surfaceStorage is then a view of
+    // its pixels, which surface_free() leaves alone.
     sprite_t* spritePtr = nullptr;
-
-    // True when spritePtr is a whole sprite this image owns (freed with
-    // sprite_free(), and surfaceStorage is a view of its pixels). False when
-    // it's a header-only sprite created for surfaceStorage (freed with free()).
-    bool ownsSpritePixels = false;
 };

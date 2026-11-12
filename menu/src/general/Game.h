@@ -11,7 +11,6 @@
 #include "GameDatabase.h"
 #include "M64File.h"
 #include "ROMFile.h"
-#include "general/Speedrun.h"
 
 class CartLabel;
 
@@ -93,11 +92,11 @@ public:
     }
 
     bool hasSpeedrunDatabase() {
-        if (databaseEntry == nullptr) {
-            return false;
+        if (databaseEntry != nullptr) {
+            return databaseEntry->hasSpeedrunDatabase();
         }
         else {
-            return databaseEntry->hasSpeedrunDatabase();
+            return false;
         }
     }
 
@@ -133,9 +132,8 @@ public:
         }
     }
 
-    // `sortIndex` when title() comes from the database, -1 otherwise
     int titleSortIndex() const {
-        if (databaseEntry != nullptr && databaseEntry->title()[0] != '\0') {
+        if (databaseEntry != nullptr) {
             return databaseEntry->data.sortIndex;
         }
 

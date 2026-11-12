@@ -320,17 +320,15 @@ CartLabelType CartRenderer::loadLabelDataForGame(Game* game, bool preferHighRes)
         }
     }
 
-    if (spriteData == nullptr) {
-        LoadResult result = labelLoader.loadSmallLabelDataForGame(game, 4);
-        spriteData = result.data;
+    LoadResult result = labelLoader.loadSmallLabelDataForGame(game, 4);
+    spriteData = result.data;
 
-        if (spriteData) {
-            for (int i = 0; i < DB_S_LABEL_TILE_COUNT; i++) {
-                rdpq_set_lookup_address(i + 1, spriteData + (DB_LABEL_TILE_SIZE * i));
-            }
-
-            return CART_LABEL_SMALL;
+    if (spriteData) {
+        for (int i = 0; i < DB_S_LABEL_TILE_COUNT; i++) {
+            rdpq_set_lookup_address(i + 1, spriteData + (DB_LABEL_TILE_SIZE * i));
         }
+
+        return CART_LABEL_SMALL;
     }
 
     return CART_LABEL_NONE;
@@ -390,7 +388,7 @@ int CartRenderer::preloadLabel(float scale, Game* game) {
     }
 }
 
-Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPosition, float yRelativeToLight, Game* game, float opacity = 1.0f, int cacheIndex = -1) {
+Rect CartRenderer::render2DCart(int frameNumber, float scale, Vec2 screenPosition, float yRelativeToLight, Game* game, float opacity, int cacheIndex) {
     Size size = sizeForScale(scale);
 
     if (cacheIndex >= 0) {
