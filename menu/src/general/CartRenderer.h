@@ -102,7 +102,6 @@ private:
 
     // Render only the textured label
     rspq_block_t* blankLabelBlock;
-    rspq_block_t* fadedTexturedLabelBlock;
     rspq_block_t* texturedLabelBlock;
     rspq_block_t* highResTexturedLabelBlock;
 

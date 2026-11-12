@@ -161,44 +161,6 @@ void CartRenderer::setupBlocks() {
         t3d_model_draw(blankLabelModel);
     });
 
-    fadedTexturedLabelBlock = rspq_make_block([&] {
-        T3DModelDrawConf conf = (T3DModelDrawConf){
-            .userData = &placeholders,
-            .dynTextureCb = dynamicTextureCallback,
-        };
-        T3DModelState state = t3d_model_state_create();
-        state.drawConf = &conf;
-
-        T3DModelIter it = t3d_model_iter_create(texturedLabelModel, T3D_CHUNK_TYPE_OBJECT);
-        
-        while(t3d_model_iter_next(&it))
-        {
-            if(conf.filterCb && !conf.filterCb(conf.userData, it.object)) {
-                continue;
-            }
-
-            if(it.object->material) {
-                // auto oldColorFlags = it.object->material->setColorFlags;
-                // it.object->material->setColorFlags = 0x000;
-
-                t3d_model_draw_material(it.object->material, &state);
-
-                // rdpq_mode_begin();
-                //  rdpq_mode_combiner(RDPQ_COMBINER1((SHADE, 0, TEX0, 0), (0, 0, 0, PRIM)));
-                //  rdpq_mode_blender(RDPQ_BLENDER((IN_RGB, IN_ALPHA, BLEND_RGB, INV_MUX_ALPHA)));
-                //  rdpq_mode_antialias(AA_NONE);
-                // rdpq_mode_end();
-                rdpq_mode_blender(0);
-
-                // it.object->material->setColorFlags = oldColorFlags;
-
-                // rdpq_mode_antialias(AA_NONE);
-            }
-            
-            t3d_model_draw_object(it.object, conf.matrices);
-        }
-    });
-
     texturedLabelBlock = rspq_make_block([&] {
         t3d_model_draw_custom(texturedLabelModel, (T3DModelDrawConf){
             .userData = &placeholders,
@@ -273,12 +235,7 @@ Rect CartRenderer::renderCart(int frameNumber, float scale, Vec3f position, Vec3
         labelBlock = highResTexturedLabelBlock;
     }
     else {
-        // if (opacity < 1.0f) {
-            labelBlock = fadedTexturedLabelBlock;
-        // }
-        // else {
-            // labelBlock = texturedLabelBlock;
-        // }
+        labelBlock = texturedLabelBlock;
     }
 
     if (flags & CART_RENDER_LABEL_ONLY) {
