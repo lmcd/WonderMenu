@@ -431,11 +431,10 @@ void ListScene::toggleRetailGroupings() {
         return;
     }
 
-    GameGroup gameGroup = gameGroups->at(getSelectedRow());
     // Track the first game of the current selection. After regrouping,
     // landing on its row gives the preferred game (grouping on) or the
     // first game of the now-expanded group (grouping off).
-    Game* game = gameGroup.games.front();
+    Game* game = gameGroups->at(getSelectedRow()).games.front();
 
     gameLibrary->toggleRetailGroupings();
 
@@ -457,9 +456,9 @@ void ListScene::toggleFavourite() {
         return;
     }
 
-    GameGroup gameGroup = gameGroups->at(getSelectedRow());
-
-    gameLibrary->toggleFavourite(gameGroup);
+    // The game is owned by allGames, so it outlives its group being erased
+    // from favouriteGroups (which gameGroups may point at).
+    gameLibrary->toggleFavourite(*gameGroups->at(getSelectedRow()).preferredGame());
 
     moveSelectionBy(0, true);
 }

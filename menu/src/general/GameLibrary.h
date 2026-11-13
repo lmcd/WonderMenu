@@ -211,7 +211,10 @@ public:
 
     void addToRecents(GameGroup gameGroup);
 
-    void toggleFavourite(GameGroup gameGroup);
+    /**
+     * Favourites `game`, or unfavourites it if it already is one, and saves.
+     */
+    void toggleFavourite(Game& game);
 
     void toggleRetailGroupings();
 };

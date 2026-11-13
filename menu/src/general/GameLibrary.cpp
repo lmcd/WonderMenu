@@ -370,20 +370,21 @@ void GameLibrary::addToRecents(GameGroup gameGroup) {
     saveHistoryAndFavourites();
 }
 
-// TODO: should be reference
-// TODO: should be `Game`
-void GameLibrary::toggleFavourite(GameGroup gameGroup) {
-    Game* game = gameGroup.preferredGame();
-    game->isFavourite = !game->isFavourite;
+void GameLibrary::toggleFavourite(Game& game) {
+    game.isFavourite = !game.isFavourite;
 
-    if (!game->isFavourite) {
-        auto it = std::find(favouriteGroups.begin(), favouriteGroups.end(), gameGroup);
+    if (!game.isFavourite) {
+        // Each favourite is a group of just its own game.
+        auto it = std::find_if(favouriteGroups.begin(), favouriteGroups.end(), [&](GameGroup& group) {
+            return group.preferredGame() == &game;
+        });
+
         if (it != favouriteGroups.end()) {
             favouriteGroups.erase(it);
         }
     }
     else {
-        favouriteGroups.emplace(favouriteGroups.begin(), *game);
+        favouriteGroups.emplace(favouriteGroups.begin(), game);
 
         // The oldest favourite drops off the end, so it's no longer one
         while (favouriteGroups.size() > MAX_NUMBER_OF_FAVOURITES) {
