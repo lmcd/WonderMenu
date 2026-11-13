@@ -30,15 +30,6 @@ static_assert((M64_INPUTS_ADDRESS & 0x1FFFFFFF) + M64_INPUTS_MAX_SIZE <= (PAYLOA
 #define ROM_SCREENSHOT_MAGIC      1093627481  // Just a random number
 #define ROM_SPEEDRUN_MAGIC        3412958702  // Just a random number
 
-// Layout of a recording the payload leaves in cart space, after the game ROM,
-// for the menu to save as an M64. The inputs are frameCount samples of
-// controllerCount words each, starting 16 bytes in so the DMA stays aligned.
-#define ROM_SPEEDRUN_MAGIC_OFFSET            0
-#define ROM_SPEEDRUN_FRAME_COUNT_OFFSET      4
-#define ROM_SPEEDRUN_CONTROLLER_COUNT_OFFSET 8
-#define ROM_SPEEDRUN_INPUTS_OFFSET           16
-
-
 // Upper bound on the screenshot count read back from the cart, which is only
 // guarded by the magic word above.
 #define MAX_SCREENSHOT_IMPORT_COUNT 64
@@ -58,13 +49,41 @@ enum HookIdentifier : uint16_t {
     HOOK_osContGetReadData   = HOOK_AFTER  | 10  // after_osContGetReadData
 };
 
-// Size: 8
+// Size: 16
 struct __attribute__((packed)) ScreenshotsHeader {
     // Size: 4
     uint32_t magic = 0;
     // Size: 4
     uint32_t count = 0;
+    // Size: 4
+    uint32_t reserved1 = 0;
+    // Size: 4
+    uint32_t reserved2 = 0;
+
+    bool isValid() const {
+        return magic == ROM_SCREENSHOT_MAGIC;
+    }
 };
+
+// Size: 16
+struct __attribute__((packed)) SpeedrunHeader {
+    // Size: 4
+    uint32_t magic = 0;
+    // Size: 4
+    uint32_t frameCount = 0;
+    // Size: 4
+    uint32_t controllerCount = 0;
+    // Size: 4
+    uint32_t reserved = 0;
+
+    bool isValid() const {
+        return magic == ROM_SPEEDRUN_MAGIC;
+    }
+};
+
+// Either header can follow the ROM. Both are the same size, and
+// their magic says which it is.
+static_assert(sizeof(ScreenshotsHeader) == sizeof(SpeedrunHeader));
 
 // Size: 12
 struct __attribute__((packed)) ScreenshotSettings {

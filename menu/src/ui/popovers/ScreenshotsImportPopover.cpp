@@ -50,6 +50,13 @@ void ScreenshotsImportPopover::updateViews(const RenderInfo& renderInfo) {
                 sideThumbnailView2.setFullSizeScreenshotSurface(reader->surfaceForSprite(reader->nextSprite()));
             }
         }
+
+        if (renderInfo.sceneFrameNumber >= 4) {
+            // We've read 3 screenshots from the reader. Reset the cursor back
+            // to the beginning so another consumer outside of the popover can
+            // use it.
+            reader->reset();
+        }
     }
 
     if (renderInfo.sceneFrameNumber >= 22) {

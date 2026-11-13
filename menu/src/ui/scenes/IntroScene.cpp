@@ -6,6 +6,7 @@
 #include "IntroScene.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 
 #include "main.h"
@@ -166,33 +167,36 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
         if (hasWarmResetState && lastLaunchedGame != nullptr) {
             uint32_t baseReadOffset = ROM_ADDRESS + lastLaunchedGame->romFile.size;
 
-            // Only the magic word is needed to decide whether there's anything to
-            // import, so read that single word straight over the PI bus.
-            uint32_t magic = io_read(baseReadOffset);
+            // A whole cache line, invalidated so the CPU sees what the DMA
+            // wrote rather than stale cached stack.
+            alignas(16) uint8_t headerBytes[sizeof(ScreenshotsHeader)];
+            data_cache_hit_writeback_invalidate(headerBytes, sizeof(headerBytes));
+            dma_read(headerBytes, baseReadOffset, sizeof(headerBytes));
 
-            if (magic == ROM_SCREENSHOT_MAGIC) {
-                // Dirty the magic so the same screenshots aren't imported again
-                io_write(baseReadOffset, 0);
+            // Clear it on the cart, so the same screenshots or recording
+            // aren't imported again.
+            alignas(8) uint8_t zeroBytes[sizeof(headerBytes)] = {};
+            data_cache_hit_writeback(zeroBytes, sizeof(zeroBytes));
+            dma_write(zeroBytes, baseReadOffset, sizeof(zeroBytes));
 
-                uint32_t count = io_read(baseReadOffset + 4);
+            const ScreenshotsHeader& screenshotsHeader = *(const ScreenshotsHeader*)headerBytes;
+            const SpeedrunHeader& speedrunHeader = *(const SpeedrunHeader*)headerBytes;
 
-                debugf("[IntroScene] %lu Screenshots Found\n", count);
-
-                // Only the magic is validated, so clamp the count rather than
-                // trusting it to be sane.
+            if (screenshotsHeader.isValid()) {
+                uint32_t count = screenshotsHeader.count;
                 count = std::min(count, (uint32_t)MAX_SCREENSHOT_IMPORT_COUNT);
 
+                uint32_t screenshotsOffset = sizeof(ScreenshotsHeader);
+
                 // Handed to the import scene below, which owns it from there
-                ScreenshotsSDRAMReader* screenshotsReader = new ScreenshotsSDRAMReader(baseReadOffset + sizeof(ScreenshotsHeader), count);
+                ScreenshotsSDRAMReader* screenshotsReader = new ScreenshotsSDRAMReader(baseReadOffset + screenshotsOffset, count);
 
                 auto result = presentPopover<ScreenshotsImportPopover>(screenshotsReader);
 
                 if (result.value == 0) {
-                    // The popover read the first few screenshots to preview them,
-                    // so reset before handing over to `ScreenshotsImportScene`
-                    screenshotsReader->reset();
+                    debugf("[IntroScene] %lu Screenshots Found\n", count);
 
-                    // labelView.setString("Processing Screenshots");
+                    labelView.setString("Processing Screenshots");
 
                     ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(*this, *lastLaunchedGame, *screenshotsReader);
                     pushScene(screenshotsImportScene);
@@ -201,21 +205,19 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                     delete screenshotsReader;
                 }
             }
-            else if (magic == ROM_SPEEDRUN_MAGIC) {
-                // Dirty the magic so the same recording isn't written again
-                io_write(baseReadOffset, 0);
-
-                uint32_t count = io_read(baseReadOffset + ROM_SPEEDRUN_FRAME_COUNT_OFFSET);
-                uint32_t controllerCount = io_read(baseReadOffset + ROM_SPEEDRUN_CONTROLLER_COUNT_OFFSET);
+            else if (speedrunHeader.isValid()) {
+                uint32_t frameCount = speedrunHeader.frameCount;
+                uint32_t controllerCount = speedrunHeader.controllerCount;
+                uint32_t inputsOffset = sizeof(SpeedrunHeader);
 
                 auto result = presentPopover<SpeedrunImportPopover>();
 
                 if (result.value == 0) {
-                    debugf("[IntroScene] %lu M64 Frames Found (%lu controllers)\n", count, controllerCount);
+                    debugf("[IntroScene] %lu M64 Frames Found (%lu controllers)\n", frameCount, controllerCount);
 
                     labelView.setString("Processing Speedrun");
 
-                    gameLibrary->writeRecordedSpeedrun(*lastLaunchedGame, baseReadOffset + ROM_SPEEDRUN_INPUTS_OFFSET, count, controllerCount);
+                    gameLibrary->writeRecordedSpeedrun(*lastLaunchedGame, baseReadOffset + inputsOffset, frameCount, controllerCount);
                 }
             }
         }
