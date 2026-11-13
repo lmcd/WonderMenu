@@ -184,8 +184,6 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
             if (screenshotsHeader.isValid()) {
                 uint32_t count = screenshotsHeader.count;
-                count = std::min(count, (uint32_t)MAX_SCREENSHOT_IMPORT_COUNT);
-
                 uint32_t screenshotsOffset = sizeof(ScreenshotsHeader);
 
                 // Handed to the import scene below, which owns it from there

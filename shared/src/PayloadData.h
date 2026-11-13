@@ -30,10 +30,6 @@ static_assert((M64_INPUTS_ADDRESS & 0x1FFFFFFF) + M64_INPUTS_MAX_SIZE <= (PAYLOA
 #define ROM_SCREENSHOT_MAGIC      1093627481  // Just a random number
 #define ROM_SPEEDRUN_MAGIC        3412958702  // Just a random number
 
-// Upper bound on the screenshot count read back from the cart, which is only
-// guarded by the magic word above.
-#define MAX_SCREENSHOT_IMPORT_COUNT 64
-
 /* A hook value with this bit set runs jal_hook_c AFTER the original function
    returns, rather than before it's called (see jal_hook_entry in resume.S).
    Only for functions taking four or fewer arguments. */
