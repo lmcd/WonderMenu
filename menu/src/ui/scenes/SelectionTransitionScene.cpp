@@ -106,8 +106,9 @@ void SelectionTransitionScene::update(const UpdateInfo& updateInfo) {
     joypad_buttons_t btn = updateInfo.btn;
 
     if (transition.didReachBeginning()) {
-        // This is a hack to address the Cart3DView clearing its bounding box when being removed from the scene
-        // This draws over the bounding box in the list scene
+        // This is a hack to address the Cart3DView clearing its bounding box
+        // when being removed from the scene.
+        // This draws over the bounding box in the list scene.
         gameLaunchScene->cart3DView.clearDrawnBoxes();
         popScene();
     }
