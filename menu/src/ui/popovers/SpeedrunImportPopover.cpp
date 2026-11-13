@@ -3,8 +3,6 @@
 * @license AGPLv3
 */
 
-#include <cmath>
-
 #include "SpeedrunImportPopover.h"
 
 SpeedrunImportPopover::SpeedrunImportPopover(Scene* baseScene)

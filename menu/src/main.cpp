@@ -7,7 +7,6 @@
 
 #include <libdragon.h>
 #include <t3d/t3d.h>
-#include <sys/stat.h>
 
 #include "flashcart/flashcart.h"
 #include "general/GameDatabase.h"
@@ -19,7 +18,6 @@
 #include "ui/SceneRenderer.h"
 #include "ui/scenes/IntroScene.h"
 #include "ui/scenes/TestScene.h"
-#include "utils/utils.h"
 
 BootSession bootSession;
 WarmResetState warmResetState;

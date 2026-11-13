@@ -10,7 +10,6 @@
 #include <libdragon.h>
 #include <cstddef>
 #include <vector>
-#include <cstring>
 #include <optional>
 #include <string>
 

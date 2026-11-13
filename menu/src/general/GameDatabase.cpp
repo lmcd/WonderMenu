@@ -3,7 +3,6 @@
 * @license AGPLv3
 */
 
-#include <chrono>
 #include <cstdlib>
 #ifdef N64
 #include <malloc.h>

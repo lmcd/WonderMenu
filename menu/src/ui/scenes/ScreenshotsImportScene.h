@@ -7,16 +7,13 @@
 
 #include <libdragon.h>
 #include <fatfs/ff.h>
-#include <string>
 
-#include "general/GameDSO.h"
 #include "general/ScreenshotsSDRAMReader.h"
 #include "general/ScreenshotSDWriter.h"
 #include "ui/Scene.h"
 #include "ui/views/ProgressBarView.h"
 #include "ui/views/ScreenshotThumbnailView.h"
 #include "ui/views/drawables/RectView.h"
-#include "utils/fs.h"
 
 class IntroScene;
 class Game;

@@ -11,7 +11,6 @@
 #include <cstring>
 #include <cstdint>
 #include <cstddef>
-#include <sys/stat.h>
 #include <fatfs/ff.h>
 
 struct M64File {

@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <math.h>
-
 #include "TimingFunctions.h"
 #include "ui/RenderInfo.h"
 

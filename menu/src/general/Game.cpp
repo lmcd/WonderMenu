@@ -5,9 +5,6 @@
 
 #include "Game.h"
 
-#include <cstring>
-#include <cstdio>
-
 Game::Game(ROMFile& romFile, GameDatabase::Entry* databaseEntry) :romFile(romFile), databaseEntry(databaseEntry) {}
 
 Game::~Game() {

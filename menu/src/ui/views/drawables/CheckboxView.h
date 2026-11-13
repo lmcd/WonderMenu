@@ -6,7 +6,6 @@
 #pragma once
 
 #include <libdragon.h>
-#include <algorithm>
 #include <optional>
 
 #include "ui/Theme.h"

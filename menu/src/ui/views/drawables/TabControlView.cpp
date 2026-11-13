@@ -3,8 +3,6 @@
 * @license AGPLv3
 */
 
-#include <algorithm>
-
 #include "TabControlView.h"
 
 #include "ui/Theme.h"

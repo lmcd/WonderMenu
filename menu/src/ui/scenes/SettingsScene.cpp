@@ -3,9 +3,6 @@
 * @license AGPLv3
 */
 
-#include <algorithm>
-#include <cstring>
-
 #include "SettingsScene.h"
 #include "general/Game.h"
 #include "ui/Theme.h"

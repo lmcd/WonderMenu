@@ -5,10 +5,6 @@
 
 #include "CheatsScene.h"
 
-#include <algorithm>
-#include <cstring>
-#include <string>
-
 #include "main.h"
 
 #include "general/CheatDatabase.h"

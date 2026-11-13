@@ -6,9 +6,6 @@
 #include "TestScene.h"
 
 #include <algorithm>
-#include <math.h>
-#include <malloc.h>
-#include <string.h>
 
 // A sprite_t stores its pixels inline (data[]), and here those pixels are used
 // as an RDP color image, which must be 64-byte aligned. So the header is placed

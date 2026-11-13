@@ -7,9 +7,7 @@
 
 #include "animation/TimingFunctions.h"
 #include "animation/Transition.h"
-#include "flashcart/flashcart.h"
 #include "general/BootSession.h"
-#include "general/CheatDatabase.h"
 #include "general/Game.h"
 #include "general/GameDatabase.h"
 #include "general/CartRenderer.h"

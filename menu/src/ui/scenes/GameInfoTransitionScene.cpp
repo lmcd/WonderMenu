@@ -9,7 +9,6 @@
 #include <cmath>
 
 #include "animation/TimingFunctions.h"
-#include "general/SceneStates.h"
 #include "ui/scenes/GameInfoScene.h"
 #include "ui/scenes/GameLaunchScene.h"
 #include "utils/a3d.h"

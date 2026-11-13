@@ -3,8 +3,6 @@
 * @license AGPLv3
 */
 
-#include <algorithm>
-
 #include "BorderView.h"
 
 void BorderView::clear(const RenderInfo& renderInfo) {

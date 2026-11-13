@@ -6,9 +6,7 @@
 #pragma once
 
 #include <libdragon.h>
-#include <algorithm>
 #include <cstring>
-#include <cmath>
 
 #include "ui/View.h"
 #include "ui/views/drawables/LabelReferenceView.h"

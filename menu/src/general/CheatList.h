@@ -7,7 +7,6 @@
 
 #include <cstdint>
 #include <cstddef>
-#include <cstring>
 #include <libdragon.h>
 
 #include "general/CheatDatabase.h"

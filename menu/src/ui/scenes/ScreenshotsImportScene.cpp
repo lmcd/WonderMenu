@@ -4,7 +4,6 @@
 */
 
 #include <algorithm>
-#include <array>
 #include <cstring>
 #include <ctype.h>
 #include <stdlib.h>

@@ -5,8 +5,6 @@
 
 #include "Cart3DView.h"
 
-#include "general/Game.h"
-
 void Cart3DView::update(const RenderInfo& renderInfo) {
     Drawable::update(renderInfo);
 

@@ -10,7 +10,6 @@
 
 #include <dir.h>
 #include <scratch.h>
-#include <cstdlib>
 #include <cstring>
 #include <cstdint>
 #include <vector>

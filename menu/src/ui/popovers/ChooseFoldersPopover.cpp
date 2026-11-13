@@ -5,7 +5,6 @@
 
 #include "ChooseFoldersPopover.h"
 #include "ui/Theme.h"
-#include "util/Color.h"
 
 ChooseFoldersPopover::ChooseFoldersPopover(Scene* baseScene, const std::vector<std::string>& paths)
     : Popover<FolderRowView, std::vector<std::string>>(baseScene) {

@@ -5,7 +5,6 @@
 
 #include <libdragon.h>
 #include <algorithm>
-#include <cmath>
 
 #include "ProgressBarView.h"
 

@@ -4,7 +4,6 @@
 */
 
 #include <algorithm>
-#include <bit>
 
 #include "RectView.h"
 

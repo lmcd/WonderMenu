@@ -10,9 +10,6 @@
 #ifdef N64
 #include <libdragon.h>
 #include <fatfs/ff.h>
-extern "C" {
-#include "utils/fs.h"
-}
 #endif
 #include <cstddef>
 #include <cstring>
@@ -21,7 +18,6 @@ extern "C" {
 
 #include "CheatDatabase.h"
 #include "DatabaseLookupEntry.h"
-#include "GameIdentifier.h"
 #include "GameIDMap.h"
 #include "Region.h"
 #include "ROMFile.h"
