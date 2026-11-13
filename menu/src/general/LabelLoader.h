@@ -18,11 +18,6 @@ struct LoadResult {
 };
 
 struct CartLabel {
-    enum Size {
-        LABEL_SIZE_SMALL,
-        LABEL_SIZE_LARGE
-    };
-
     enum Status {
         LABEL_FREE,
         LABEL_PARTIAL,
