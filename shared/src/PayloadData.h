@@ -27,9 +27,6 @@ static_assert((FRAMEBUFFER_COPY_ADDRESS & 0x1FFFFFFF) + FRAMEBUFFER_COPY_MAX_SIZ
 static_assert((M64_INPUTS_ADDRESS & 0x1FFFFFFF) + M64_INPUTS_MAX_SIZE <= (PAYLOAD_ADDRESS & 0x1FFFFFFF),
     "The M64 inputs table runs into the payload");
 
-#define ROM_SCREENSHOT_MAGIC      1093627481  // Just a random number
-#define ROM_SPEEDRUN_MAGIC        3412958702  // Just a random number
-
 /* A hook value with this bit set runs jal_hook_c AFTER the original function
    returns, rather than before it's called (see jal_hook_entry in resume.S).
    Only for functions taking four or fewer arguments. */
@@ -47,8 +44,10 @@ enum HookIdentifier : uint16_t {
 
 // Size: 16
 struct __attribute__((packed)) ScreenshotsHeader {
+    static constexpr uint32_t MAGIC = 1093627481;
+
     // Size: 4
-    uint32_t magic = 0;
+    uint32_t magic = MAGIC;
     // Size: 4
     uint32_t count = 0;
     // Size: 4
@@ -57,14 +56,16 @@ struct __attribute__((packed)) ScreenshotsHeader {
     uint32_t reserved2 = 0;
 
     bool isValid() const {
-        return magic == ROM_SCREENSHOT_MAGIC;
+        return magic == MAGIC;
     }
 };
 
 // Size: 16
 struct __attribute__((packed)) SpeedrunHeader {
+    static constexpr uint32_t MAGIC = 3412958702;
+
     // Size: 4
-    uint32_t magic = 0;
+    uint32_t magic = MAGIC;
     // Size: 4
     uint32_t frameCount = 0;
     // Size: 4
@@ -73,13 +74,32 @@ struct __attribute__((packed)) SpeedrunHeader {
     uint32_t reserved = 0;
 
     bool isValid() const {
-        return magic == ROM_SPEEDRUN_MAGIC;
+        return magic == MAGIC;
     }
 };
 
-// Either header can follow the ROM. Both are the same size, and
-// their magic says which it is.
-static_assert(sizeof(ScreenshotsHeader) == sizeof(SpeedrunHeader));
+// Size: 16
+struct __attribute__((packed)) SavestateHeader {
+    static constexpr uint32_t MAGIC = 2529397229;
+
+    // Size: 4
+    uint32_t magic = MAGIC;
+    // Size: 4
+    uint32_t reserved1 = 0;
+    // Size: 4
+    uint32_t reserved2 = 0;
+    // Size: 4
+    uint32_t reserved3 = 0;
+
+    bool isValid() const {
+        return magic == MAGIC;
+    }
+};
+
+// Each header must be 16 bytes
+static_assert(sizeof(ScreenshotsHeader) == 16);
+static_assert(sizeof(SpeedrunHeader)    == 16);
+static_assert(sizeof(SavestateHeader)   == 16);
 
 // Size: 12
 struct __attribute__((packed)) ScreenshotSettings {
@@ -162,8 +182,12 @@ struct __attribute__((packed)) PayloadData {
     uint32_t memSize;
     // Size: 1
     uint8_t cardType;
-    // Size: 3
-    uint8_t reserved1[3] = {0};
+    // Size: 1
+    bool screenshotsEnabled;
+    // Size: 1
+    bool saveStatesEnabled;
+    // Size: 1
+    uint8_t reserved1[1] = {0};
     // Size: 12
     ScreenshotSettings screenshotSettings;
     // Size: 16

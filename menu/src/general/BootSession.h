@@ -295,7 +295,7 @@ public:
             uint8_t controllerCount = 1;
             uint32_t sampleCount = 0;
 
-            if (m64File != nullptr) {
+            if (speedrunStatus == STATUS_PLAYING) {
                 loadSpeedrunFile(m64File);
 
                 controllerCount = m64File->controllerCount;
@@ -326,7 +326,7 @@ public:
             speedrunSettings->sampleCount = sampleCount;
         }
 
-        if (m64File == nullptr && !(speedrunStatus != STATUS_RECORDING)) {
+        if (speedrunStatus == STATUS_NONE) {
             loadSaveFile();
         }
     }

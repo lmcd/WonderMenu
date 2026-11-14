@@ -33,14 +33,15 @@
 #define DEFAULT_ENGINE_ADDRESS (0x807D8000)
 
 // The payload reserves the first 64 bytes at 0x807D0000 (payload_settings /
-// PayloadData) for its own settings. The resume trampoline's game_ctx snapshot
-// buffer -- and every O_* offset / flag the engine writes into it -- therefore
-// sits this many bytes higher. MUST match the payload_settings size in resume.S.
-#define GAME_CTX_OFFSET (64)
+// PayloadData) for its own settings. The resume trampoline's suspend_context
+// snapshot buffer -- and every O_* offset / flag the engine writes into it --
+// therefore sits this many bytes higher. MUST match the payload_settings size
+// in resume.S.
+#define SUSPEND_CONTEXT_OFFSET (64)
 
-// game_ctx offset of the pre-NMI jump's "already fired" flag. Cause.IP4 stays
-// set until the NMI itself, so without this every later exception would jump
-// into the payload again. MUST match the reservation in resume.S.
+// suspend_context offset of the pre-NMI jump's "already fired" flag. Cause.IP4
+// stays set until the NMI itself, so without this every later exception would
+// jump into the payload again. MUST match the reservation in resume.S.
 #define PRE_NMI_FLAG_OFFSET (352)
 
 // TEST: 0 jumps on every exception that shows Cause.IP4, ignoring the flag above
@@ -333,16 +334,17 @@ static bool cheats_install_impl (cic_type_t cic_type, uint32_t *cheat_list, bool
         *engine_p++ = I_NOP();
 
         // IP4 stays set until the NMI, so every later exception lands here
-        // too. The flag lives in game_ctx (zero after staging) and is reached
-        // uncached so it's coherent on the next exception. The payload's base
-        // is the jump target's upper half, as both are in its first 64 KiB.
+        // too. The flag lives in suspend_context (zero after staging) and is
+        // reached uncached so it's coherent on the next exception. The
+        // payload's base is the jump target's upper half, as both are in its
+        // first 64 KiB.
         *engine_p++ = I_LUI(REG_K0, (pre_nmi_target | 0x20000000) >> 16);  // PAYLOAD_ADDRESS
-        *engine_p++ = I_LW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
+        *engine_p++ = I_LW(REG_K1, SUSPEND_CONTEXT_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
         io32_t *fired_branch = engine_p;
         *engine_p++ = I_NOP();                                              // patched: BNE k1,0,not_nmi
         *engine_p++ = I_NOP();
         *engine_p++ = I_ORI(REG_K1, REG_ZERO, 1);
-        *engine_p++ = I_SW(REG_K1, GAME_CTX_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
+        *engine_p++ = I_SW(REG_K1, SUSPEND_CONTEXT_OFFSET + PRE_NMI_FLAG_OFFSET, REG_K0);
 
         *engine_p++ = I_LUI(REG_K0, pre_nmi_target >> 16);
         *engine_p++ = I_ORI(REG_K0, REG_K0, pre_nmi_target & 0xFFFF);

@@ -181,6 +181,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
             const ScreenshotsHeader& screenshotsHeader = *(const ScreenshotsHeader*)headerBytes;
             const SpeedrunHeader& speedrunHeader = *(const SpeedrunHeader*)headerBytes;
+            const SavestateHeader& savestateHeader = *(const SavestateHeader*)headerBytes;
 
             if (screenshotsHeader.isValid()) {
                 uint32_t count = screenshotsHeader.count;
@@ -203,7 +204,8 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                     delete screenshotsReader;
                 }
             }
-            else if (speedrunHeader.isValid()) {
+            
+            if (speedrunHeader.isValid()) {
                 uint32_t frameCount = speedrunHeader.frameCount;
                 uint32_t controllerCount = speedrunHeader.controllerCount;
                 uint32_t inputsOffset = sizeof(SpeedrunHeader);
@@ -217,6 +219,10 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
                     gameLibrary->writeRecordedSpeedrun(*lastLaunchedGame, baseReadOffset + inputsOffset, frameCount, controllerCount);
                 }
+            }
+
+            if (savestateHeader.isValid()) {
+
             }
         }
     }
