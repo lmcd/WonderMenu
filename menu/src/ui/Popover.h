@@ -8,9 +8,8 @@
 #include <cmath>
 #include <string>
 
-#include "animation/Transition.h"
 #include "general/Result.h"
-#include "ui/Scene.h"
+#include "ui/Modal.h"
 #include "ui/SceneRenderer.h"
 #include "ui/Theme.h"
 #include "ui/views/drawables/LabelReferenceView.h"
@@ -24,11 +23,8 @@
  *  - `Value` is the payload a successful selection produces
  */
 template <typename RV, typename Value>
-class Popover : public Scene {
+class Popover : public Modal {
 private:
-    bool hasCancelled = false;
-
-    Transition transition;
     InputWatcher aButtonWatcher;
 
 protected:
@@ -41,12 +37,6 @@ protected:
      */
     int initialSelectedRowIndex = 0;
 
-    /**
-     * Has the user actioned the popover and made a selection?
-     * This is the trigger that causes the `Popover` to dismiss.
-     */
-    bool hasMadeSelection = false;
-    
     /**
      * Can the `Popover` be cancelled by pressing the B button?
      */
@@ -62,9 +52,7 @@ public:
 
     const char* name() override { return "Popover"; }
 
-    Popover(Scene* baseScene) : baseScene(baseScene) {
-        ownedByRenderer = true;
-
+    Popover(Scene* baseScene) : Modal(baseScene) {
         tableView.drawsBackground = false;
         tableView.selectionInset = Vec2::ZERO;
         tableView.selectedRowView.isRounded = true;
@@ -85,9 +73,15 @@ public:
     TableView<RV> tableView;
     ScrollbarView scrollbarView;
     LabelReferenceView<32> titleLabelView;
-    Scene* baseScene;
 
+    /**
+     * Present the popover, and spin until the user has made a selection or
+     * cancelled it with the B button.
+     */
     PopoverResult present() {
+        tableView.selectedRowIndex = initialSelectedRowIndex;
+        tableView.clampScrollPosition();
+
         ResultStatus resultStatus = runModal();
 
         return (resultStatus == ResultStatus::SUCCEEDED)
@@ -95,67 +89,14 @@ public:
             : PopoverResult::cancelled();
     }
 
-private:
-    /**
-     * Runs the modal loop.
-     * Presents the popover on-screen and spins until the user has made a
-     * selection or cancelled the popover with the B button.
-     */
-    ResultStatus runModal() {
-        transition.progress = 0.0;
-        transition.speed = 0.1;
-        transition.direction = Transition::FORWARDS;
+    void didBeginScene(SceneEntry entry) override {
+        Modal::didBeginScene(entry);
 
-        hasMadeSelection = false;
-        hasCancelled = false;
-
-        tableView.selectedRowIndex = initialSelectedRowIndex;
-        tableView.clampScrollPosition();
-
-        ResultStatus resultStatus;
-
-        baseScene->hasActivePopover = true;
-        baseScene->popoverTransitionProgress = 0.0f;
-        baseScene->view.opacity = 1.0f;
-        baseScene->pushScene(this);
-
-        while (true) {
-            // Render current scene
-            renderer->advance();
-
-            transition.advance();
-
-            baseScene->popoverTransitionProgress = transition.progress;
-
-            if (hasMadeSelection) {
-                resultStatus = ResultStatus::SUCCEEDED;
-                break;
-            }
-            else if (hasCancelled) {
-                resultStatus = ResultStatus::CANCELLED;
-                break;
-            }
-            else {
-                continue;
-            }
-        }
-
-        baseScene->hasActivePopover = false;
-        baseScene->popoverTransitionProgress = 0.0f;
-        baseScene->view.opacity = 1.0f;
-        baseScene->popScene();
-
-        return resultStatus;
-    }
-
-public:
-    void didBeginScene(SceneEntry) override {
         contentView.addSubview(&rectView);
         contentView.addSubview(&titleLabelView);
         contentView.addSubview(&tableView);
         contentView.addSubview(&scrollbarView);
 
-        view.addSubview(&baseScene->view);
         view.addSubview(&contentView);
 
         tableView.aButtonWatcher.reset();
@@ -168,10 +109,10 @@ public:
         tableView.handleInputs(updateInfo);
 
         if (aButtonWatcher.update(updateInfo.joypad.btn.a) == InputWatcher::BUTTON_UP) {
-            hasMadeSelection = true;
+            dismiss(SUCCEEDED);
         }
         else if (btn.b && isCancellable) {
-            hasCancelled = true;
+            dismiss(CANCELLED);
         }
     }
 
@@ -222,6 +163,6 @@ public:
         scrollbarView.scrollPosition = tableView.scrollPosition * tableView.paddedRowHeight();
         scrollbarView.backgroundColor = backgroundColor;
 
-        baseScene->updateViews(renderInfo);
+        Modal::updateViews(renderInfo);
     }
 };

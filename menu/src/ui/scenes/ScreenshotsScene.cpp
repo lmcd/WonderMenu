@@ -362,7 +362,7 @@ bool ScreenshotsScene::confirmDelete() {
         return true;
     }
 
-    // Built by hand rather than with presentPopover(), so the buttons can be set
+    // Built by hand rather than with presentModal(), so the buttons can be set
     // before it's presented
     Scene* baseScene = (parentScene != nullptr) ? parentScene : this;
 
@@ -529,7 +529,7 @@ void ScreenshotsScene::openSelectedScreenshot() {
     }
 
     // Hands GameInfoScene's input to this tab, and disables its tabs
-    parentScene->hasActivePopover = true;
+    parentScene->hasActiveModal = true;
 
     // GameInfoScene keeps the tab behind its tab bar and scrollbar, which redraw
     // as they fade and would land on top of the screenshot. Brought to the front
@@ -551,8 +551,8 @@ void ScreenshotsScene::closeSelectedScreenshot() {
         return;
     }
 
-    parentScene->hasActivePopover = false;
-    parentScene->popoverTransitionProgress = 0.0f;
+    parentScene->hasActiveModal = false;
+    parentScene->modalTransitionProgress = 0.0f;
     parentScene->view.opacity = 1.0f;
 
     // Back behind the tab bar, where GameInfoScene put it
@@ -596,7 +596,7 @@ void ScreenshotsScene::fadeBehindFullScreenshot(float openValue, float zoomValue
     }
 
     parentScene->view.opacity = opacity;
-    parentScene->popoverTransitionProgress = openCloseTransition.progress;
+    parentScene->modalTransitionProgress = openCloseTransition.progress;
 }
 
 Rect ScreenshotsScene::thumbnailRect(int index) const {

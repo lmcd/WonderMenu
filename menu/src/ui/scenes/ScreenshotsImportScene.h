@@ -10,15 +10,18 @@
 
 #include "general/ScreenshotsSDRAMReader.h"
 #include "general/ScreenshotSDWriter.h"
-#include "ui/Scene.h"
+#include "ui/Modal.h"
 #include "ui/views/ProgressBarView.h"
 #include "ui/views/ScreenshotThumbnailView.h"
 #include "ui/views/drawables/RectView.h"
 
-class IntroScene;
 class Game;
 
-class ScreenshotsImportScene : public Scene {
+/**
+ * Writes the screenshots taken in the last game out to the SD card, presented
+ * modally over the scene that imports them.
+ */
+class ScreenshotsImportScene : public Modal {
 private:
     // TODO: not yet used
     enum Stage {
@@ -29,7 +32,6 @@ private:
         THUMBNAIL_WRITE_CHUNK
     };
 
-    IntroScene& introScene;
     Game& lastLaunchedGame;
     ScreenshotsSDRAMReader& reader;
 
@@ -88,7 +90,7 @@ private:
 public:
     const char* name() override { return "ScreenshotsImportScene"; }
 
-    ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, ScreenshotsSDRAMReader& reader);
+    ScreenshotsImportScene(Scene* baseScene, Game& lastLaunchedGame, ScreenshotsSDRAMReader& reader);
     ~ScreenshotsImportScene();
 
     void didBeginScene(SceneEntry entry) override;

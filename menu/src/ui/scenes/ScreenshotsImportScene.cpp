@@ -10,16 +10,14 @@
 #include <strings.h>
 
 #include "general/Game.h"
-#include "ui/scenes/IntroScene.h"
 #include "ui/scenes/ScreenshotsImportScene.h"
 #include "utils/fs.h"
 
-ScreenshotsImportScene::ScreenshotsImportScene(IntroScene& introScene, Game& lastLaunchedGame, ScreenshotsSDRAMReader& reader)
-    : introScene(introScene),
+ScreenshotsImportScene::ScreenshotsImportScene(Scene* baseScene, Game& lastLaunchedGame, ScreenshotsSDRAMReader& reader)
+    : Modal(baseScene),
       lastLaunchedGame(lastLaunchedGame),
       reader(reader) {
 
-    ownedByRenderer = true;
     directoryPath = "sd:/screenshots/" + lastLaunchedGame.directoryName();
 }
 
@@ -163,8 +161,8 @@ void ScreenshotsImportScene::beginThumbnailWrite() {
     );
 }
 
-void ScreenshotsImportScene::didBeginScene(SceneEntry) {
-    view.addSubview(&introScene.view);
+void ScreenshotsImportScene::didBeginScene(SceneEntry entry) {
+    Modal::didBeginScene(entry);
 
     view.addSubview(&screenshotThumbnailView);
     view.addSubview(&lineView);
@@ -206,14 +204,14 @@ void ScreenshotsImportScene::updateViews(const RenderInfo& renderInfo) {
     lineView.frame = Rect(linePositionX, screenshotThumbnailView.frame.maxY(), 1, 10);
     lineView.fillColor = Color::WHITE;
 
-    introScene.updateViews(renderInfo);
+    Modal::updateViews(renderInfo);
 }
 
 void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
     int maxFrameNumber = (reader.count * screenshotFrameInterval) + 10;
 
     if (updateInfo.sceneFrameNumber == maxFrameNumber) {
-        popScene();
+        dismiss(SUCCEEDED);
         return;
     }
 
@@ -256,7 +254,7 @@ void ScreenshotsImportScene::update(const UpdateInfo& updateInfo) {
     // A stale or corrupt header on the cart is the only way this fails, and
     // there's no way to find the following records without it.
     if (screenshotSprite == nullptr) {
-        popScene();
+        dismiss(CANCELLED);
         return;
     }
 

@@ -55,7 +55,7 @@ void ChooseFoldersPopover::update(const UpdateInfo& updateInfo) {
     tableView.handleInputs(updateInfo);
 
     if (updateInfo.btn.start) {
-        hasMadeSelection = true;
+        dismiss(SUCCEEDED);
     }
     else if (aButtonWatcher.update(updateInfo.joypad.btn.a) == InputWatcher::BUTTON_DOWN) {
         toggleSelectedFolder();

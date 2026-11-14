@@ -53,17 +53,13 @@ public:
      */
     bool ownedByRenderer = false;
 
-    /**
-     * The transition progress of a popover being presented over this scene.
-     * Can be used to adjust/transition views int he scene as a popover is
-     * presenting.
-     */
-    float popoverTransitionProgress = 0.0f;
+    // The transition progress of a `Modal` being presented over this scene.
+    // Can be used to adjust or transition views in the scene as a modal is
+    // presenting.
+    float modalTransitionProgress = 0.0f;
 
-    /**
-     * Is a `Popover` currently active on top of this scene?
-     */
-    bool hasActivePopover = false;
+    // Is a `Modal` (e.g. a `Popover`) currently active on top of this scene?
+    bool hasActiveModal = false;
 
     // TODO: this should be private
     SceneRenderer* renderer = nullptr;
@@ -124,15 +120,16 @@ public:
     }
 
     /**
-     * Present a `Popover` modally.
+     * Present a `Modal` (e.g. a `Popover`) over this scene, or over its parent
+     * when this is a child scene, and return its result once dismissed.
      */
     template<typename T, typename... Args>
-    auto presentPopover(Args&&... args) {
+    auto presentModal(Args&&... args) {
         Scene* baseScene = (parentScene != nullptr) ? parentScene : this;
 
-        T* popover = new T(baseScene, args...);
+        T* modal = new T(baseScene, args...);
 
-        auto value = popover->present();
+        auto value = modal->present();
 
         return value;
     }

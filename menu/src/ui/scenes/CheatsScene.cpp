@@ -312,7 +312,7 @@ void CheatsScene::update(const UpdateInfo& updateInfo) {
                 // Re-open on the previously chosen option, if there is one
                 int optionIndex = (row.multipleChoiceIndex != -1) ? row.multipleChoiceIndex : 0;
 
-                auto result = presentPopover<ChooseCheatOptionPopover>(firstOption, wildcardCount, optionIndex);
+                auto result = presentModal<ChooseCheatOptionPopover>(firstOption, wildcardCount, optionIndex);
 
                 if (result.didSucceed()) {
                     row.multipleChoiceIndex = result.value;

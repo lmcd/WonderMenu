@@ -308,11 +308,11 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
         if (isRowSelected) {
             selectionRectView.isHidden = isRowHidden;
             
-            rowView.popoverIsVisible = (popoverTransitionProgress != 0.0f);
+            rowView.popoverIsVisible = (modalTransitionProgress != 0.0f);
             rowView.backgroundColor = SELECTED_ROW_COLOR;
             selectionRectView.opacity = rowOpacity;
 
-            wobbler.speed = std::lerp(1.0f, 0.5f, popoverTransitionProgress);
+            wobbler.speed = std::lerp(1.0f, 0.5f, modalTransitionProgress);
 
             cart3DView.frame.origin = rowView.cartPosition;
             cart3DView.scale = rowView.cartScale;
@@ -343,7 +343,7 @@ void ListScene::updateViews(const RenderInfo& renderInfo) {
         (view.frame.size.width - tabControlView.frame.size.width) / 2,
         19
     );
-    tabControlView.isEnabled = (popoverTransitionProgress == 0.0f);
+    tabControlView.isEnabled = (modalTransitionProgress == 0.0f);
     tabControlView.setNeedsDisplay();
 }
 
@@ -398,7 +398,7 @@ GameLaunchScene* ListScene::performSelection(bool animated) {
     Game* game;
 
     if (gameGroup.games.size() > 1) {
-        auto result = presentPopover<ChooseVersionPopover>(&gameGroup);
+        auto result = presentModal<ChooseVersionPopover>(&gameGroup);
 
         game = result.value;
 

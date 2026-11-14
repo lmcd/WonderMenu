@@ -43,7 +43,7 @@ void GameInfoScene::updateViews(const RenderInfo& renderInfo) {
         (view.frame.size.width - tabControlView.frame.size.width) / 2,
         19
     );
-    tabControlView.isEnabled = (popoverTransitionProgress == 0.0f);
+    tabControlView.isEnabled = (modalTransitionProgress == 0.0f);
 
     scrollbarView.frame = Rect(
         view.frame.size.width - scrollbarView.frame.size.width,
@@ -64,7 +64,7 @@ void GameInfoScene::update(const UpdateInfo& updateInfo) {
 
     // The tab is presenting something over this scene (e.g. a full size
     // screenshot), so it gets every input, B included
-    if (hasActivePopover) {
+    if (hasActiveModal) {
         if (currentTabScene != nullptr) {
             currentTabScene->update(updateInfo);
         }

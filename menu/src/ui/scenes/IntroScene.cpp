@@ -48,7 +48,8 @@ IntroScene::IntroScene(GameLibrary* gameLibrary)
 void IntroScene::didBeginScene(SceneEntry) {
     labelView.setString("");
 
-    // Still loaded when returning from `ScreenshotsImportScene`
+    // Still loaded when a modal over this scene, such as
+    // `ScreenshotsImportScene`, is dismissed.
     if (logoImage.isValid()) {
         return;
     }
@@ -75,7 +76,7 @@ void IntroScene::updateViews(const RenderInfo& renderInfo) {
 
     labelView.frame.origin = Vec2(0, 458);
     labelView.maxWidth = view.frame.size.width;
-    labelView.opacity = hasActivePopover ? popoverTransitionProgress : 1.0f;
+    labelView.opacity = hasActiveModal ? modalTransitionProgress : 1.0f;
 }
 
 void IntroScene::update(const UpdateInfo& updateInfo) {
@@ -135,7 +136,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
             std::vector<std::string> folderPaths = gameLibrary->findROMDirectories(2);
 
             labelView.setString("Press Start to Continue");
-            auto chosenFolders = presentPopover<ChooseFoldersPopover>(folderPaths);
+            auto chosenFolders = presentModal<ChooseFoldersPopover>(folderPaths);
             labelView.setString("");
 
             gameLibrary->romDirectoryPaths = chosenFolders.value;
@@ -190,19 +191,18 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                 // Handed to the import scene below, which owns it from there
                 ScreenshotsSDRAMReader* screenshotsReader = new ScreenshotsSDRAMReader(baseReadOffset + screenshotsOffset, count);
 
-                auto result = presentPopover<ScreenshotsImportPopover>(screenshotsReader);
+                auto result = presentModal<ScreenshotsImportPopover>(screenshotsReader);
 
                 if (result.value == 0) {
                     debugf("[IntroScene] %lu Screenshots Found\n", count);
 
                     labelView.setString("Processing Screenshots");
 
-                    ScreenshotsImportScene* screenshotsImportScene = new ScreenshotsImportScene(*this, *lastLaunchedGame, *screenshotsReader);
-                    pushScene(screenshotsImportScene);
+                    // Blocks until every screenshot has been written.
+                    presentModal<ScreenshotsImportScene>(*lastLaunchedGame, *screenshotsReader);
                 }
-                else {
-                    delete screenshotsReader;
-                }
+                
+                delete screenshotsReader;
             }
             
             if (speedrunHeader.isValid()) {
@@ -210,7 +210,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
                 uint32_t controllerCount = speedrunHeader.controllerCount;
                 uint32_t inputsOffset = sizeof(SpeedrunHeader);
 
-                auto result = presentPopover<SpeedrunImportPopover>();
+                auto result = presentModal<SpeedrunImportPopover>();
 
                 if (result.value == 0) {
                     debugf("[IntroScene] %lu M64 Frames Found (%lu controllers)\n", frameCount, controllerCount);
@@ -237,8 +237,8 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
     }
 
     if (updateInfo.sceneFrameNumber >= 9) {
-        // Freed here rather than in didEndScene(), as `ScreenshotsImportScene`
-        // still draws this scene's view after being pushed over it.
+        // Freed here rather than in didEndScene(), as a modal over this scene
+        // (e.g. `ScreenshotsImportScene`) still draws its view.
         // The last frame may still be drawing it.
         rspq_wait();
         logoImage.reset();
