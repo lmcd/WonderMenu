@@ -207,7 +207,5 @@ void GameLaunchScene::clearProgressBarArea() {
 
 void GameLaunchScene::showGameInfo() {
     GameInfoScene* gameInfoScene = new GameInfoScene(state, game, database);
-    GameInfoTransitionScene* transitionScene = new GameInfoTransitionScene(this, gameInfoScene);
-
-    pushScene(transitionScene);
+    pushScene<GameInfoTransitionScene>(gameInfoScene);
 }

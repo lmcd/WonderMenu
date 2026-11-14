@@ -100,6 +100,22 @@ public:
     void pushScene(Scene* scene);
 
     /**
+     * Switch to `destinationScene` through a transition scene, which is built
+     * from this scene and the destination, then pushed.
+     * `Self` is deduced as the calling scene's own type, so it has to match
+     * the source scene the transition's constructor takes.
+     * E.g. `pushScene<ListTransitionScene>(listScene)` from `IntroScene`.
+     */
+    template<typename TransitionScene, typename Self, typename DestinationScene>
+    TransitionScene* pushScene(this Self& self, DestinationScene* destinationScene) {
+        TransitionScene* transitionScene = new TransitionScene(&self, destinationScene);
+
+        self.pushScene(transitionScene);
+
+        return transitionScene;
+    }
+
+    /**
      * Pop this scene from the stack, and switch to the previous scene.
      */
     void popScene();

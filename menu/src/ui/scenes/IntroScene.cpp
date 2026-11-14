@@ -256,9 +256,7 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
 
         debugf("[IntroScene] Loaded List Scene: %.3fs\n", seconds);
 
-        ListTransitionScene* transitionScene = new ListTransitionScene(this, listScene);
-
-        pushScene(transitionScene);
+        pushScene<ListTransitionScene>(listScene);
 
         if (hasWarmResetState) {
             pushScene(listScene);

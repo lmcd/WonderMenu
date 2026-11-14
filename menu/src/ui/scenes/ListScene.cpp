@@ -415,9 +415,7 @@ GameLaunchScene* ListScene::performSelection(bool animated) {
     }
 
     GameLaunchScene* gameLaunchScene = new GameLaunchScene(*game, cartRenderer, *database);
-    SelectionTransitionScene* transitionScene = new SelectionTransitionScene(this, gameLaunchScene);
-
-    pushScene(transitionScene);
+    pushScene<SelectionTransitionScene>(gameLaunchScene);
 
     if (!animated) {
         pushScene(gameLaunchScene);
