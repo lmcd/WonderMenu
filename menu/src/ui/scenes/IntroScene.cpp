@@ -6,6 +6,7 @@
 #include "IntroScene.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <cstdio>
 
@@ -180,9 +181,9 @@ void IntroScene::update(const UpdateInfo& updateInfo) {
             data_cache_hit_writeback(zeroBytes, sizeof(zeroBytes));
             dma_write(zeroBytes, baseReadOffset, sizeof(zeroBytes));
 
-            const ScreenshotsHeader& screenshotsHeader = *(const ScreenshotsHeader*)headerBytes;
-            const SpeedrunHeader& speedrunHeader = *(const SpeedrunHeader*)headerBytes;
-            const SavestateHeader& savestateHeader = *(const SavestateHeader*)headerBytes;
+            const ScreenshotsHeader screenshotsHeader = std::bit_cast<ScreenshotsHeader>(headerBytes);
+            const SpeedrunHeader speedrunHeader = std::bit_cast<SpeedrunHeader>(headerBytes);
+            const SavestateHeader savestateHeader = std::bit_cast<SavestateHeader>(headerBytes);
 
             if (screenshotsHeader.isValid()) {
                 uint32_t count = screenshotsHeader.count;
