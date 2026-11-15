@@ -35,11 +35,10 @@ static_assert((M64_INPUTS_ADDRESS & 0x1FFFFFFF) + M64_INPUTS_MAX_SIZE <= (PAYLOA
 
 enum HookIdentifier : uint16_t {
     HOOK_BEGIN_SCREENSHOT    = HOOK_BEFORE | 2,  // before_osViSwapBuffer
-    HOOK_READ_CONTROLLERS    = HOOK_AFTER  | 4,  // after_osContGetReadData
     HOOK_osSpTaskLoad        = HOOK_BEFORE | 3,  // before_osSpTaskLoad
+    HOOK_osContGetReadData   = HOOK_AFTER  | 4,  // after_osContGetReadData
     HOOK_osViSwapBuffer      = HOOK_BEFORE | 8,  // before_osViSwapBuffer
-    HOOK_osContStartReadData = HOOK_BEFORE | 9,  // before_osContStartReadData
-    HOOK_osContGetReadData   = HOOK_AFTER  | 10  // after_osContGetReadData
+    HOOK_osContStartReadData = HOOK_BEFORE | 9   // before_osContStartReadData
 };
 
 // Size: 16
