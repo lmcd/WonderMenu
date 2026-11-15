@@ -13,7 +13,7 @@
 View::~View() {
     if (superview) {
         auto& siblings = superview->subviews;
-        siblings.erase(std::remove(siblings.begin(), siblings.end(), this), siblings.end());
+        std::erase(siblings, this);
         superview = nullptr;
     }
 
@@ -193,7 +193,7 @@ void View::removeFromSuperview() {
 
     auto& siblings = superview->subviews;
 
-    siblings.erase(std::remove(siblings.begin(), siblings.end(), this), siblings.end());
+    std::erase(siblings, this);
 
     superview = nullptr;
 
