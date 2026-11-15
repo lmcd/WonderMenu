@@ -4,10 +4,12 @@
 */
 
 #include <algorithm>
+#include <bit>
 #include <climits>
 #include <cstdio>
 #include <cstring>
 #include <strings.h>
+#include <utility>
 
 #include "DirectoryScanner.h"
 #include "INIParser.h"
@@ -911,17 +913,17 @@ bool GameLibrary::writeRecordedSpeedrun(Game& game, uint32_t inputsAddress, uint
     M64File::Header header = {};
 
     memcpy(header.signature, "M64\x1A", 4);
-    header.version         = __builtin_bswap32(3);
-    header.viFrames        = __builtin_bswap32(sampleCount);
+    header.version         = std::byteswap<uint32_t>(3);
+    header.viFrames        = std::byteswap<uint32_t>(sampleCount);
     header.fps             = (game.romFile.tvType() == BOOT_TV_TYPE_PAL) ? 50 : 60;
     header.controllerCount = (uint8_t)controllerCount;
-    header.inputSamples    = __builtin_bswap32(sampleCount);
-    header.startType       = __builtin_bswap16(2);
+    header.inputSamples    = std::byteswap<uint32_t>(sampleCount);
+    header.startType       = std::byteswap<uint16_t>(2);
     // Bits 0-3: controllers 1-4 present. The payload records ports in order
     // from the first, so they're the lowest bits.
-    header.controllerFlags = __builtin_bswap32((1u << controllerCount) - 1);
+    header.controllerFlags = std::byteswap<uint32_t>((1u << controllerCount) - 1);
     header.romCRC32        = game.romFile.crc1;
-    header.countryCode     = __builtin_bswap16((uint16_t)game.romFile.regionCode);
+    header.countryCode     = std::byteswap<uint16_t>(std::to_underlying(game.romFile.regionCode));
     header.extAuthorship   = M64File::WONDERMENU;
 
     memcpy(header.romName, game.romFile.title, sizeof(game.romFile.title) - 1);
