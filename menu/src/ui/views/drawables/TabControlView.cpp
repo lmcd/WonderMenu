@@ -339,14 +339,14 @@ void TabControlView::render(const RenderInfo& renderInfo) {
         lLabelOpacity *= lLabelAnimation->value();
     }
     else {
-        lLabelOpacity *= lIsDisabled ? 0.4 : 1.0;
+        lLabelOpacity *= lIsDisabled ? 0.4f : 1.0f;
     }
 
     if (rLabelAnimation != nullptr) {
         rLabelOpacity *= rLabelAnimation->value();
     }
     else {
-        rLabelOpacity *= rIsDisabled ? 0.4 : 1.0;
+        rLabelOpacity *= rIsDisabled ? 0.4f : 1.0f;
     }
 
     Color lLabelColor = Color::WHITE;

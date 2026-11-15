@@ -24,7 +24,9 @@ EXTRA_DEFINES ?=
 # initializes libdragon/Tiny3D structs in ~97 places, which is well-defined
 # (omitted members are value-initialised) and intentional. Enabling it would mean
 # either listing third-party members we don't set, or rewriting every site.
-N64_CXXFLAGS += -Wall -Wextra -Wno-missing-field-initializers -std=gnu++23 -Os -fno-exceptions -fno-rtti -fno-threadsafe-statics -Isrc $(EXTRA_DEFINES)
+# -Wsuggest-override flags a virtual override missing `override`, which -Werror
+# turns into a build failure.
+N64_CXXFLAGS += -Wall -Wextra -Wno-missing-field-initializers -Wsuggest-override -std=gnu++23 -Os -fno-exceptions -fno-rtti -fno-threadsafe-statics -Isrc $(EXTRA_DEFINES)
 
 # n64.mk passes -MMD but not -MP, so the generated .d files list headers as real
 # prerequisites with no rule to build them. Deleting or moving a header then

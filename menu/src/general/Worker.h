@@ -29,6 +29,8 @@ protected:
      */
     int workIterationsPerFrame = 1;
 
+    ~Worker() = default;
+
 public:
     /**
      * Units of work still outstanding -- chunks, blocks, whatever the subclass
@@ -59,7 +61,7 @@ public:
     }
 };
 
-class LoadROMToCartWorker : public Worker {
+class LoadROMToCartWorker final : public Worker {
     static constexpr unsigned int initialChunk = 11;
 
     ROMFile romFile;
@@ -138,7 +140,7 @@ public:
     LoadROMToCartWorker(const ROMFile& romFile) : romFile(romFile) {}
 };
 
-class LoadROMFirstMBToMemoryWorker : public Worker {
+class LoadROMFirstMBToMemoryWorker final : public Worker {
     // Skip the header and IPL3: the boot path copies this straight to the game's
     // entry point, so it has to hold game code from its very first byte.
     static constexpr uint32_t romAddress = ROM_ADDRESS + GAME_LOAD_ROM_OFFSET;

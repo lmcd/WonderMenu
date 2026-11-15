@@ -68,18 +68,11 @@ void ChevronView::renderChevron(const RenderInfo& renderInfo) {
     };
 
     float degrees00 = 0.0f;
-    float degrees90 = M_PI / -2.0f;
+    float degrees90 = -M_PI_2;
 
-    float degrees;
+    float degrees = std::lerp(degrees00, degrees90, expandProgress);
 
-    if (expandProgress > 0.0f || expandProgress < 1.0f) {
-        degrees = std::lerp(degrees00, degrees90, expandProgress);
-    }
-    else {
-        degrees = (expandProgress == 1.0f) ? degrees90 : degrees00;
-    }
-
-    if (abs(degrees) == 0.0) {
+    if (abs(degrees) == 0.0f) {
         p.theta = 0;
     }
     else {

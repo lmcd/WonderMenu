@@ -70,11 +70,11 @@ void GameInfoTransitionScene::updateViews(const RenderInfo& renderInfo) {
     gameLaunchScene->updateViews(renderInfo);
     gameInfoScene->updateViews(renderInfo);
 
-    if (transition.progress > 0.25) {
+    if (transition.progress > 0.25f) {
         // Cheaper antialiasing while the cheats UI is also being drawn
         gameLaunchScene->cart3DView.flags |= CART_RENDER_REDUCED_AA;
 
-        if (transition.progress > 0.75) {
+        if (transition.progress > 0.75f) {
             gameLaunchScene->cart3DView.isHidden = true;
         }
         else {

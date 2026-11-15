@@ -115,7 +115,7 @@ void GameLaunchScene::updateViews(const RenderInfo& renderInfo) {
     labelView.align = ALIGN_CENTER;
     labelView.fontID = Fonts::INTERDISPLAY_BOLD_12;
     labelView.opacity = (1.0f - transition.progress);
-    labelView.isHidden = (transition.progress > 0.5);
+    labelView.isHidden = (transition.progress > 0.5f);
 
     int cheatsCount = state.cheatsState.enabledCheatIndexes.size();
 

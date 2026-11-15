@@ -12,7 +12,7 @@
 #include "M64File.h"
 #include "ROMFile.h"
 
-class CartLabel;
+struct CartLabel;
 
 /**
  * Combined entry containing both ROMFile and database Entry

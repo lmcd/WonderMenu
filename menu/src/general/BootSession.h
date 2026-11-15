@@ -12,6 +12,7 @@
 #include <vector>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "../../shared/src/PayloadData.h"
 #include "boot/boot.h"
@@ -40,7 +41,7 @@ extern WarmResetState warmResetState;
 // multiple of 16, so this has room for the alignment between them.
 #define DSO_CODE_MAX_SIZE (GAME_STATE_WRITE_MAX_SIZE + GAME_STATE_FRAME_DELAY_MAX_SIZE + GAME_STATE_RENDER_RECT_MAX_SIZE)
 
-struct BootSession : public Worker {
+struct BootSession final : public Worker {
 private:
     // Empty until start()
     std::optional<LoadROMToCartWorker> cartWorker;
@@ -312,7 +313,7 @@ public:
             gameInfo->romSize     = game->romFile.size;
             gameInfo->uniqueID[0] = game->romFile.uniqueID[0];
             gameInfo->uniqueID[1] = game->romFile.uniqueID[1];
-            gameInfo->region      = (uint8_t)game->romFile.regionCode;
+            gameInfo->region      = std::to_underlying(game->romFile.regionCode);
             gameInfo->version     = game->romFile.version;
 
             screenshotSettings->showOverlay  = true;

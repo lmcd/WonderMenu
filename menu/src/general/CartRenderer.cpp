@@ -18,7 +18,7 @@
 
 int matIndexes[FRAMEBUFFER_COUNT] = {0};
 
-Rect getModelScreenBoundingBox(T3DViewport& viewport, const T3DModel* model, const T3DMat4* modelMatrix) {
+static Rect getModelScreenBoundingBox(T3DViewport& viewport, const T3DModel* model, const T3DMat4* modelMatrix) {
     float minX = model->aabbMin[0];
     float minY = model->aabbMin[1];
     float minZ = model->aabbMin[2];

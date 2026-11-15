@@ -229,7 +229,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             continue;
         }
 
-        if (line.rfind("Note=", 0) == 0) {
+        if (line.starts_with("Note=")) {
             continue;
         }
 
@@ -265,7 +265,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
 
         // Beginning of game name.
         // E.g. Name=007 - The World Is Not Enough (U)
-        if (line.rfind("Name=", 0) == 0) {
+        if (line.starts_with("Name=")) {
             rootName = line.substr(5);
 
             continue;
@@ -319,7 +319,7 @@ bool CheatDatabase::parseStream(std::istream& stream, std::string& outKey)
             // "88" codes only apply while the GameShark button is held, which
             // this project has no way to offer. Drop the whole cheat: what's
             // left of it without its activator wouldn't be the same cheat.
-            if (line.rfind("88", 0) == 0) {
+            if (line.starts_with("88")) {
                 codes.resize(cheatPool[currentCheatIndex].codesStartIndex);
 
                 // The cheat is always the most recent thing pushed, both to the

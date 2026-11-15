@@ -169,10 +169,10 @@ void SceneRenderer::render(int frameNumber) {
         int bufferIndex = (frameNumber % FRAMEBUFFER_COUNT);
 
         RenderInfo renderInfo = {
-            frameNumber,
-            sceneFrameNumber,
-            bufferIndex,
-            Rect(0, 0, display_get_width(), display_get_height())
+            .frameNumber = frameNumber,
+            .sceneFrameNumber = sceneFrameNumber,
+            .bufferIndex = bufferIndex,
+            .screenRect = Rect(0, 0, display_get_width(), display_get_height())
         };
 
         currentScene->updateViews(renderInfo);
@@ -205,11 +205,11 @@ void SceneRenderer::render(int frameNumber) {
         rdpq_detach_show();
 
         UpdateInfo updateInfo = {
-            frameNumber,
-            sceneFrameNumber,
-            bufferIndex,
-            joypad_get_inputs(JOYPAD_PORT_1),
-            joypad_get_buttons_pressed(JOYPAD_PORT_1)
+            .frameNumber = frameNumber,
+            .sceneFrameNumber = sceneFrameNumber,
+            .bufferIndex = bufferIndex,
+            .joypad = joypad_get_inputs(JOYPAD_PORT_1),
+            .btn = joypad_get_buttons_pressed(JOYPAD_PORT_1)
         };
 
         currentScene->update(updateInfo);
