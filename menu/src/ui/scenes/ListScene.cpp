@@ -439,7 +439,7 @@ void ListScene::toggleRetailGroupings() {
     int newRow = 0;
     for (int i = 0; i < (int)gameGroups->size(); i++) {
         const GameGroup& group = gameGroups->at(i);
-        if (std::find(group.games.begin(), group.games.end(), game) != group.games.end()) {
+        if (std::ranges::contains(group.games, game)) {
             newRow = i;
             break;
         }
